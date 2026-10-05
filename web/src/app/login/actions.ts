@@ -1,7 +1,8 @@
 'use server';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
 
 // These run on the server when the login form is submitted.
-// For now they only check the form. In Piece 5 we connect them to Supabase.
 
 export type AuthState = { error?: string; ok?: string } | undefined;
 
@@ -15,7 +16,10 @@ export async function signIn(_prev: AuthState, form: FormData): Promise<AuthStat
   if (!EMAIL.test(email)) return { error: 'Enter an email address like name@pencilmaths.com.' };
 
   // Piece 5: check the email and password with Supabase, then redirect('/').
-  return { error: 'Sign-in is not connected yet. We connect it to Supabase in the next step.' };
+const supabase = await createClient();
+const { error } = await supabase.auth.signInWithPassword({ email, password });
+if (error) return { error: 'Email or password is incorrect.' };
+redirect('/');
 }
 
 export async function sendReset(_prev: AuthState, form: FormData): Promise<AuthState> {

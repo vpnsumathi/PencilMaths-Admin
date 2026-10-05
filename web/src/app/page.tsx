@@ -1,7 +1,19 @@
 import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { signOut } from './actions';
 
-// The home page sends people to the login page for now.
-// Once sign-in works, this becomes the dashboard.
-export default function Home() {
-  redirect('/login');
+// Temporary home page: shows who is signed in. Becomes the dashboard in Piece 8.
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const { data: staff } = await supabase.from('staff').select('full_name, role').eq('id', user.id).maybeSingle();
+
+  return (
+    <main style={{ padding: 24 }}>
+      <p>Signed in as {staff?.full_name ?? user.email} ({staff?.role ?? 'not staff'})</p>
+      <form action={signOut}><button>Sign out</button></form>
+    </main>
+  );
 }
