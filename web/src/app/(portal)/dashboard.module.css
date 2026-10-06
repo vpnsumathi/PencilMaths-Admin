@@ -1,0 +1,9 @@
+.title { margin: 0 0 20px; font-size: 24px; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.card {
+  display: flex; flex-direction: column; gap: 6px; padding: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+}
+.card span { font-size: 13px; color: var(--muted); }
+.card strong { font-size: 28px; }
+@media (min-width: 1024px) { .grid { grid-template-columns: repeat(4, 1fr); } }

@@ -1,0 +1,52 @@
+/* Mobile first: top bar + slide-in menu. Desktop (1024px+): fixed sidebar. */
+.shell { min-height: 100vh; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 12px;
+  height: 56px; padding: 0 16px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.iconButton {
+  display: grid; place-items: center; width: 40px; height: 40px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.iconButton:hover { background: var(--bg); color: var(--text); }
+.brand { font-weight: 700; color: var(--brand); }
+.brand small { margin-left: 6px; font-weight: 500; color: var(--muted); }
+
+.backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(15, 23, 42, 0.4); }
+
+.sidebar {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 30;
+  display: flex; flex-direction: column; width: 264px; padding: 16px;
+  background: var(--surface); border-right: 1px solid var(--border);
+  transform: translateX(-100%); transition: transform 0.2s ease;
+}
+.open { transform: translateX(0); }
+.sidebarHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-left: 8px; }
+
+.nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.link {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border-radius: 12px; color: var(--muted); font-weight: 500; text-decoration: none;
+}
+.link:hover { background: var(--bg); color: var(--text); }
+.active, .active:hover { background: var(--brand-ring); color: var(--brand-strong); }
+.disabled, .disabled:hover { background: none; color: var(--subtle); cursor: default; }
+.disabled em { margin-left: auto; font-size: 11px; font-style: normal; }
+
+.user {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 12px 0 0 8px; border-top: 1px solid var(--border);
+}
+.user strong { display: block; font-size: 14px; }
+.user span { font-size: 12px; color: var(--muted); text-transform: capitalize; }
+
+.main { padding: 24px 16px; }
+
+@media (min-width: 1024px) {
+  .topbar, .backdrop, .close { display: none; }
+  .sidebar { transform: none; transition: none; }
+  .main { margin-left: 264px; padding: 32px; }
+}

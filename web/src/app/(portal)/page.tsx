@@ -1,19 +1,36 @@
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { signOut } from '@/app/actions';
+import styles from './dashboard.module.css';
 
-// Temporary home page: shows who is signed in. Becomes the dashboard in Piece 8.
-export default async function Home() {
+export const metadata = { title: 'Dashboard' };
+
+export default async function Dashboard() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  // head: true returns only the count, not the rows. All four run at the same time.
+  const [students, teachers, batches, enquiries] = await Promise.all([
+    supabase.from('students').select('id', { count: 'exact', head: true }).neq('status', 'left'),
+    supabase.from('teachers').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+    supabase.from('batches').select('id', { count: 'exact', head: true }).is('closed_on', null),
+    supabase.from('enquiries').select('id', { count: 'exact', head: true }).not('stage', 'in', '(enrolled,not_proceeding)'),
+  ]);
 
-  const { data: staff } = await supabase.from('staff').select('full_name, role').eq('id', user.id).maybeSingle();
+  const cards = [
+    { label: 'Active students', value: students.count },
+    { label: 'Active teachers', value: teachers.count },
+    { label: 'Open batches', value: batches.count },
+    { label: 'Open enquiries', value: enquiries.count },
+  ];
 
   return (
-    <main style={{ padding: 24 }}>
-      <p>Signed in as {staff?.full_name ?? user.email} ({staff?.role ?? 'not staff'})</p>
-      <form action={signOut}><button>Sign out</button></form>
-    </main>
+    <>
+      <h1 className={styles.title}>Dashboard</h1>
+      <div className={styles.grid}>
+        {cards.map((c) => (
+          <div key={c.label} className={styles.card}>
+            <span>{c.label}</span>
+            <strong>{c.value ?? '–'}</strong>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

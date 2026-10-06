@@ -78,3 +78,15 @@ export const PencilIcon = (p: IconProps) => (
     <path d="m15 5 4 4" />
   </Icon>
 );
+export const HomeIcon = (p: IconProps) => (
+  <Icon {...p}><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></Icon>
+);
+export const MenuIcon = (p: IconProps) => (
+  <Icon {...p}><path d="M4 6h16M4 12h16M4 18h16" /></Icon>
+);
+export const XIcon = (p: IconProps) => (
+  <Icon {...p}><path d="M18 6 6 18M6 6l12 12" /></Icon>
+);
+export const LogOutIcon = (p: IconProps) => (
+  <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></Icon>
+);

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { AppShell } from '@/components/AppShell';
 
 // Every page inside (portal) is for active staff only.
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -8,8 +9,8 @@ export default async function PortalLayout({ children }: { children: React.React
   if (!user) redirect('/login');
 
   // The security rules only return this row if the user is active staff.
-  const { data: staff } = await supabase.from('staff').select('id').eq('id', user.id).maybeSingle();
+  const { data: staff } = await supabase.from('staff').select('full_name, role').eq('id', user.id).maybeSingle();
   if (!staff) redirect('/no-access');
 
-  return <>{children}</>;
+  return <AppShell staff={staff}>{children}</AppShell>;
 }
