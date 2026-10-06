@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { signOut } from './actions';
+import { signOut } from '@/app/actions';
 
 // Temporary home page: shows who is signed in. Becomes the dashboard in Piece 8.
 export default async function Home() {
