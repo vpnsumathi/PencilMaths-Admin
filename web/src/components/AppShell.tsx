@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { signOut } from '@/app/actions';
 import styles from './AppShell.module.css';
 import {
-  CalendarIcon, HomeIcon, LogOutIcon, MailIcon, MenuIcon, PencilIcon, ShieldCheckIcon, UsersIcon, XIcon,
+  BookIcon, CalendarIcon, HomeIcon, LogOutIcon, MailIcon, MenuIcon, PencilIcon, ShieldCheckIcon, UsersIcon, XIcon,
 } from './icons';
 
 type Staff = { full_name: string; role: string };
@@ -14,12 +14,15 @@ type Staff = { full_name: string; role: string };
 // Sidebar links. ready: false shows the link greyed out until that screen is built.
 const NAV = [
   { href: '/', label: 'Dashboard', icon: HomeIcon, ready: true },
-  { href: '/students', label: 'Students', icon: UsersIcon, ready: false },
-  { href: '/teachers', label: 'Teachers', icon: PencilIcon, ready: false },
-  { href: '/batches', label: 'Batches', icon: CalendarIcon, ready: false },
+  { href: '/students', label: 'Students', icon: UsersIcon, ready: true },
+  { href: '/teachers', label: 'Teachers', icon: PencilIcon, ready: true },
+  { href: '/batches', label: 'Batches', icon: CalendarIcon, ready: true },
   { href: '/enquiries', label: 'Enquiries', icon: MailIcon, ready: false },
 ];
-const ADMIN_NAV = [{ href: '/staff', label: 'Staff', icon: ShieldCheckIcon, ready: true }];
+const ADMIN_NAV = [
+  { href: '/subjects', label: 'Subjects', icon: BookIcon, ready: true },
+  { href: '/staff', label: 'Staff', icon: ShieldCheckIcon, ready: true },
+];
 
 export function AppShell({ staff, children }: { staff: Staff; children: React.ReactNode }) {
   const pathname = usePathname();

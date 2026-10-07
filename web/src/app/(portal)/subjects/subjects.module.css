@@ -1,0 +1,87 @@
+/* Styles for the Subjects and Curriculum pages. */
+.title { margin: 0 0 6px; font-size: 24px; }
+.lead { margin: 0 0 20px; max-width: 640px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.back { display: inline-block; margin-bottom: 12px; color: var(--muted); font-size: 14px; text-decoration: none; }
+.back:hover { color: var(--brand); }
+.empty { color: var(--muted); }
+
+.alert { margin: 0 0 16px; padding: 12px 16px; border-radius: 14px; font-size: 14px; border: 1px solid; }
+.alertOk { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-border); }
+.alertError { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
+
+/* "Add" forms: stacked on phones, one row on desktop. */
+.panel {
+  display: grid; gap: 10px; margin-bottom: 20px; padding: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+}
+
+/* On narrow screens the table scrolls sideways instead of squashing. */
+.tableWrap {
+  overflow-x: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+}
+.table { width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap; }
+.table th {
+  padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+.table td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.table tr:last-child td { border-bottom: 0; }
+
+.inline { display: flex; gap: 8px; align-items: center; }
+.grow { flex: 1; min-width: 0; }
+
+.input, .select {
+  padding: 7px 12px; border: 1px solid var(--border-strong); border-radius: 10px;
+  font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
+}
+.input:focus, .select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+
+.button, .dangerButton {
+  padding: 6px 12px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text);
+}
+.button:hover { border-color: var(--brand); color: var(--brand); }
+.dangerButton { border-color: var(--danger-border); color: var(--danger); }
+.dangerButton:hover { background: var(--danger-soft); }
+.primaryButton {
+  padding: 8px 16px; border: 0; border-radius: 10px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; background: var(--brand); color: #fff;
+}
+.primaryButton:hover { background: var(--brand-strong); }
+.iconButton {
+  display: grid; place-items: center; width: 32px; height: 32px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted);
+}
+.iconButton:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.iconButton:disabled { opacity: 0.35; cursor: default; }
+
+.link { color: var(--brand); font-weight: 500; text-decoration: none; }
+.link:hover { text-decoration: underline; }
+
+.active, .inactive { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.active { background: var(--ok-soft); color: var(--ok); }
+.inactive { background: var(--danger-soft); color: var(--danger); }
+
+/* Curriculum topics */
+.group { margin-bottom: 24px; }
+.group h2 { margin: 0 0 10px; font-size: 15px; color: var(--muted); }
+.topicList {
+  margin: 0; padding: 0; list-style: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+}
+.topic {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.topic:last-child { border-bottom: 0; }
+.number {
+  display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0;
+  border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 13px; font-weight: 600;
+}
+
+@media (min-width: 1024px) {
+  .panel { grid-template-columns: 1fr auto auto; align-items: center; }
+  .topic { flex-wrap: nowrap; }
+}

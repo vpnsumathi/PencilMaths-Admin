@@ -1,0 +1,95 @@
+/* Shared styles for the portal's list and form pages (Students, Teachers, Batches). */
+
+/* Page header */
+.header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.title { margin: 0; font-size: 24px; }
+.subtitle { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.back { display: inline-block; margin-bottom: 12px; color: var(--muted); font-size: 14px; text-decoration: none; }
+.back:hover { color: var(--brand); }
+.empty { color: var(--muted); }
+.muted { color: var(--muted); }
+
+/* Messages */
+.alert { margin: 0 0 16px; padding: 12px 16px; border-radius: 14px; font-size: 14px; border: 1px solid; }
+.alertOk { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-border); }
+.alertError { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
+
+/* Search and filter bar */
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+/* Tables: scroll sideways on narrow screens instead of squashing */
+.tableWrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap; }
+.table th {
+  padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+.table td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.table tr:last-child td { border-bottom: 0; }
+
+.link { color: var(--brand); font-weight: 500; text-decoration: none; }
+.link:hover { text-decoration: underline; }
+
+/* Inputs */
+.input, .select, .textarea {
+  padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 10px;
+  font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
+}
+.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+.textarea { min-height: 90px; resize: vertical; }
+
+/* Buttons (primaryButton also styles links that look like buttons) */
+.button, .dangerButton {
+  padding: 7px 14px; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); text-decoration: none;
+}
+.button:hover { border-color: var(--brand); color: var(--brand); }
+.dangerButton { border-color: var(--danger-border); color: var(--danger); }
+.dangerButton:hover { background: var(--danger-soft); }
+.primaryButton {
+  display: inline-block; padding: 8px 16px; border: 0; border-radius: 10px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; background: var(--brand); color: #fff; text-decoration: none;
+}
+.primaryButton:hover { background: var(--brand-strong); }
+
+/* Status badges */
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.badgeOk { background: var(--ok-soft); color: var(--ok); }
+.badgeDanger { background: var(--danger-soft); color: var(--danger); }
+.badgeBrand { background: var(--brand-ring); color: var(--brand-strong); }
+.badgeMuted { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+
+/* Forms */
+.form { display: grid; gap: 16px; max-width: 900px; }
+.card { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+.card h2 { margin: 0 0 12px; font-size: 16px; }
+.fieldGrid { display: grid; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field .input, .field .select, .field .textarea { width: 100%; }
+.label { font-size: 13px; font-weight: 500; color: var(--muted); }
+.hint { margin: -4px 0 12px; font-size: 13px; color: var(--muted); }
+.formActions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Student form: one row per subject */
+.subjectRow { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--border); }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.check input { width: 18px; height: 18px; accent-color: var(--brand); }
+
+/* Batch form: one row per weekly time */
+.slotRow { display: flex; gap: 8px; margin-bottom: 8px; }
+
+/* Simple lists inside cards (batch members, lesson plan) */
+.list { margin: 0; padding: 0; list-style: none; }
+.list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+.list li:first-child { border-top: 0; }
+.columns { display: grid; gap: 16px; margin-top: 16px; }
+
+@media (min-width: 768px) {
+  .fieldGrid { grid-template-columns: 1fr 1fr; }
+  .full { grid-column: 1 / -1; }
+  .subjectRow { grid-template-columns: 180px 1fr 1fr; align-items: center; }
+}
+@media (min-width: 1024px) {
+  .columns { grid-template-columns: 1fr 1fr; }
+}
