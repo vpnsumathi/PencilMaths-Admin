@@ -21,3 +21,20 @@
 .active, .inactive { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
 .active { background: var(--ok-soft); color: var(--ok); }
 .inactive { background: var(--danger-soft); color: var(--danger); }
+
+.alert { margin: 0 0 16px; padding: 12px 16px; border-radius: 14px; font-size: 14px; border: 1px solid; }
+.alertOk { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-border); }
+.alertError { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
+
+.inline { display: flex; gap: 8px; align-items: center; }
+.select {
+  padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 10px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: 14px;
+}
+.button, .dangerButton {
+  padding: 6px 12px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text);
+}
+.button:hover { border-color: var(--brand); color: var(--brand); }
+.dangerButton { border-color: var(--danger-border); color: var(--danger); }
+.dangerButton:hover { background: var(--danger-soft); }
