@@ -19,7 +19,7 @@ const NAV = [
   { href: '/batches', label: 'Batches', icon: CalendarIcon, ready: false },
   { href: '/enquiries', label: 'Enquiries', icon: MailIcon, ready: false },
 ];
-const ADMIN_NAV = [{ href: '/staff', label: 'Staff', icon: ShieldCheckIcon, ready: false }];
+const ADMIN_NAV = [{ href: '/staff', label: 'Staff', icon: ShieldCheckIcon, ready: true }];
 
 export function AppShell({ staff, children }: { staff: Staff; children: React.ReactNode }) {
   const pathname = usePathname();

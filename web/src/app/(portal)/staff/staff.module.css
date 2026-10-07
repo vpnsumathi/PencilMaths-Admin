@@ -1,0 +1,23 @@
+.title { margin: 0 0 20px; font-size: 24px; }
+
+/* On narrow screens the table scrolls sideways instead of squashing. */
+.tableWrap {
+  overflow-x: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+}
+.table { width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap; }
+.table th {
+  padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+.table td { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.table tr:last-child td { border-bottom: 0; }npm
+
+.you {
+  margin-left: 8px; padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; background: var(--brand-ring); color: var(--brand-strong);
+}
+.active, .inactive { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.active { background: var(--ok-soft); color: var(--ok); }
+.inactive { background: var(--danger-soft); color: var(--danger); }

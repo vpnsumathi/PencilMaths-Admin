@@ -28,11 +28,11 @@ export async function sendReset(_prev: AuthState, form: FormData): Promise<AuthS
   if (!email) return { error: 'Enter your email address first.' };
   if (!EMAIL.test(email)) return { error: 'Enter an email address like name@pencilmaths.com.' };
 
-  // Piece 5: ask Supabase to email a reset link.
+  // ask Supabase to email a reset link. 
 const supabase = await createClient();
 const { error } = await supabase.auth.resetPasswordForEmail(email, {
   redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/reset-password`,
 });
-if (error) console.error('sendReset failed:', error.message);
-return { ok: 'If that email belongs to a staff account, a reset link is on its way.' };
+    if (error) console.error('sendReset failed:', error.message);
+    return { ok: 'If that email belongs to a staff account, a reset link is on its way.' };
 }
