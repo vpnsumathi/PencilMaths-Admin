@@ -1,0 +1,11 @@
+{
+  "name": "pencilmaths-admin",
+  "version": "1.0.0",
+  "description": "Admin modules application for PencilMaths",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "license": "MIT"
+}
