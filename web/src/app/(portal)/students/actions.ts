@@ -85,3 +85,22 @@ export async function createDriveFolder(form: FormData) {
     driveOk ? 'Drive folder created.' : 'Could not create the Drive folder. Check the connection at /google-drive.',
   );
 }
+// Makes a new secret hand-in code; the old WhatsApp link stops working immediately.
+export async function resetHandInLink(form: FormData) {
+  const id = text(form, 'id');
+  if (!UUID.test(id)) redirectWith('/students', 'error', 'Student not found.');
+  const path = `/students/${id}`;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('students')
+    .update({ handin_code: crypto.randomUUID().replaceAll('-', '') })
+    .eq('id', id)
+    .select('id');
+  if (error || data.length === 0) {
+    console.error('resetHandInLink failed:', error?.message ?? 'no rows updated');
+    redirectWith(path, 'error', 'Could not reset the link.');
+  }
+  revalidatePath(path);
+  redirectWith(path, 'ok', 'New hand-in link created. The old link no longer works.');
+}

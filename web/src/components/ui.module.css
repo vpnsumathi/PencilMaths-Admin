@@ -93,3 +93,8 @@
 @media (min-width: 1024px) {
   .columns { grid-template-columns: 1fr 1fr; }
 }
+
+/* Batch page: one collapsible block per homework */
+.homework { padding: 12px 0; border-top: 1px solid var(--border); }
+.homework summary { padding: 4px 0 12px; cursor: pointer; }
+.files { display: inline-flex; flex-wrap: wrap; gap: 8px; }

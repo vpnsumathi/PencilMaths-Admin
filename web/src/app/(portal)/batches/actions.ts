@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirectWith, text } from '@/lib/form';
+import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { todayInUk, UUID, YEARS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
@@ -134,4 +134,102 @@ export async function setBatchClosed(form: FormData) {
   revalidatePath(path);
   revalidatePath('/');
   redirectWith(path, 'ok', close ? 'Batch closed.' : 'Batch reopened.');
+}
+
+/* ---------- Homework (Phase 5) ---------- */
+
+// Sets homework for the whole batch, with a "not handed in" result for each current student.
+export async function createHomework(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  if (!UUID.test(batchId)) redirectWith('/batches', 'error', 'Batch not found.');
+  const path = `/batches/${batchId}`;
+  const title = text(form, 'title');
+  const setOn = text(form, 'set_on') || todayInUk();
+  const dueOn = optional(form, 'due_on');
+  const maxMark = optionalNumber(form, 'max_mark');
+  if (!title) redirectWith(path, 'error', 'Enter a homework title.');
+  if (dueOn && dueOn < setOn) redirectWith(path, 'error', 'The due date cannot be before the date it is set.');
+  if (maxMark !== null && !(maxMark > 0)) redirectWith(path, 'error', 'The maximum mark must be more than 0.');
+
+  const supabase = await createClient();
+  const { data: sheet, error } = await supabase
+    .from('homework_sheets')
+    .insert({ batch_id: batchId, title, set_on: setOn, due_on: dueOn, max_mark: maxMark })
+    .select('id')
+    .single();
+  if (error) {
+    console.error('createHomework failed:', error.message);
+    redirectWith(path, 'error', 'Could not set the homework.');
+  }
+
+  // One "pending" result per current student, so reports count anyone who hasn't handed it in.
+  const { data: members } = await supabase.from('enrolments').select('student_id').eq('batch_id', batchId).is('ended_on', null);
+  if (members?.length) {
+    const { error: resultError } = await supabase
+      .from('homework_results')
+      .insert(members.map((m) => ({ sheet_id: sheet.id, student_id: m.student_id })));
+    if (resultError) console.error('createHomework results failed:', resultError.message);
+  }
+
+  revalidatePath(path);
+  revalidatePath('/');
+  redirectWith(path, 'ok', `Homework set for ${members?.length ?? 0} student(s). It is now on their hand-in links.`);
+}
+
+// Records a mark, or "excused", for one student's homework.
+export async function markHomework(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const sheetId = text(form, 'sheet_id');
+  const studentId = text(form, 'student_id');
+  if (![batchId, sheetId, studentId].every((v) => UUID.test(v))) redirectWith('/batches', 'error', 'Homework not found.');
+  const path = `/batches/${batchId}`;
+  const excuse = form.get('excuse') === 'true';
+  const mark = optionalNumber(form, 'mark');
+
+  const supabase = await createClient();
+  // The maximum mark comes from the database, not the form, so it can't be tampered with.
+  const { data: sheet } = await supabase
+    .from('homework_sheets').select('max_mark').eq('id', sheetId).eq('batch_id', batchId).maybeSingle();
+  if (!sheet) redirectWith(path, 'error', 'Homework not found.');
+  if (!excuse) {
+    if (mark === null || !(mark >= 0)) redirectWith(path, 'error', 'Enter a mark of 0 or more.');
+    if (sheet.max_mark !== null && mark > sheet.max_mark) redirectWith(path, 'error', `The mark can't be more than ${sheet.max_mark}.`);
+  }
+
+  const row = excuse
+    ? { status: 'excused', mark: null, marked_on: null }
+    : { status: 'marked', mark, marked_on: todayInUk() };
+  // upsert = update the result if it exists, otherwise add it.
+  const { error } = await supabase
+    .from('homework_results')
+    .upsert({ sheet_id: sheetId, student_id: studentId, ...row }, { onConflict: 'sheet_id,student_id' });
+  if (error) {
+    console.error('markHomework failed:', error.message);
+    redirectWith(path, 'error', 'Could not save the mark.');
+  }
+
+  revalidatePath(path);
+  revalidatePath('/');
+  redirectWith(path, 'ok', excuse ? 'Marked as excused.' : 'Mark saved.');
+}
+
+// Deletes a homework and its results. Handed-in files stay in Google Drive.
+export async function deleteHomework(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const sheetId = text(form, 'sheet_id');
+  if (!UUID.test(batchId) || !UUID.test(sheetId)) redirectWith('/batches', 'error', 'Homework not found.');
+  const path = `/batches/${batchId}`;
+
+  const supabase = await createClient();
+  // file_links rows point at the sheet without a database link, so remove them by hand.
+  await supabase.from('file_links').delete().eq('owner_type', 'homework_submission').eq('owner_id', sheetId);
+  const { data, error } = await supabase.from('homework_sheets').delete().eq('id', sheetId).eq('batch_id', batchId).select('id');
+  if (error || data.length === 0) {
+    console.error('deleteHomework failed:', error?.message ?? 'no rows deleted');
+    redirectWith(path, 'error', 'Could not delete the homework.');
+  }
+
+  revalidatePath(path);
+  revalidatePath('/');
+  redirectWith(path, 'ok', 'Homework deleted. Any handed-in files are still in Google Drive.');
 }

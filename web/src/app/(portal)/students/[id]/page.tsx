@@ -7,6 +7,7 @@ import { formatPercent } from '@/lib/format';
 import { STUDENT_STATUSES, UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { createDriveFolder } from '../actions';
+import { HandInLink } from '../HandInLink';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
 
 export const metadata = { title: 'Student' };
@@ -24,7 +25,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
   const supabase = await createClient();
   const { data: student } = await supabase
     .from('students')
-    .select('id, code, family_id, first_name, last_name, year_group, school, date_of_birth, status, start_date')
+    .select('id, code, family_id, first_name, last_name, year_group, school, date_of_birth, status, start_date, handin_code')
     .eq('id', id)
     .maybeSingle();
   if (!student) notFound();
@@ -64,6 +65,14 @@ export default async function StudentPage({ params, searchParams }: Props) {
           <p style={{ margin: '0 0 12px' }}>This student has no Google Drive folder yet.</p>
           <button className={ui.primaryButton}>Create Drive folder</button>
         </form>
+      )}
+      {student.status !== 'left' && (
+        <HandInLink
+          studentId={student.id}
+          firstName={student.first_name}
+          url={`${process.env.NEXT_PUBLIC_SITE_URL}/h/${student.handin_code}`}
+          hasFolder={folder?.provider === 'google_drive'}
+        />
       )}
       <StudentForm
         student={student as Student}

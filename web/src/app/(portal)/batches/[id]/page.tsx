@@ -8,6 +8,7 @@ import { STUDENT_STATUSES, UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { setBatchClosed } from '../actions';
 import { BatchForm } from '../BatchForm';
+import { HomeworkSection } from '../HomeworkSection';
 
 export const metadata = { title: 'Batch' };
 
@@ -109,6 +110,8 @@ export default async function BatchPage({ params, searchParams }: Props) {
           )}
         </section>
       </div>
+
+      <HomeworkSection batchId={batch.id} members={students} />
     </>
   );
 }

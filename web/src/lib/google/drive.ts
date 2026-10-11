@@ -70,3 +70,26 @@ export async function createStudentFolder(student: { code: string; first_name: s
   const homework = await findOrCreateFolder('Homework', folder.id);
   return { folder, homework };
 }
+const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+
+// Uploads one file into a Drive folder; returns its id and link.
+// "multipart" = one request carrying two parts: the file's details (JSON) and its contents.
+export async function uploadFile(parentId: string, name: string, mimeType: string, data: ArrayBuffer) {
+  const boundary = `pm-${crypto.randomUUID()}`;
+  const body = new Blob([
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
+    JSON.stringify({ name, parents: [parentId] }),
+    `\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    data,
+    `\r\n--${boundary}--`,
+  ]);
+  const res = await fetch(`${UPLOAD}?uploadType=multipart&fields=id,webViewLink`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${await accessToken()}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+    cache: 'no-store',
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Google Drive upload error: ${json.error?.message ?? res.status}`);
+  return json as { id: string; webViewLink: string };
+}

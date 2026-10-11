@@ -1,0 +1,34 @@
+/* Public hand-in page: designed for phones first. */
+.page { max-width: 480px; margin: 0 auto; padding: 24px 16px 48px; }
+.page h2 { margin: 28px 0 12px; font-size: 16px; color: var(--muted); }
+.head h1 { margin: 4px 0 6px; font-size: 26px; }
+.brand { margin: 0; font-weight: 700; color: var(--brand); }
+.muted { margin: 0; color: var(--muted); font-size: 14px; }
+
+.card { margin-bottom: 12px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+.card h3 { margin: 2px 0 4px; font-size: 18px; }
+.subject { margin: 0; font-size: 12px; font-weight: 600; color: var(--brand); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.handin { display: grid; gap: 8px; margin-top: 14px; }
+
+/* "Take a photo or choose a file": the whole box is clickable (hand cursor). */
+.pick {
+  display: block; padding: 14px; text-align: center; cursor: pointer;
+  border: 2px dashed var(--border-strong); border-radius: 14px; font-weight: 600; color: var(--text);
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.pick:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-ring); }
+.chosen { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+
+/* "Hand in": always clickable (hand cursor); only greyed out while files are being sent. */
+.send {
+  padding: 14px; border: 0; border-radius: 14px; cursor: pointer;
+  font: inherit; font-size: 16px; font-weight: 700; background: var(--brand); color: #fff;
+  transition: background 0.15s;
+}
+.send:hover { background: var(--brand-strong); }
+.send:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-ring); }
+.send:disabled { opacity: 0.6; cursor: wait; }
+
+.ok { margin: 0; color: var(--ok); font-weight: 600; text-align: center; }
+.error { margin: 0; color: var(--danger); font-weight: 600; text-align: center; }

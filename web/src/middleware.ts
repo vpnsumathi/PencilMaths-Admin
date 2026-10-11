@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 type CookieList = { name: string; value: string; options: CookieOptions }[];
 
 // Pages anyone can open without signing in.
-const PUBLIC_PATHS = ['/login', '/auth'];
+const PUBLIC_PATHS = ['/login', '/auth', '/h/'];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
