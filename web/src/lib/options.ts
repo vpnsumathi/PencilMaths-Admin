@@ -29,3 +29,19 @@ export const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export function todayInUk() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
 }
+// Enquiry (lead) stages in order, matching the enquiry_stage enum.
+export const ENQUIRY_STAGES: Record<string, string> = {
+  new: 'New',
+  assessment_sent: 'Assessment sent',
+  assessment_returned: 'Assessment returned',
+  results_shared: 'Results shared',
+  confirmed: 'Confirmed',
+  enrolled: 'Enrolled',
+  not_proceeding: 'Not proceeding',
+};
+export const OPEN_STAGES = ['new', 'assessment_sent', 'assessment_returned', 'results_shared', 'confirmed'];
+
+// Badge colour for a stage: enrolled = green, not proceeding = red, open = blue.
+export function stageTone(stage: string) {
+  return stage === 'enrolled' ? 'active' : stage === 'not_proceeding' ? 'left' : 'trial';
+}

@@ -17,7 +17,7 @@ const NAV = [
   { href: '/students', label: 'Students', icon: UsersIcon, ready: true },
   { href: '/teachers', label: 'Teachers', icon: PencilIcon, ready: true },
   { href: '/batches', label: 'Batches', icon: CalendarIcon, ready: true },
-  { href: '/enquiries', label: 'Enquiries', icon: MailIcon, ready: false },
+  { href: '/enquiries', label: 'Enquiries', icon: MailIcon, ready: true },
 ];
 const ADMIN_NAV = [
   { href: '/subjects', label: 'Subjects', icon: BookIcon, ready: true },

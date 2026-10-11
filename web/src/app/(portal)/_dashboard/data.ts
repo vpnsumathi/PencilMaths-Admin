@@ -213,7 +213,7 @@ export async function loadDashboard(days: number) {
       tone: 'info', kind: 'enquiry',
       title: `${e.child_first_name} ${e.child_last_name}: waiting ${waiting} days`,
       detail: PIPELINE.find((p) => p.stage === e.stage)?.label ?? e.stage,
-      href: '/', // Enquiries screen is not built yet
+      href: `/enquiries/${e.id}`,
     });
   }
   for (const b of openBatches.filter((b) => b.member_count >= b.capacity)) {
