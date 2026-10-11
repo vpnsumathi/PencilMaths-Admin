@@ -1,13 +1,13 @@
 # PencilMaths-Admin — Project Help Guide
 
 > **Living document.** Update this file every time you change the project (see [How to update this guide](#15-how-to-update-this-guide)).
-> Keep it in the repository at `PencilMaths-Admin/docs/HELP.md` and commit it together with the change it describes.
+> Keep it in the repository at `PencilMaths-Admin/Help/project-guide.md` and commit it together with the change it describes.
 
 | | |
 |---|---|
 | **Last updated** | 5 October 2026 |
 | **Current stage** | Piece 4 done (project created, login page designed). Next: Piece 5, connect the app to Supabase. |
-| **Where this guide lives** | `PencilMaths-Admin/docs/HELP.md` (master copy). A copy is kept in the Claude project's files. |
+| **Where this guide lives** | `PencilMaths-Admin/Help/project-guide.md` (master copy). A copy is kept in the Claude project's files. |
 | **Reference project** | `pencil-maths-portal-phase1/pencil-portal` (the original phase 1 portal, used as a guide; we do not edit it) |
 
 ---
@@ -110,8 +110,11 @@ Understanding these words makes the rest of the project easy to follow.
 ```
 PencilMaths-Admin/                 ← the project folder (one Git repository)
 ├── .git/                          ← Git's history (hidden; never edit)
-├── docs/
-│   └── HELP.md                    ← this guide
+├── Help/                          ← help guides
+│   ├── project-guide.md           ← this guide (setup, workflow, decisions, roadmap, change log)
+│   ├── features-core-admin-screens.md ← Staff, Subjects, Teachers, Batches, Students, dashboard, Vercel
+│   ├── help_enquiry.md            ← Enquiries (leads)
+│   └── SUPABASE.md                ← database scripts and tables
 ├── supabase/
 │   ├── migrations/                ← database scripts, run in order
 │   │   ├── 20260928000001_schema.sql
@@ -144,7 +147,7 @@ PencilMaths-Admin/                 ← the project folder (one Git repository)
 
 **Rule of thumb:** a folder inside `src/app` with a `page.tsx` becomes a web page. `src/app/login/page.tsx` → `http://localhost:3000/login`.
 
-**Why the app lives in `web/`:** npm does not allow capital letters in app names, so `PencilMaths-Admin` cannot be the app folder itself. Keeping the app in `web/` also leaves room for `supabase/` and `docs/` beside it.
+**Why the app lives in `web/`:** npm does not allow capital letters in app names, so `PencilMaths-Admin` cannot be the app folder itself. Keeping the app in `web/` also leaves room for `supabase/` and `Help/` beside it.
 
 ---
 
@@ -824,11 +827,11 @@ Update this file **in the same commit** as the change it describes.
 
 You can also ask Claude, in the PencilMaths Admin project, to add new help information. Claude will:
 
-1. Put the information in the right section of `docs/HELP.md` (or add a new section and list it in Contents).
+1. Put the information in the right section of `Help/project-guide.md` (or add a new section and list it in Contents).
 2. Update **Last updated** at the top and add a change log entry (section 17).
 3. Share the updated file back in the project so the project's copy matches.
 
-You then commit `docs/HELP.md` as usual (section 11).
+You then commit `Help/project-guide.md` as usual (section 11).
 
 ---
 
