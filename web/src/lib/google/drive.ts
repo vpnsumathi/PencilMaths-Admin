@@ -63,3 +63,10 @@ export async function studentsRootFolder() {
   const root = await findOrCreateFolder('PencilMaths');
   return findOrCreateFolder('Students', root.id);
 }
+// PencilMaths / Students / <code> <name> / Homework. Returns the student folder and its Homework folder.
+export async function createStudentFolder(student: { code: string; first_name: string; last_name: string }) {
+  const students = await studentsRootFolder();
+  const folder = await findOrCreateFolder(`${student.code} ${student.first_name} ${student.last_name}`, students.id);
+  const homework = await findOrCreateFolder('Homework', folder.id);
+  return { folder, homework };
+}

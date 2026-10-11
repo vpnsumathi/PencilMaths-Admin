@@ -39,12 +39,12 @@ type Props = {
   student?: Student;
   guardian?: Guardian | null;
   enrolments?: Enrolment[];
-  folderUrl?: string | null;
+  folder?: { url: string | null; provider: string } | null;
   options: Options;
 };
 
 // Used by "Add student" (no student) and the student page.
-export function StudentForm({ student, guardian, enrolments = [], folderUrl, options }: Props) {
+export function StudentForm({ student, guardian, enrolments = [], folder, options }: Props) {
   const bySubject = new Map(enrolments.map((e) => [e.subject_id, e]));
   // Active subjects, plus any switched-off subject this student still takes.
   const subjects = options.subjects.filter((s) => s.active || bySubject.has(s.id));
@@ -137,9 +137,17 @@ export function StudentForm({ student, guardian, enrolments = [], folderUrl, opt
 
       <section className={ui.card}>
         <h2>Student folder</h2>
-        <Field label="Link to the student's folder (e.g. Google Drive)">
-          <input name="folder_url" type="url" placeholder="https://…" defaultValue={folderUrl ?? ''} className={ui.input} />
-        </Field>
+        {folder?.provider === 'google_drive' ? (
+          // Created by the app. No input here, so saving the form never changes it.
+          <p>
+            <a href={folder.url ?? '#'} target="_blank" rel="noreferrer" className={ui.link}>Open the Google Drive folder →</a>
+            <br /><span className={ui.muted}>Created by the app. Homework uploads go in its Homework folder.</span>
+          </p>
+        ) : (
+          <Field label="Link to the student's folder (e.g. Google Drive)">
+            <input name="folder_url" type="url" placeholder="https://…" defaultValue={folder?.url ?? ''} className={ui.input} />
+          </Field>
+        )}
       </section>
 
       <div className={ui.formActions}>

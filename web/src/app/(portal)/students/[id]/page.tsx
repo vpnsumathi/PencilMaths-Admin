@@ -6,6 +6,7 @@ import ui from '@/components/ui.module.css';
 import { formatPercent } from '@/lib/format';
 import { STUDENT_STATUSES, UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
+import { createDriveFolder } from '../actions';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
 
 export const metadata = { title: 'Student' };
@@ -38,7 +39,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
           .maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from('enrolments').select('id, subject_id, teacher_id, batch_id').eq('student_id', id).is('ended_on', null),
-    supabase.from('file_links').select('url').eq('student_id', id).eq('owner_type', 'student_folder').maybeSingle(),
+    supabase.from('file_links').select('url, provider').eq('student_id', id).eq('owner_type', 'student_folder').maybeSingle(),
     supabase.from('student_stats').select('attendance_pct, homework_pct').eq('student_id', id).maybeSingle(),
     loadStudentFormOptions(),
   ]);
@@ -57,11 +58,18 @@ export default async function StudentPage({ params, searchParams }: Props) {
         <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
       </div>
       <Alerts ok={ok} problem={problem} />
+      {folder?.provider !== 'google_drive' && (
+        <form action={createDriveFolder} className={ui.card} style={{ marginBottom: 16, maxWidth: 900 }}>
+          <input type="hidden" name="id" value={student.id} />
+          <p style={{ margin: '0 0 12px' }}>This student has no Google Drive folder yet.</p>
+          <button className={ui.primaryButton}>Create Drive folder</button>
+        </form>
+      )}
       <StudentForm
         student={student as Student}
         guardian={guardian as Guardian | null}
         enrolments={(enrolments ?? []) as Enrolment[]}
-        folderUrl={folder?.url}
+        folder={folder}
         options={options}
       />
     </>

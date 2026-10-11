@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { EMAIL, ENQUIRY_STAGES, UUID, YEARS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
+import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
 
 // Adds a lead, or updates one when the form includes an id.
 export async function saveEnquiry(form: FormData) {
@@ -139,5 +140,16 @@ export async function convertToStudent(form: FormData) {
   revalidatePath('/enquiries');
   revalidatePath('/students');
   revalidatePath('/');
-  redirectWith(`/students/${studentId}`, 'ok', 'Student created from the enquiry. Now choose their batches.');
+  // Give the new student a Google Drive folder. A Drive problem must not undo the conversion.
+const driveOk = await ensureStudentDriveFolder(studentId).then(
+  () => true,
+  (err) => { console.error('Drive folder failed:', err); return false; },
+);
+redirectWith(
+  `/students/${studentId}`,
+  driveOk ? 'ok' : 'error',
+  driveOk
+    ? 'Student and Drive folder created. Now choose their batches.'
+    : 'Student created, but the Drive folder could not be made. Use "Create Drive folder" below.',
+);
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirectWith, text } from '@/lib/form';
 import { STUDENT_STATUSES, UUID, YEARS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
+import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
 
 // Adds or updates a student. The database function save_student (file 4) saves the student,
 // family, main parent, subjects and folder link together, so a half-saved student is impossible.
@@ -55,5 +56,32 @@ export async function saveStudent(form: FormData) {
   revalidatePath('/students');
   revalidatePath('/batches');
   revalidatePath('/');
-  redirectWith(`/students/${studentId}`, 'ok', id ? 'Student updated.' : 'Student added.');
+  // New students get their Google Drive folder straight away.
+if (!id) {
+  const driveOk = await ensureStudentDriveFolder(studentId).then(
+    () => true,
+    (err) => { console.error('Drive folder failed:', err); return false; },
+  );
+  if (!driveOk) {
+    redirectWith(`/students/${studentId}`, 'error', 'Student added, but the Drive folder could not be made. Use "Create Drive folder" below.');
+  }
+}
+redirectWith(`/students/${studentId}`, 'ok', id ? 'Student updated.' : 'Student and Drive folder added.');
+}
+// "Create Drive folder" button on the student page (existing students, or after a Drive problem).
+export async function createDriveFolder(form: FormData) {
+  const id = text(form, 'id');
+  if (!UUID.test(id)) redirectWith('/students', 'error', 'Student not found.');
+  const path = `/students/${id}`;
+
+  const driveOk = await ensureStudentDriveFolder(id).then(
+    () => true,
+    (err) => { console.error('createDriveFolder failed:', err); return false; },
+  );
+  revalidatePath(path);
+  redirectWith(
+    path,
+    driveOk ? 'ok' : 'error',
+    driveOk ? 'Drive folder created.' : 'Could not create the Drive folder. Check the connection at /google-drive.',
+  );
 }
