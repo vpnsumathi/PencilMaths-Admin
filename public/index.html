@@ -1,0 +1,47 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>PencilMaths Admin</title></head>
+<body>
+<h1>PencilMaths Admin</h1>
+<nav id="nav"></nav>
+<h2 id="title"></h2>
+<form id="form"></form>
+<ul id="list"></ul>
+<script>
+let mods = [], cur;
+const $ = (id) => document.getElementById(id);
+async function api(path, opt) { const r = await fetch('/api' + path, opt); return r.status === 204 ? null : r.json(); }
+function show(m) {
+  cur = m; $('title').textContent = m.name;
+  $('form').innerHTML = '';
+  m.fields.forEach((f) => {
+    const i = document.createElement('input'); i.name = f; i.placeholder = f; $('form').append(i);
+  });
+  const b = document.createElement('button'); b.textContent = 'Add'; $('form').append(b);
+  load();
+}
+async function load() {
+  const items = await api('/' + cur.name);
+  $('list').innerHTML = '';
+  items.forEach((it) => {
+    const li = document.createElement('li');
+    li.textContent = cur.fields.map((f) => it[f] || '').join(' | ') + ' ';
+    const d = document.createElement('button'); d.textContent = 'Delete';
+    d.onclick = async () => { await api('/' + cur.name + '/' + it.id, { method: 'DELETE' }); load(); };
+    li.append(d); $('list').append(li);
+  });
+}
+$('form').onsubmit = async (e) => {
+  e.preventDefault();
+  const body = {};
+  new FormData(e.target).forEach((v, k) => { if (v) body[k] = v; });
+  const r = await api('/' + cur.name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (r.error) alert(r.error); else e.target.reset();
+  load();
+};
+api('').then((m) => {
+  mods = m;
+  m.forEach((x) => { const b = document.createElement('button'); b.textContent = x.name; b.onclick = () => show(x); $('nav').append(b); });
+  show(m[0]);
+});
+</script>
+</body></html>
