@@ -4,6 +4,7 @@ import ui from '@/components/ui.module.css';
 import { STUDENT_STATUSES, todayInUk, YEARS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { saveStudent } from './actions';
+import { YearBatchFilter } from './YearBatchFilter';
 
 export type Student = {
   id: string;
@@ -107,7 +108,9 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
         <h2>Subjects</h2>
         <p className={ui.hint}>
           Tick each subject the student takes. Choosing a batch also sets the teacher. Unticking a subject ends it.
+          Batches are listed for the year group chosen above.
         </p>
+        <YearBatchFilter />
         {subjects.map((s) => {
           const e = bySubject.get(s.id);
           return (
@@ -119,7 +122,7 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
               <select name={`batch_${s.id}`} defaultValue={e?.batch_id ?? ''} className={ui.select} aria-label={`${s.name} batch`}>
                 <option value="">No batch yet</option>
                 {options.batches.filter((b) => b.subject_id === s.id).map((b) => (
-                  <option key={b.id} value={b.id}>
+                  <option key={b.id} value={b.id} data-year={b.year_group}>
                     {b.code} · Year {b.year_group} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity})
                   </option>
                 ))}
