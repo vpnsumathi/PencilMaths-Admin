@@ -1,7 +1,7 @@
 # PencilMaths-Admin — Help 1: What we built on 7 October 2026
 
 > A brief overview of each feature added today and how its code works.
-> For setup, Git and earlier pieces see `project-guide.md`; for the database see `SUPABASE.md`.
+> For setup, Git and earlier pieces see `01-project-guide.md`; for the database see `02-database-supabase.md`.
 
 ---
 

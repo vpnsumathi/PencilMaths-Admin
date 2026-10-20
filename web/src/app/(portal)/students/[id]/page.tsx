@@ -8,6 +8,7 @@ import { STUDENT_STATUSES, UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { createDriveFolder } from '../actions';
 import { HandInLink } from '../HandInLink';
+import { PortalAccess } from '../PortalAccess';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
 
 export const metadata = { title: 'Student' };
@@ -25,7 +26,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
   const supabase = await createClient();
   const { data: student } = await supabase
     .from('students')
-    .select('id, code, family_id, first_name, last_name, year_group, school, date_of_birth, status, start_date, handin_code')
+    .select('id, code, family_id, first_name, last_name, year_group, school, date_of_birth, status, start_date, handin_code, auth_user_id')
     .eq('id', id)
     .maybeSingle();
   if (!student) notFound();
@@ -73,6 +74,9 @@ export default async function StudentPage({ params, searchParams }: Props) {
           url={`${process.env.NEXT_PUBLIC_SITE_URL}/h/${student.handin_code}`}
           hasFolder={folder?.provider === 'google_drive'}
         />
+      )}
+      {(student.status !== 'left' || student.auth_user_id) && (
+        <PortalAccess studentId={student.id} authUserId={student.auth_user_id} suggestedEmail={guardian?.email ?? null} />
       )}
       <StudentForm
         student={student as Student}

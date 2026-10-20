@@ -18,6 +18,15 @@
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .pick:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-ring); }
+.picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.list { margin: 0; padding: 0 0 0 22px; display: grid; gap: 4px; font-size: 14px; }
+.list li::marker { color: var(--muted); }
+.list li > span { margin-right: 8px; word-break: break-word; }
+.remove {
+  padding: 2px 8px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  background: var(--surface); color: var(--muted); font: inherit; font-size: 12px;
+}
+.remove:hover { color: var(--danger); border-color: var(--danger); }
 .chosen { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
 
 /* "Hand in": always clickable (hand cursor); only greyed out while files are being sent. */

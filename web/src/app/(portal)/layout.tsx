@@ -10,7 +10,11 @@ export default async function PortalLayout({ children }: { children: React.React
 
   // The security rules only return this row if the user is active staff.
   const { data: staff } = await supabase.from('staff').select('full_name, role').eq('id', user.id).maybeSingle();
-  if (!staff) redirect('/no-access');
+  if (!staff) {
+    // Not staff: students have their own area; anyone else has no access.
+    const { data: studentId } = await supabase.rpc('current_student_id');
+    redirect(studentId ? '/me' : '/no-access');
+  }
 
   return <AppShell staff={staff}>{children}</AppShell>;
 }

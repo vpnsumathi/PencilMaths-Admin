@@ -1,11 +1,12 @@
 # PencilMaths-Admin — Supabase Database Guide
 
 > What each database script in `supabase/` does, and what every table is for.
-> Run the scripts **in this order** in the Supabase SQL Editor: files 1 → 4, then `seed.sql`.
+> Run the scripts **in this order** in the Supabase SQL Editor: files 1 → 4, then `seed.sql`, then files 5 and 6.
+> Optional test data: `dummy_data.sql` (remove with `clear_dummy_data.sql`); see `03-core-admin-screens.md`.
 
 | | |
 |---|---|
-| **Last updated** | 5 October 2026 |
+| **Last updated** | 11 October 2026 |
 | **Totals** | 20 tables, 4 views, 10 enums, 54 curriculum topics |
 
 ---
@@ -19,6 +20,8 @@
 5. [File 4 — `20260928000004_student_functions.sql`: saving students](#file-4--20260928000004_student_functionssql-saving-students)
 6. [`seed.sql`: starting data](#seedsql-starting-data)
 7. [Automatic rules (triggers) at a glance](#automatic-rules-triggers-at-a-glance)
+8. [File 5 — `20261007000001_reference_data_admin_only.sql`](#file-5--20261007000001_reference_data_admin_onlysql)
+9. [File 6 — `20261011000001_homework_handin.sql`](#file-6--20261011000001_homework_handinsql)
 
 ---
 
@@ -155,3 +158,28 @@ Re-running is safe for `subjects`. ⚠️ Re-running would **duplicate** the cur
 | An enrolment is saved with a batch | Batch must be the same subject; enrolment's teacher copied from the batch | 1 |
 | A batch is created | Lesson plan copied from the curriculum | 2 |
 | A student's status becomes `left` | Batch places released; `left_on` set | 4 |
+
+---
+
+## File 5 — `20261007000001_reference_data_admin_only.sql`
+
+Subjects and curriculum topics: **all staff can read, only admins can change** (replaces file 3's "all staff" rule for these two tables). Used by the Subjects screens (`03-core-admin-screens.md`).
+
+| Name | Type | What it does |
+|---|---|---|
+| `staff_read` / `admin_write` | rules | Read for active staff; insert/update/delete for admins |
+| `move_curriculum_topic(id, 'up'|'down')` | function | Swaps a topic with its neighbour (same subject and year group); parks one at `-1` first because positions must be unique |
+
+---
+
+## File 6 — `20261011000001_homework_handin.sql`
+
+The WhatsApp hand-in link (`08-homework-handin-link.md`). Families aren't signed in, so they reach data only through these functions, which run with full rights (`security definer`) but only for the student whose secret code is given.
+
+| Name | Type | What it does |
+|---|---|---|
+| `students.handin_code` | column | 32 random characters, unique; every student gets one |
+| `handin_page(code)` | function | First name + homework from current batches (last 90 days) with status, mark and file count |
+| `handin_target(code, sheet)` | function | Checks code and homework belong together; returns the Drive folder id and file count |
+| `handin_record(code, sheet, file…)` | function | Adds a `file_links` row (`homework_submission`) and marks the result received (marked stays marked); max 20 files |
+| `grant execute … to anon` | permission | Lets phones that aren't signed in call them |

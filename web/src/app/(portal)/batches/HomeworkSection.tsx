@@ -5,7 +5,7 @@ import ui from '@/components/ui.module.css';
 import { formatDate } from '@/lib/format';
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
-import { createHomework, deleteHomework, markHomework } from './actions';
+import { addHomeworkFile, createHomework, deleteHomework, markHomework, removeHomeworkFile } from './actions';
 
 // Label and badge colour for each homework status.
 const STATUS: Record<string, { tone: string; label: string }> = {
@@ -14,6 +14,8 @@ const STATUS: Record<string, { tone: string; label: string }> = {
   marked: { tone: 'active', label: 'Marked' },
   excused: { tone: 'paused', label: 'Excused' },
 };
+
+const SHEET_ACCEPT = '.pdf,.doc,.docx,image/*';
 
 type Member = { id: string; first_name: string; last_name: string };
 type Result = {
@@ -39,6 +41,14 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
         .in('owner_id', sheetIds)
         .order('created_at')
     : { data: [] };
+  const { data: sheetFiles } = sheetIds.length
+    ? await supabase
+        .from('file_links')
+        .select('id, owner_id, url, label')
+        .eq('owner_type', 'homework_sheet')
+        .in('owner_id', sheetIds)
+        .order('created_at')
+    : { data: [] };
 
   return (
     <section className={ui.card} style={{ marginTop: 16 }}>
@@ -57,6 +67,12 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
         </Field>
         <Field label="Maximum mark (optional)">
           <input name="max_mark" type="number" min={1} step="0.5" className={ui.input} />
+        </Field>
+        <Field label="Homework file (optional, PDF, Word or photo, 4 MB max)">
+          <input name="sheet_file" type="file" accept={SHEET_ACCEPT} className={ui.input} />
+        </Field>
+        <Field label="Or a link to it (optional)">
+          <input name="sheet_url" type="url" placeholder="https://…" className={ui.input} />
         </Field>
         <div className={ui.formActions} style={{ alignSelf: 'end' }}>
           <button className={ui.primaryButton}>Set homework</button>
@@ -89,6 +105,28 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
               </span>
               {toMark > 0 && <> <StatusBadge status="trial" label={`${toMark} to mark`} /></>}
             </summary>
+
+            <div style={{ margin: '8px 0 12px' }}>
+              <strong>Homework file: </strong>
+              {(sheetFiles ?? []).filter((f) => f.owner_id === sheet.id).length === 0 && <span className={ui.muted}>none yet </span>}
+              {(sheetFiles ?? []).filter((f) => f.owner_id === sheet.id).map((f) => (
+                <form key={f.id} action={removeHomeworkFile} style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginRight: 12 }}>
+                  <input type="hidden" name="batch_id" value={batchId} />
+                  <input type="hidden" name="file_id" value={f.id} />
+                  <a href={f.url} target="_blank" rel="noreferrer" className={ui.link}>{f.label}</a>
+                  <ConfirmButton className={ui.button} message={`Remove "${f.label}" from this homework? An uploaded file stays in Google Drive.`}>
+                    Remove
+                  </ConfirmButton>
+                </form>
+              ))}
+              <form action={addHomeworkFile} className={ui.formActions} style={{ marginTop: 6 }}>
+                <input type="hidden" name="batch_id" value={batchId} />
+                <input type="hidden" name="sheet_id" value={sheet.id} />
+                <input name="sheet_file" type="file" accept={SHEET_ACCEPT} className={ui.input} aria-label="Homework file" />
+                <input name="sheet_url" type="url" placeholder="or paste a link" className={ui.input} aria-label="Homework link" />
+                <button className={ui.button}>Add file</button>
+              </form>
+            </div>
 
             <div className={ui.tableWrap}>
               <table className={ui.table}>

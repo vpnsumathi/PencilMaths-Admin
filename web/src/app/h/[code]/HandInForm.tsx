@@ -2,46 +2,58 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
-import { handInFile } from './actions';
+import { convertWordToPdf } from '@/lib/homework/convert';
+import type { HandInResult } from '@/lib/homework/handin';
+import { buildPdfs, isWord } from '@/lib/homework/makePdf';
 import styles from './handin.module.css';
-
-// Shrinks a phone photo to at most 2000px as a JPEG (usually 300–800 KB) so it uploads fast and stays
-// under the size limit. PDFs, and images the browser can't read, are sent unchanged.
-async function shrink(file: File): Promise<File> {
-  if (!file.type.startsWith('image/')) return file;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
-  } catch {
-    return file;
-  }
-}
 
 type Status = { kind: 'idle' | 'busy' | 'done' | 'error'; text: string };
 
-export function HandInForm({ code, sheetId, label = 'Hand in' }: { code: string; sheetId: string; label?: string }) {
+// Used by the WhatsApp link (with the family's code) and by the student login (no code: the login says who it is).
+// The student adds photos and files one after another, then one Hand in sends them all as a single PDF.
+export function HandInForm({ action, code, sheetId, label = 'Hand in' }: {
+  action: (form: FormData) => Promise<HandInResult>; code?: string; sheetId: string; label?: string;
+}) {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<Status>({ kind: 'idle', text: '' });
   const picker = useRef<HTMLInputElement>(null);
 
-  // Sends the chosen files one by one, stopping at the first problem.
+  // Each pick adds to the list, so several photos can be taken one at a time.
+  function add(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = ''; // lets the same file or camera be picked again
+    setFiles((current) => [...current, ...picked]);
+    setStatus({ kind: 'idle', text: '' });
+  }
+
+  async function convertWord(file: File) {
+    const form = new FormData();
+    if (code) form.set('code', code);
+    form.set('sheet_id', sheetId);
+    form.set('file', file);
+    const result = await convertWordToPdf(form);
+    if (!result.ok) throw new Error(result.error);
+    return Uint8Array.from(atob(result.pdf), (c) => c.charCodeAt(0));
+  }
+
+  // Combines everything into one PDF, then sends it (two or more PDFs only for very long hand-ins).
   async function send() {
-    for (const [i, original] of files.entries()) {
-      setStatus({ kind: 'busy', text: `Sending ${i + 1} of ${files.length}…` });
+    let pdfs: File[];
+    try {
+      pdfs = await buildPdfs(files, convertWord, (text) => setStatus({ kind: 'busy', text }));
+    } catch (e) {
+      setStatus({ kind: 'error', text: e instanceof Error ? e.message : 'Could not make the PDF.' });
+      return;
+    }
+    for (const [i, pdf] of pdfs.entries()) {
+      setStatus({ kind: 'busy', text: pdfs.length === 1 ? 'Sending…' : `Sending ${i + 1} of ${pdfs.length}…` });
       const form = new FormData();
-      form.set('code', code);
+      if (code) form.set('code', code);
       form.set('sheet_id', sheetId);
       form.set('part', String(i + 1));
-      form.set('file', await shrink(original));
-      const result = await handInFile(form);
+      form.set('file', pdf);
+      const result = await action(form);
       if (!result.ok) {
         setStatus({ kind: 'error', text: result.error });
         return;
@@ -52,24 +64,47 @@ export function HandInForm({ code, sheetId, label = 'Hand in' }: { code: string;
     router.refresh(); // reload the list so this homework moves to "Handed in"
   }
 
+  const busy = status.kind === 'busy';
   return (
     <div className={styles.handin}>
-      <label className={styles.pick}>
-        📷 Take a photo or choose a file
-        <input
-          ref={picker}
-          type="file"
-          accept="image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          multiple
-          hidden
-          onChange={(e) => { setFiles(Array.from(e.target.files ?? [])); setStatus({ kind: 'idle', text: '' }); }}
-        />
-      </label>
-      {files.length > 0 && <p className={styles.chosen}>{files.length} file{files.length === 1 ? '' : 's'} chosen</p>}
-      {/* Always clickable: with no files chosen yet, it opens the camera / file picker instead. */}
-      <button type="button" className={styles.send} disabled={status.kind === 'busy'}
+      <div className={styles.picks}>
+        <label className={styles.pick}>
+          📷 Take a photo
+          <input type="file" accept="image/*" capture="environment" hidden onChange={add} disabled={busy} />
+        </label>
+        <label className={styles.pick}>
+          📎 Choose files
+          <input
+            ref={picker}
+            type="file"
+            accept="image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            multiple
+            hidden
+            onChange={add}
+            disabled={busy}
+          />
+        </label>
+      </div>
+
+      {files.length > 0 && (
+        <ol className={styles.list}>
+          {files.map((f, i) => (
+            <li key={`${i}-${f.name}-${f.lastModified}`}>
+              <span>{f.type.startsWith('image/') ? '🖼️' : isWord(f) ? '📝' : '📄'} {f.name}</span>
+              <button type="button" className={styles.remove} disabled={busy} aria-label={`Remove ${f.name}`}
+                onClick={() => setFiles((current) => current.filter((_, j) => j !== i))}>✕</button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {files.length > 0 && (
+        <p className={styles.chosen}>Add as many pages as you need. They are sent together as one PDF.</p>
+      )}
+
+      {/* Always clickable: with nothing chosen yet, it opens the file picker instead. */}
+      <button type="button" className={styles.send} disabled={busy}
         onClick={() => (files.length === 0 ? picker.current?.click() : send())}>
-        {status.kind === 'busy' ? status.text : label}
+        {busy ? status.text : files.length > 0 ? `${label} (${files.length} page${files.length === 1 ? '' : 's'})` : label}
       </button>
       {status.kind === 'done' && <p className={styles.ok} role="status">✅ {status.text}</p>}
       {status.kind === 'error' && <p className={styles.error} role="alert">{status.text}</p>}

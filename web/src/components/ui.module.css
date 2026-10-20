@@ -98,3 +98,10 @@
 .homework { padding: 12px 0; border-top: 1px solid var(--border); }
 .homework summary { padding: 4px 0 12px; cursor: pointer; }
 .files { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+
+/* Pop-up (native <dialog>), e.g. "Mark completed" on a lesson plan topic. */
+.dialog {
+  width: min(560px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); color: var(--text);
+}
+.dialog::backdrop { background: rgb(15 23 42 / 0.45); }

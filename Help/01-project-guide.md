@@ -1,13 +1,13 @@
 # PencilMaths-Admin — Project Help Guide
 
 > **Living document.** Update this file every time you change the project (see [How to update this guide](#15-how-to-update-this-guide)).
-> Keep it in the repository at `PencilMaths-Admin/Help/project-guide.md` and commit it together with the change it describes.
+> Keep it in the repository at `PencilMaths-Admin/Help/01-project-guide.md` and commit it together with the change it describes.
 
 | | |
 |---|---|
-| **Last updated** | 5 October 2026 |
-| **Current stage** | Piece 4 done (project created, login page designed). Next: Piece 5, connect the app to Supabase. |
-| **Where this guide lives** | `PencilMaths-Admin/Help/project-guide.md` (master copy). A copy is kept in the Claude project's files. |
+| **Last updated** | 11 October 2026 |
+| **Current stage** | Pieces 1–10 done, plus Students, Teachers, Batches, dashboard, Enquiries and the WhatsApp homework feature (Phases 1–5). Next: staff invites (Part 9.3) and audit log. |
+| **Where this guide lives** | `PencilMaths-Admin/Help/01-project-guide.md` (master copy). A copy is kept in the Claude project's files. |
 | **Reference project** | `pencil-maths-portal-phase1/pencil-portal` (the original phase 1 portal, used as a guide; we do not edit it) |
 
 ---
@@ -111,10 +111,16 @@ Understanding these words makes the rest of the project easy to follow.
 PencilMaths-Admin/                 ← the project folder (one Git repository)
 ├── .git/                          ← Git's history (hidden; never edit)
 ├── Help/                          ← help guides
-│   ├── project-guide.md           ← this guide (setup, workflow, decisions, roadmap, change log)
-│   ├── features-core-admin-screens.md ← Staff, Subjects, Teachers, Batches, Students, dashboard, Vercel
-│   ├── help_enquiry.md            ← Enquiries (leads)
-│   └── SUPABASE.md                ← database scripts and tables
+│   ├── README.md                  ← index of all guides (start here)
+│   ├── 01-project-guide.md        ← this guide (setup, workflow, decisions, roadmap, change log)
+│   ├── 02-database-supabase.md    ← database scripts and tables
+│   ├── 03-core-admin-screens.md   ← Staff, Subjects, Teachers, Batches, Students, dashboard, Vercel
+│   ├── 04-enquiries.md            ← Enquiries (leads)
+│   ├── 05-gdrive-setup.md         ← Google Drive: Google Cloud setup and secrets
+│   ├── 06-gdrive-code.md          ← Google Drive: how the code works
+│   ├── 07-gdrive-student-folders.md ← a Drive folder per student
+│   ├── 08-homework-handin-link.md ← WhatsApp hand-in link (families upload homework)
+│   └── 09-homework-marking.md     ← set and mark homework on the batch page
 ├── supabase/
 │   ├── migrations/                ← database scripts, run in order
 │   │   ├── 20260928000001_schema.sql
@@ -789,13 +795,18 @@ Problems we met while setting up, and their fixes.
 | 2 | Install Node.js, Git, VS Code | ✅ Done |
 | 3 | Supabase project + database scripts | ✅ Done |
 | 4 | Create project folder, Next.js app, first commit, login page design | ✅ Done |
-| 5 | Connect the app to Supabase: install libraries, `.env.local`, show subjects from the database | ⏭ Next |
-| 6 | Real sign-in: invite yourself, add your `staff` row as `admin`, sign in/out, password reset links | Planned |
-| 7 | Protect pages: only signed-in staff can see the portal (middleware + layout check) | Planned |
-| 8 | App shell: sidebar navigation (mobile menu) and dashboard | Planned |
-| 9 | Admin module: manage staff (invite, role, deactivate) | Planned |
-| 10 | Admin module: subjects and curriculum topics | Planned |
-| 11 | Audit log; then Students, Teachers, Batches… | Planned |
+| 5 | Connect the app to Supabase: install libraries, `.env.local`, show subjects from the database | ✅ Done |
+| 6 | Real sign-in: invite yourself, add your `staff` row as `admin`, sign in/out, password reset links | ✅ Done |
+| 7 | Protect pages: only signed-in staff can see the portal (middleware + layout check) | ✅ Done |
+| 8 | App shell: sidebar navigation (mobile menu) and dashboard | ✅ Done (dashboard now interactive analytics) |
+| 9 | Admin module: manage staff (list, role, deactivate) | ✅ Done, except 9.3 invite by email (skipped for now) |
+| 10 | Admin module: subjects and curriculum topics | ✅ Done |
+| — | Students, Teachers, Batches screens | ✅ Done |
+| — | Enquiries (leads, convert to student) | ✅ Done |
+| — | WhatsApp homework: Drive setup, student folders, hand-in link, marking (Phases 2–5) | ✅ Done |
+| 9.3 | Invite staff by email | ⏭ Next |
+| 11 | Audit log | Planned |
+| — | Classes and attendance logging screen | Planned |
 
 ---
 
@@ -827,11 +838,11 @@ Update this file **in the same commit** as the change it describes.
 
 You can also ask Claude, in the PencilMaths Admin project, to add new help information. Claude will:
 
-1. Put the information in the right section of `Help/project-guide.md` (or add a new section and list it in Contents).
+1. Put the information in the right section of `Help/01-project-guide.md` (or add a new section and list it in Contents).
 2. Update **Last updated** at the top and add a change log entry (section 17).
 3. Share the updated file back in the project so the project's copy matches.
 
-You then commit `Help/project-guide.md` as usual (section 11).
+You then commit `Help/01-project-guide.md` as usual (section 11).
 
 ---
 
@@ -870,6 +881,16 @@ You then commit `Help/project-guide.md` as usual (section 11).
 ## 17. Change log
 
 Newest first.
+
+### 2026-10-11 — Help folder organised
+**What changed:**
+- `docs/` renamed to `Help/`; every guide renamed `NN-topic.md` in reading order; links between guides updated.
+- Added `README.md` (index), `08-homework-handin-link.md` and `09-homework-marking.md`.
+- `02-database-supabase.md` now covers the two later database scripts.
+- Current stage and roadmap brought up to date.
+
+**Files added / changed / removed:**
+- `Help/HELP.md` → `Help/01-project-guide.md`; `SUPABASE.md` → `02-database-supabase.md`; `help_1.md` → `03-core-admin-screens.md`; `help_enquiry.md` → `04-enquiries.md`; G-Drive guides → `05`–`07`.
 
 ### 2026-10-05 — Password reset section
 **What changed:**

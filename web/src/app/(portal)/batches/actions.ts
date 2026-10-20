@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { todayInUk, UUID, YEARS } from '@/lib/options';
+import { attachSheetFiles } from '@/lib/homework/sheets';
 import { createClient } from '@/lib/supabase/server';
 
 type Slot = { weekday: number; start_time: string };
@@ -138,11 +139,10 @@ export async function setBatchClosed(form: FormData) {
 
 /* ---------- Homework (Phase 5) ---------- */
 
-// Sets homework for the whole batch, with a "not handed in" result for each current student.
-export async function createHomework(form: FormData) {
-  const batchId = text(form, 'batch_id');
-  if (!UUID.test(batchId)) redirectWith('/batches', 'error', 'Batch not found.');
-  const path = `/batches/${batchId}`;
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+// Reads and checks the homework fields shared by "Set homework" and "Mark completed".
+function readHomework(form: FormData, path: string) {
   const title = text(form, 'title');
   const setOn = text(form, 'set_on') || todayInUk();
   const dueOn = optional(form, 'due_on');
@@ -150,15 +150,18 @@ export async function createHomework(form: FormData) {
   if (!title) redirectWith(path, 'error', 'Enter a homework title.');
   if (dueOn && dueOn < setOn) redirectWith(path, 'error', 'The due date cannot be before the date it is set.');
   if (maxMark !== null && !(maxMark > 0)) redirectWith(path, 'error', 'The maximum mark must be more than 0.');
+  return { title, set_on: setOn, due_on: dueOn, max_mark: maxMark };
+}
 
-  const supabase = await createClient();
+// Adds the homework with a "pending" result for each current student. Returns its id and the number of students.
+async function insertHomework(supabase: Supabase, batchId: string, path: string, fields: ReturnType<typeof readHomework> & { topic_id?: string }) {
   const { data: sheet, error } = await supabase
     .from('homework_sheets')
-    .insert({ batch_id: batchId, title, set_on: setOn, due_on: dueOn, max_mark: maxMark })
+    .insert({ batch_id: batchId, ...fields })
     .select('id')
     .single();
   if (error) {
-    console.error('createHomework failed:', error.message);
+    console.error('insertHomework failed:', error.message);
     redirectWith(path, 'error', 'Could not set the homework.');
   }
 
@@ -168,12 +171,91 @@ export async function createHomework(form: FormData) {
     const { error: resultError } = await supabase
       .from('homework_results')
       .insert(members.map((m) => ({ sheet_id: sheet.id, student_id: m.student_id })));
-    if (resultError) console.error('createHomework results failed:', resultError.message);
+    if (resultError) console.error('insertHomework results failed:', resultError.message);
   }
+  return { sheetId: sheet.id as string, students: members?.length ?? 0 };
+}
+
+// Sets homework for the whole batch, with a "not handed in" result for each current student.
+export async function createHomework(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  if (!UUID.test(batchId)) redirectWith('/batches', 'error', 'Batch not found.');
+  const path = `/batches/${batchId}`;
+  const fields = readHomework(form, path);
+
+  const supabase = await createClient();
+  const { sheetId, students } = await insertHomework(supabase, batchId, path, fields);
+  const fileProblem = await attachSheetFiles(supabase, sheetId, form);
 
   revalidatePath(path);
   revalidatePath('/');
-  redirectWith(path, 'ok', `Homework set for ${members?.length ?? 0} student(s). It is now on their hand-in links.`);
+  if (fileProblem) redirectWith(path, 'error', `Homework set, but: ${fileProblem}`);
+  redirectWith(path, 'ok', `Homework set for ${students} student(s). It is now on their hand-in links.`);
+}
+
+/* ---------- Lesson plan ---------- */
+
+// Start (Not started → In progress) and Undo (Completed → In progress, In progress → Not started).
+// Undoing a completed topic keeps any homework it sent.
+export async function setTopicStatus(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const topicId = text(form, 'topic_id');
+  const status = text(form, 'status');
+  if (!UUID.test(batchId) || !UUID.test(topicId)) redirectWith('/batches', 'error', 'Topic not found.');
+  if (status !== 'not_started' && status !== 'in_progress') redirectWith(`/batches/${batchId}`, 'error', 'Unknown status.');
+  const path = `/batches/${batchId}`;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('batch_topics').update({ status, completed_on: null }).eq('id', topicId).eq('batch_id', batchId).select('id');
+  if (error || data.length === 0) {
+    console.error('setTopicStatus failed:', error?.message ?? 'no rows updated');
+    redirectWith(path, 'error', 'Could not change the topic.');
+  }
+  revalidatePath(path);
+  revalidatePath('/batches');
+  redirectWith(path, 'ok', status === 'in_progress' ? 'Topic is now in progress.' : 'Topic moved back to not started.');
+}
+
+// Marks a topic completed and sends its homework to everyone in the batch (from the pop-up).
+// A topic that already sent homework (completed, undone, completed again) doesn't send it twice.
+export async function completeTopic(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const topicId = text(form, 'topic_id');
+  if (!UUID.test(batchId) || !UUID.test(topicId)) redirectWith('/batches', 'error', 'Topic not found.');
+  const path = `/batches/${batchId}`;
+
+  const supabase = await createClient();
+  const [{ data: topic }, { data: sent }] = await Promise.all([
+    supabase.from('batch_topics').select('id, status').eq('id', topicId).eq('batch_id', batchId).maybeSingle(),
+    supabase.from('homework_sheets').select('title').eq('topic_id', topicId).maybeSingle(),
+  ]);
+  if (!topic) redirectWith(path, 'error', 'Topic not found.');
+  if (topic.status === 'complete') redirectWith(path, 'error', 'This topic is already completed.');
+
+  let message: string;
+  let fileProblem: string | null = null;
+  if (sent) {
+    message = `Topic completed. Its homework "${sent.title}" was already sent, so it was not sent again.`;
+  } else {
+    const fields = readHomework(form, path);
+    const { sheetId, students } = await insertHomework(supabase, batchId, path, { ...fields, topic_id: topicId });
+    fileProblem = await attachSheetFiles(supabase, sheetId, form, fields.title);
+    message = `Topic completed. Homework "${fields.title}" sent to ${students} student(s).`;
+  }
+
+  const { error } = await supabase
+    .from('batch_topics').update({ status: 'complete', completed_on: todayInUk() }).eq('id', topicId);
+  if (error) {
+    console.error('completeTopic failed:', error.message);
+    redirectWith(path, 'error', 'The homework was sent, but the topic could not be marked completed.');
+  }
+
+  revalidatePath(path);
+  revalidatePath('/batches');
+  revalidatePath('/');
+  if (fileProblem) redirectWith(path, 'error', `${message} But: ${fileProblem}`);
+  redirectWith(path, 'ok', message);
 }
 
 // Records a mark, or "excused", for one student's homework.
@@ -222,7 +304,7 @@ export async function deleteHomework(form: FormData) {
 
   const supabase = await createClient();
   // file_links rows point at the sheet without a database link, so remove them by hand.
-  await supabase.from('file_links').delete().eq('owner_type', 'homework_submission').eq('owner_id', sheetId);
+  await supabase.from('file_links').delete().in('owner_type', ['homework_submission', 'homework_sheet']).eq('owner_id', sheetId);
   const { data, error } = await supabase.from('homework_sheets').delete().eq('id', sheetId).eq('batch_id', batchId).select('id');
   if (error || data.length === 0) {
     console.error('deleteHomework failed:', error?.message ?? 'no rows deleted');
@@ -232,4 +314,40 @@ export async function deleteHomework(form: FormData) {
   revalidatePath(path);
   revalidatePath('/');
   redirectWith(path, 'ok', 'Homework deleted. Any handed-in files are still in Google Drive.');
+}
+
+// Adds a homework file (upload or link) to homework that is already set.
+export async function addHomeworkFile(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const sheetId = text(form, 'sheet_id');
+  if (!UUID.test(batchId) || !UUID.test(sheetId)) redirectWith('/batches', 'error', 'Homework not found.');
+  const path = `/batches/${batchId}`;
+
+  const supabase = await createClient();
+  const { data: sheet } = await supabase.from('homework_sheets').select('id').eq('id', sheetId).eq('batch_id', batchId).maybeSingle();
+  if (!sheet) redirectWith(path, 'error', 'Homework not found.');
+  const file = form.get('sheet_file');
+  if (!(file instanceof File && file.size > 0) && !text(form, 'sheet_url')) redirectWith(path, 'error', 'Choose a file or paste a link.');
+
+  const problem = await attachSheetFiles(supabase, sheetId, form);
+  revalidatePath(path);
+  if (problem) redirectWith(path, 'error', problem);
+  redirectWith(path, 'ok', 'Homework file added. Students can open it from My homework.');
+}
+
+// Removes a homework file from the homework. An uploaded file stays in Google Drive.
+export async function removeHomeworkFile(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const fileId = text(form, 'file_id');
+  if (!UUID.test(batchId) || !UUID.test(fileId)) redirectWith('/batches', 'error', 'File not found.');
+  const path = `/batches/${batchId}`;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from('file_links').delete().eq('id', fileId).eq('owner_type', 'homework_sheet');
+  if (error) {
+    console.error('removeHomeworkFile failed:', error.message);
+    redirectWith(path, 'error', 'Could not remove the file.');
+  }
+  revalidatePath(path);
+  redirectWith(path, 'ok', 'Homework file removed. It is still in Google Drive.');
 }

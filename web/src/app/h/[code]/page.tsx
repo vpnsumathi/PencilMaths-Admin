@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { formatDate } from '@/lib/format';
 import { createClient } from '@/lib/supabase/server';
+import { handInFile } from './actions';
 import { HandInForm } from './HandInForm';
 import styles from './handin.module.css';
 
@@ -39,7 +40,7 @@ export default async function HandInPage({ params }: { params: Promise<{ code: s
           <p className={styles.subject}>{h.subject}</p>
           <h3>{h.title}</h3>
           <p className={styles.muted}>{h.due_on ? `Due ${formatDate(h.due_on)}` : `Set ${formatDate(h.set_on)}`}</p>
-          <HandInForm code={code} sheetId={h.sheet_id} />
+          <HandInForm action={handInFile} code={code} sheetId={h.sheet_id} />
         </article>
       ))}
 
@@ -57,7 +58,7 @@ export default async function HandInPage({ params }: { params: Promise<{ code: s
                     ? 'Excused'
                     : `📥 Received · ${h.files} file${h.files === 1 ? '' : 's'}`}
               </p>
-              {h.status === 'received' && <HandInForm code={code} sheetId={h.sheet_id} label="Add more pages" />}
+              {h.status === 'received' && <HandInForm action={handInFile} code={code} sheetId={h.sheet_id} label="Add more pages" />}
             </article>
           ))}
         </>

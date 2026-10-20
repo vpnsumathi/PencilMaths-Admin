@@ -4,9 +4,10 @@ import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { formatDate } from '@/lib/format';
-import { STUDENT_STATUSES, UUID } from '@/lib/options';
+import { STUDENT_STATUSES, todayInUk, UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
-import { setBatchClosed } from '../actions';
+import { setBatchClosed, setTopicStatus } from '../actions';
+import { CompleteTopic } from '../CompleteTopic';
 import { BatchForm } from '../BatchForm';
 import { HomeworkSection } from '../HomeworkSection';
 
@@ -17,7 +18,7 @@ type Props = {
   searchParams: Promise<{ ok?: string; error?: string }>;
 };
 
-const TOPIC_STATUS: Record<string, string> = { not_started: 'Not started', in_progress: 'In progress', complete: 'Done' };
+const TOPIC_STATUS: Record<string, string> = { not_started: 'Not started', in_progress: 'In progress', complete: 'Completed' };
 
 export default async function BatchPage({ params, searchParams }: Props) {
   const { id } = await params;
@@ -39,11 +40,16 @@ export default async function BatchPage({ params, searchParams }: Props) {
         .select('id, students(id, code, first_name, last_name, year_group, status)')
         .eq('batch_id', id)
         .is('ended_on', null),
-      supabase.from('batch_topics').select('id, position, name, status').eq('batch_id', id).order('position'),
+      supabase.from('batch_topics').select('id, position, name, status, completed_on').eq('batch_id', id).order('position'),
       supabase.from('subjects').select('id, name').order('sort'),
       supabase.from('teachers').select('id, first_name, last_name, subject_id').neq('status', 'left').order('first_name'),
     ]);
   if (!batch) notFound();
+  // Homework already sent by completing a topic, by topic.
+  const { data: topicHomework } = await supabase
+    .from('homework_sheets').select('topic_id, title').eq('batch_id', id).not('topic_id', 'is', null);
+  const sentFor = new Map((topicHomework ?? []).map((h) => [h.topic_id as string, h.title as string]));
+  const today = todayInUk();
 
   const subjectName = (batch.subjects as unknown as { name: string } | null)?.name ?? batch.subject_id;
   const students = (members ?? [])
@@ -98,12 +104,40 @@ export default async function BatchPage({ params, searchParams }: Props) {
           ) : (
             <ol className={ui.list}>
               {(topics ?? []).map((t) => (
-                <li key={t.id}>
-                  <span>{t.position}. {t.name}</span>
-                  <StatusBadge
-                    status={t.status === 'complete' ? 'active' : t.status === 'in_progress' ? 'trial' : 'closed'}
-                    label={TOPIC_STATUS[t.status] ?? t.status}
-                  />
+                <li key={t.id} style={{ flexWrap: 'wrap' }}>
+                  <span>
+                    {t.position}. {t.name}
+                    {sentFor.has(t.id) && <span className={ui.muted}> · homework sent: {sentFor.get(t.id)}</span>}
+                  </span>
+                  <span className={ui.formActions}>
+                    <StatusBadge
+                      status={t.status === 'complete' ? 'active' : t.status === 'in_progress' ? 'trial' : 'closed'}
+                      label={t.status === 'complete' && t.completed_on
+                        ? `Completed ${formatDate(t.completed_on)}`
+                        : TOPIC_STATUS[t.status] ?? t.status}
+                    />
+                    {t.status === 'not_started' && (
+                      <form action={setTopicStatus}>
+                        <input type="hidden" name="batch_id" value={batch.id} />
+                        <input type="hidden" name="topic_id" value={t.id} />
+                        <button name="status" value="in_progress" className={ui.button}>Start</button>
+                      </form>
+                    )}
+                    {t.status === 'in_progress' && (
+                      <CompleteTopic batchId={batch.id} topicId={t.id} topicName={t.name} students={students.length}
+                        today={today} alreadySent={sentFor.get(t.id) ?? null} />
+                    )}
+                    {t.status !== 'not_started' && (
+                      <form action={setTopicStatus}>
+                        <input type="hidden" name="batch_id" value={batch.id} />
+                        <input type="hidden" name="topic_id" value={t.id} />
+                        <button name="status" value={t.status === 'complete' ? 'in_progress' : 'not_started'} className={ui.button}
+                          title={t.status === 'complete' ? 'Back to In progress. Homework already sent stays.' : 'Back to Not started'}>
+                          Undo
+                        </button>
+                      </form>
+                    )}
+                  </span>
                 </li>
               ))}
             </ol>

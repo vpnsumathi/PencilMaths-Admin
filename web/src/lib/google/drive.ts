@@ -93,3 +93,44 @@ export async function uploadFile(parentId: string, name: string, mimeType: strin
   if (!res.ok) throw new Error(`Google Drive upload error: ${json.error?.message ?? res.status}`);
   return json as { id: string; webViewLink: string };
 }
+// Fetches a file's contents (for files this app uploaded). Returns Google's response to pass on.
+export async function downloadFile(fileId: string) {
+  const res = await fetch(`${DRIVE}/files/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${await accessToken()}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Google Drive download error: ${res.status}`);
+  return res;
+}
+
+// Turns a Word file into a PDF: Drive converts it to a Google Doc, we export that as PDF,
+// then delete the Google Doc. Returns the PDF's bytes.
+export async function wordToPdf(name: string, mimeType: string, data: ArrayBuffer) {
+  const token = await accessToken();
+  const boundary = `pm-${crypto.randomUUID()}`;
+  const body = new Blob([
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
+    JSON.stringify({ name, mimeType: 'application/vnd.google-apps.document' }),
+    `\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    data,
+    `\r\n--${boundary}--`,
+  ]);
+  const created = await fetch(`${UPLOAD}?uploadType=multipart&fields=id`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+    cache: 'no-store',
+  });
+  const doc = await created.json();
+  if (!created.ok) throw new Error(`Google Drive convert error: ${doc.error?.message ?? created.status}`);
+  try {
+    const res = await fetch(`${DRIVE}/files/${doc.id}/export?mimeType=application/pdf`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`Google Drive export error: ${res.status}`);
+    return await res.arrayBuffer();
+  } finally {
+    await fetch(`${DRIVE}/files/${doc.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+  }
+}

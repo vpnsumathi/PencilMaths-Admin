@@ -1,7 +1,7 @@
 # PencilMaths-Admin — Help: Enquiries (leads)
 
 > Built 11 October 2026 as Phase 1 of the WhatsApp homework feature (every student starts as a lead).
-> See `features-core-admin-screens.md` for the shared building blocks it reuses, and `SUPABASE.md` for the tables.
+> See `03-core-admin-screens.md` for the shared building blocks it reuses, and `02-database-supabase.md` for the tables.
 
 ---
 

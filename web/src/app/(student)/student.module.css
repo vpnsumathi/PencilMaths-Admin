@@ -1,0 +1,108 @@
+/* Student area: designed for phones first, like the hand-in page. */
+.shell { min-height: 100vh; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.brand { display: inline-flex; align-items: center; }
+.nav { display: flex; gap: 4px; flex: 1; align-self: stretch; align-items: flex-end; margin-bottom: -11px; }
+/* Top menu drawn as tabs: the open page's tab joins the page below it. */
+.link {
+  padding: 9px 16px; border: 1px solid var(--border); border-bottom: 0; border-radius: 12px 12px 0 0;
+  background: var(--bg); color: var(--muted); font-weight: 600; text-decoration: none;
+}
+.link:hover { color: var(--text); background: var(--surface); }
+.active, .active:hover {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+}
+.who { font-weight: 600; color: var(--text); white-space: nowrap; }
+.signOut {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+  background: var(--surface); color: var(--muted); font: inherit; font-size: 14px;
+}
+.signOut:hover { color: var(--text); border-color: var(--border-strong); }
+
+.main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+.main h1 { margin: 0 0 4px; font-size: 26px; }
+.main h2 { margin: 28px 0 12px; font-size: 16px; color: var(--muted); }
+.muted { margin: 0; color: var(--muted); font-size: 14px; }
+
+.cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.card { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+.card h3 { margin: 2px 0 4px; font-size: 18px; }
+.subject { margin: 0; font-size: 12px; font-weight: 600; color: var(--brand); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.cta {
+  display: inline-block; margin-top: 24px; padding: 12px 18px; border-radius: 14px;
+  background: var(--brand); color: #fff; font-weight: 700; text-decoration: none;
+}
+.cta:hover { background: var(--brand-strong); }
+
+.overdue { color: var(--danger); font-weight: 600; }
+.marked { color: var(--ok); font-weight: 600; }
+/* Handed-in and marked homework: green so it stands out from what is still to do. */
+.done { background: var(--ok-soft); border-color: var(--ok-border); border-left: 6px solid var(--ok); }
+
+.sheets { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.sheet {
+  display: inline-block; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+  color: var(--brand-strong); font-weight: 600; text-decoration: none; word-break: break-word;
+}
+.sheet:hover { border-color: var(--brand); background: var(--brand-ring); }
+
+/* Dashboard tiles: the whole tile is a link. */
+.tiles { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 24px; }
+.tile {
+  display: flex; flex-direction: column; gap: 6px; padding: 20px; border-radius: 18px;
+  background: var(--surface); border: 1px solid var(--border); color: inherit; text-decoration: none;
+}
+.tile:hover { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+.big { margin: 0; font-size: 40px; font-weight: 700; line-height: 1.1; }
+.tileLink { margin-top: auto; padding-top: 8px; color: var(--brand-strong); font-weight: 700; }
+.recent { margin: 6px 0 0; padding: 0; list-style: none; font-size: 14px; display: grid; gap: 4px; }
+
+/* Class details */
+.details { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 10px 0 0; font-size: 14px; }
+.details dt { color: var(--muted); }
+.details dd { margin: 0; }
+
+/* My homework tabs: boxed tabs sitting on a line; the open one is filled. */
+.tabs { display: flex; gap: 6px; margin: 20px 0 16px; border-bottom: 2px solid var(--brand); overflow-x: auto; }
+.tab {
+  padding: 10px 16px; border: 1px solid var(--border); border-bottom: 0; border-radius: 12px 12px 0 0;
+  background: var(--bg); color: var(--muted); font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.tab:hover { color: var(--text); background: var(--surface); }
+.tabActive, .tabActive:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
+.count { display: inline-block; min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--bg); font-size: 12px; text-align: center; }
+.tabActive .count { background: #fff; color: var(--brand-strong); }
+
+/* Dashboard blocks inside a tile (homework counts, class schedule). */
+.tileLinkable:hover { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+.tile:not(.tileLinkable):hover { border-color: var(--border); box-shadow: none; }
+.block {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--bg); color: inherit; text-decoration: none;
+}
+a.block:hover { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+.blockDue { border-left: 6px solid var(--danger); }
+.blockOk { border-left: 6px solid var(--ok); }
+.block p { margin: 2px 0 0; }
+.mid { min-width: 40px; font-size: 24px; font-weight: 700; line-height: 1.2; }
+.wide { margin-top: 16px; }
+.scheduleList { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.nextClass { font-weight: 600; color: var(--brand-strong); }
+.teacherLine { margin: 0 0 4px; font-size: 15px; }
+
+/* Phones: name and Sign out stay on the first line; the tabs get their own row along the bottom. */
+@media (max-width: 600px) {
+  .brand { flex: 1; }
+  .nav { order: 3; flex-basis: 100%; }
+  .link, .tab { padding: 9px 10px; }
+  .tabs { gap: 4px; }
+}
+
+/* My classes page: wider cards (two side by side at most, one on phones). */
+.classCards { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
