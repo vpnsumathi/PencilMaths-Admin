@@ -41,11 +41,20 @@ export function targetProblem(target: HandInTarget | null, wrongHomework: string
 }
 
 // Uploads the file into the student's Drive Homework folder and returns what to record in the database.
-export async function uploadHandIn(target: HandInTarget, { file, type, ext }: CheckedFile, part: number) {
+// `chosenName` is the name the student typed when handing in (optional).
+export async function uploadHandIn(target: HandInTarget, { file, type, ext }: CheckedFile, part: number, chosenName?: string, parts = 1) {
   const homework = await findOrCreateFolder('Homework', target.folder_id!);
-  // e.g. "2026-10-11 14.05 Maths - Practice sheet 1 (2).jpg"
+  // e.g. "2026-10-11 14.05 Maths - Practice sheet 1 (2).jpg", or "2026-10-11 14.05 My fractions answers.pdf"
   const stamp = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/London' }).slice(0, 16).replace(':', '.');
-  const name = `${stamp} ${target.subject} - ${target.title} (${part}).${ext}`;
+  const clean = cleanName(chosenName);
+  const name = clean
+    ? `${stamp} ${clean}${parts > 1 ? ` (${part})` : ''}.${ext}`
+    : `${stamp} ${target.subject} - ${target.title} (${part}).${ext}`;
   const uploaded = await uploadFile(homework.id, name, type, await file.arrayBuffer());
   return { p_file_id: uploaded.id, p_url: uploaded.webViewLink, p_label: name };
+}
+
+// A typed file name made safe: no characters Drive or Windows dislike, at most 80 characters.
+export function cleanName(name: string | undefined | null) {
+  return (name ?? '').replace(/\.(pdf|jpe?g|png|docx?)$/i, '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
 }

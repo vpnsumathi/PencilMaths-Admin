@@ -4,9 +4,9 @@ import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-// Supabase's built-in invite email lands here with the session in the
+// Invite emails and "Forgot password" emails land here with the session in the
 // address hash (#access_token=…&refresh_token=…), or with #error=… when the
-// link was already used or has run out.
+// link was already used or has run out. Either way the person then chooses a password.
 export default function AcceptInvite() {
   const router = useRouter();
   const started = useRef(false);
@@ -55,8 +55,8 @@ export default function AcceptInvite() {
         <>
           <h1>This link has expired</h1>
           <p>
-            Invite links work once and only for a limited time. Please ask Pencil Maths to send a
-            new invite.
+            Email links work once and only for a limited time. For a password reset, use Forgot
+            password on the <a href="/login">sign-in page</a> again. For an invite, ask Pencil Maths to send a new one.
           </p>
           <p style={{ color: '#666', fontSize: 14 }}>Reason: {problem}</p>
         </>

@@ -41,3 +41,20 @@
 
 .ok { margin: 0; color: var(--ok); font-weight: 600; text-align: center; }
 .error { margin: 0; color: var(--danger); font-weight: 600; text-align: center; }
+
+/* "Name your file" pop-up, shown when Hand in is pressed. */
+.naming {
+  width: min(420px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); color: var(--text);
+}
+.naming::backdrop { background: rgb(15 23 42 / 0.45); }
+.nameLabel { display: grid; gap: 8px; font-weight: 700; }
+.nameInput {
+  padding: 12px; border: 1px solid var(--border-strong); border-radius: 12px; font: inherit; font-weight: 400;
+}
+.nameInput:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+.nameButtons { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 12px; }
+.cancel {
+  padding: 14px; border: 1px solid var(--border); border-radius: 14px; cursor: pointer;
+  background: var(--surface); color: var(--muted); font: inherit; font-weight: 600;
+}

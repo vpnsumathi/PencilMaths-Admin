@@ -12,6 +12,7 @@ type Homework = {
   sheet_id: string; title: string; subject: string; set_on: string; due_on: string | null;
   max_mark: number | null; status: string; mark: number | null; files: number;
   sheets?: { id: string; label: string | null }[];
+  handed?: { id: string; label: string | null }[];
 };
 
 // Links to the homework sheet(s) staff attached.
@@ -33,6 +34,24 @@ const TABS = [
   { key: 'handed', label: 'Handed in' },
   { key: 'marked', label: 'Marked' },
 ] as const;
+
+// The files the student handed in, newest last. The date and time at the start of the Drive name is
+// left out here ("2026-10-20 23.30 Fractions.pdf" shows as "Fractions.pdf").
+function HandedFiles({ h }: { h: Homework }) {
+  if (!h.handed?.length) return null;
+  return (
+    <div className={styles.handed}>
+      <p className={styles.handedTitle}>Your handed-in file{h.handed.length === 1 ? '' : 's'}:</p>
+      <p className={styles.sheets}>
+        {h.handed.map((f) => (
+          <a key={f.id} href={`/me/homework/file/${f.id}`} target="_blank" rel="noreferrer" className={styles.sheet}>
+            📎 {(f.label ?? 'Handed-in file').replace(/^\d{4}-\d{2}-\d{2} \d{2}\.\d{2} /, '')}
+          </a>
+        ))}
+      </p>
+    </div>
+  );
+}
 
 // The student's homework from the last 90 days, in three tabs: to hand in (the default), handed in, and marked.
 // ?tab=handed or ?tab=marked opens the other tabs (the dashboard links use these).
@@ -79,7 +98,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
                 </span>
               : `Set ${formatDate(h.set_on)}`}
           </p>
-          <HandInForm action={handInMyFile} sheetId={h.sheet_id} />
+          <HandInForm action={handInMyFile} sheetId={h.sheet_id} title={h.title} />
         </article>
       ))}
 
@@ -97,7 +116,8 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
               ? 'Excused'
               : <><strong className={styles.marked}>✓ Handed in</strong> · waiting to be marked · {h.files} file{h.files === 1 ? '' : 's'}</>}
           </p>
-          {h.status === 'received' && <HandInForm action={handInMyFile} sheetId={h.sheet_id} label="Add more pages" />}
+          <HandedFiles h={h} />
+          {h.status === 'received' && <HandInForm action={handInMyFile} sheetId={h.sheet_id} title={h.title} label="Add more pages" />}
         </article>
       ))}
 
@@ -113,6 +133,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
           <p className={styles.marked}>
             ✅ {h.mark !== null ? `${h.mark}${h.max_mark ? ` / ${h.max_mark}` : ''}` : 'Marked'}
           </p>
+          <HandedFiles h={h} />
         </article>
       ))}
       </>}

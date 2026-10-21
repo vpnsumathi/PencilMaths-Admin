@@ -1,5 +1,6 @@
 'use server';
 import { redirect } from 'next/navigation';
+import { createClient as createPlainClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
 // These run on the server when the login form is submitted.
@@ -28,11 +29,16 @@ export async function sendReset(_prev: AuthState, form: FormData): Promise<AuthS
   if (!email) return { error: 'Enter your email address first.' };
   if (!EMAIL.test(email)) return { error: 'Enter an email address like name@pencilmaths.com.' };
 
-  // ask Supabase to email a reset link. 
-const supabase = await createClient();
-const { error } = await supabase.auth.resetPasswordForEmail(email, {
-  redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/reset-password`,
-});
-    if (error) console.error('sendReset failed:', error.message);
-    return { ok: 'If that email belongs to a staff account, a reset link is on its way.' };
+  // Ask Supabase to email a reset link (staff and students alike).
+  // The "implicit" kind of link carries the sign-in itself, so it works even when opened on another
+  // device (e.g. requested on a laptop, opened on a phone). It lands on /auth/accept, which goes on
+  // to /reset-password, the same as an invite.
+  const supabase = createPlainClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+    auth: { flowType: 'implicit', persistSession: false, autoRefreshToken: false },
+  });
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/accept`,
+  });
+  if (error) console.error('sendReset failed:', error.message);
+  return { ok: 'If that email has a Pencil Maths account, a reset link is on its way. Check your spam folder too.' };
 }

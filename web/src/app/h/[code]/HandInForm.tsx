@@ -11,13 +11,15 @@ type Status = { kind: 'idle' | 'busy' | 'done' | 'error'; text: string };
 
 // Used by the WhatsApp link (with the family's code) and by the student login (no code: the login says who it is).
 // The student adds photos and files one after another, then one Hand in sends them all as a single PDF.
-export function HandInForm({ action, code, sheetId, label = 'Hand in' }: {
-  action: (form: FormData) => Promise<HandInResult>; code?: string; sheetId: string; label?: string;
+export function HandInForm({ action, code, sheetId, title, label = 'Hand in' }: {
+  action: (form: FormData) => Promise<HandInResult>; code?: string; sheetId: string; title?: string; label?: string;
 }) {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<Status>({ kind: 'idle', text: '' });
   const picker = useRef<HTMLInputElement>(null);
+  const naming = useRef<HTMLDialogElement>(null);
+  const [name, setName] = useState(title ?? '');
 
   // Each pick adds to the list, so several photos can be taken one at a time.
   function add(e: React.ChangeEvent<HTMLInputElement>) {
@@ -52,6 +54,8 @@ export function HandInForm({ action, code, sheetId, label = 'Hand in' }: {
       if (code) form.set('code', code);
       form.set('sheet_id', sheetId);
       form.set('part', String(i + 1));
+      form.set('parts', String(pdfs.length));
+      form.set('name', name);
       form.set('file', pdf);
       const result = await action(form);
       if (!result.ok) {
@@ -103,9 +107,24 @@ export function HandInForm({ action, code, sheetId, label = 'Hand in' }: {
 
       {/* Always clickable: with nothing chosen yet, it opens the file picker instead. */}
       <button type="button" className={styles.send} disabled={busy}
-        onClick={() => (files.length === 0 ? picker.current?.click() : send())}>
+        onClick={() => (files.length === 0 ? picker.current?.click() : naming.current?.showModal())}>
         {busy ? status.text : files.length > 0 ? `${label} (${files.length} page${files.length === 1 ? '' : 's'})` : label}
       </button>
+      {/* Asked when Hand in is pressed: the name the PDF is saved under. */}
+      <dialog ref={naming} className={styles.naming} aria-label="Name your file">
+        <form method="dialog" onSubmit={(e) => { e.preventDefault(); naming.current?.close(); send(); }}>
+          <label className={styles.nameLabel}>
+            Name your file
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required
+              placeholder="e.g. Fractions homework" className={styles.nameInput} autoFocus />
+          </label>
+          <p className={styles.chosen}>Saved as a PDF{files.length > 1 ? ` with all ${files.length} pages` : ''}.</p>
+          <div className={styles.nameButtons}>
+            <button type="submit" className={styles.send}>{label}</button>
+            <button type="button" className={styles.cancel} onClick={() => naming.current?.close()}>Cancel</button>
+          </div>
+        </form>
+      </dialog>
       {status.kind === 'done' && <p className={styles.ok} role="status">✅ {status.text}</p>}
       {status.kind === 'error' && <p className={styles.error} role="alert">{status.text}</p>}
     </div>

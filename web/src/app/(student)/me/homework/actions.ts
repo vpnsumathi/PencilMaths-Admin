@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/server';
 export async function handInMyFile(form: FormData): Promise<HandInResult> {
   const sheetId = String(form.get('sheet_id') ?? '');
   const part = Number(form.get('part')) || 1;
+  const parts = Number(form.get('parts')) || 1;
+  const name = String(form.get('name') ?? '');
 
   if (!UUID.test(sheetId)) return { ok: false, error: 'Homework not found.' };
   const checked = checkFile(form.get('file'));
@@ -21,7 +23,7 @@ export async function handInMyFile(form: FormData): Promise<HandInResult> {
   if (problem) return { ok: false, error: problem };
 
   try {
-    const saved = await uploadHandIn(target, checked, part);
+    const saved = await uploadHandIn(target, checked, part, name, parts);
     const { error } = await supabase.rpc('my_handin_record', { p_sheet: sheetId, ...saved });
     if (error) throw new Error(error.message);
   } catch (e) {

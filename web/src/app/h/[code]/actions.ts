@@ -12,6 +12,8 @@ export async function handInFile(form: FormData): Promise<HandInResult> {
   const code = String(form.get('code') ?? '');
   const sheetId = String(form.get('sheet_id') ?? '');
   const part = Number(form.get('part')) || 1;
+  const parts = Number(form.get('parts')) || 1;
+  const name = String(form.get('name') ?? '');
 
   if (!CODE.test(code) || !UUID.test(sheetId)) return { ok: false, error: 'This link is not valid.' };
   const checked = checkFile(form.get('file'));
@@ -24,7 +26,7 @@ export async function handInFile(form: FormData): Promise<HandInResult> {
   if (problem) return { ok: false, error: problem };
 
   try {
-    const saved = await uploadHandIn(target, checked, part);
+    const saved = await uploadHandIn(target, checked, part, name, parts);
     const { error } = await supabase.rpc('handin_record', { p_code: code, p_sheet: sheetId, ...saved });
     if (error) throw new Error(error.message);
   } catch (e) {

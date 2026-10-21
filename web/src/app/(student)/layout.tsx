@@ -26,6 +26,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         </Link>
         <StudentNav />
         <span className={styles.who} title={`Signed in as ${name}`}>{name}</span>
+        <Link href="/me/password" className={styles.signOut} title="Change password">🔑 Password</Link>
         <form action={signOut}>
           <button className={styles.signOut}>Sign out</button>
         </form>
