@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| **Last updated** | 11 October 2026 |
+| **Last updated** | 23 October 2026 |
 | **Current stage** | Pieces 1–10 done, plus Students, Teachers, Batches, dashboard, Enquiries and the WhatsApp homework feature (Phases 1–5). Next: staff invites (Part 9.3) and audit log. |
 | **Where this guide lives** | `PencilMaths-Admin/Help/01-project-guide.md` (master copy). A copy is kept in the Claude project's files. |
 | **Reference project** | `pencil-maths-portal-phase1/pencil-portal` (the original phase 1 portal, used as a guide; we do not edit it) |
@@ -694,7 +694,7 @@ Moving between folders: `cd web` (go into), `cd ..` (go up one level).
 1. Edit a file and save (**Ctrl+S**). The browser updates by itself (*hot reload*).
 2. Check it on desktop and phone view (**F12**, **Ctrl+Shift+M**).
 3. Update this guide (section 17 change log and any section affected).
-4. Commit (section 11).
+4. Commit and push to the `staging` branch (section 11). Production only changes when you merge into `main`: see [13 Staging and Production](13-staging-and-production.md).
 
 ### 10.4 Stop working
 
@@ -881,6 +881,40 @@ You then commit `Help/01-project-guide.md` as usual (section 11).
 ## 17. Change log
 
 Newest first.
+
+### 2026-10-24 — Lesson planner
+**What changed:**
+- New **Lesson library** (admin): import a "Term Lesson Plan - Year N" spreadsheet and upload the worksheets (Year 5 Maths: 95 lessons, 285 homework codes).
+- Batch page **Lesson plan** for library classes: Term and Module dropdowns, Start / Mark completed / Undo; Mark completed sends the ticked Hw-1/2/3 worksheets.
+- Staff can upload a **corrected sheet** per student; students see it on My homework.
+
+**Files added / changed / removed:**
+- `supabase/migrations/20261024000001_lesson_planner.sql` — new (Staging first).
+- `web/src/lib/lessons/` — new `xlsx.ts`, `plan.ts`.
+- `web/src/app/(portal)/lesson-library/` — new page, actions, upload box.
+- `web/src/app/(portal)/batches/` — new `LessonPlanner.tsx`, `PlannerPicker.tsx`, `CompleteLesson.tsx`; changed `actions.ts`, `HomeworkSection.tsx`, `[id]/page.tsx`.
+- `web/src/app/(student)/me/homework/page.tsx`, `web/src/components/AppShell.tsx`, `web/src/lib/form.ts` — changed.
+- `Help/14-lesson-planner.md` — new guide.
+
+### 2026-10-23 — New students only get future homework
+**What changed:**
+- A student who joins a batch no longer sees homework set before they joined. Staff can give an older homework with **Give homework** on the batch page.
+
+**Files added / changed / removed:**
+- `supabase/migrations/20261023000001_homework_for_new_students.sql` — new (run on Staging first).
+- `web/src/app/(portal)/batches/actions.ts` — `giveHomework`.
+- `web/src/app/(portal)/batches/HomeworkSection.tsx` — table lists students given the homework; **Not given to** list.
+- `Help/09-homework-marking.md` — section 2.1.
+
+### 2026-10-23 — Staging and Production
+**What changed:**
+- Two environments: Staging (branch `staging`, original Supabase project, test data) and Production (branch `main`, new empty Supabase project).
+- All development now goes to `staging`; Production changes only when `staging` is merged into `main`.
+
+**Files added / changed / removed:**
+- `Help/13-staging-and-production.md` — new guide.
+- `Help/README.md` — rows for guides 10, 12 and 13.
+- `Help/01-project-guide.md` — section 10.3 points to guide 13.
 
 ### 2026-10-11 — Help folder organised
 **What changed:**

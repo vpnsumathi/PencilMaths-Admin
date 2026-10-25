@@ -11,5 +11,5 @@ export const optionalNumber = (form: FormData, key: string) => {
 
 // Go to a page with a green (ok) or red (error) message in the address.
 export function redirectWith(path: string, kind: 'ok' | 'error', message: string): never {
-  redirect(`${path}?${kind}=${encodeURIComponent(message)}`);
+  redirect(`${path}${path.includes('?') ? '&' : '?'}${kind}=${encodeURIComponent(message)}`);
 }

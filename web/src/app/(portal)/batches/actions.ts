@@ -3,7 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { todayInUk, UUID, YEARS } from '@/lib/options';
+import { findOrCreateFolder, uploadFile } from '@/lib/google/drive';
+import { cleanName, fileKind, MAX_BYTES } from '@/lib/homework/handin';
 import { attachSheetFiles } from '@/lib/homework/sheets';
+import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
 import { createClient } from '@/lib/supabase/server';
 
 type Slot = { weekday: number; start_time: string };
@@ -142,8 +145,8 @@ export async function setBatchClosed(form: FormData) {
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 // Reads and checks the homework fields shared by "Set homework" and "Mark completed".
-function readHomework(form: FormData, path: string) {
-  const title = text(form, 'title');
+// The title comes from the form unless given (lesson homework is named after its lesson).
+function readHomework(form: FormData, path: string, title = text(form, 'title')) {
   const setOn = text(form, 'set_on') || todayInUk();
   const dueOn = optional(form, 'due_on');
   const maxMark = optionalNumber(form, 'max_mark');
@@ -154,7 +157,7 @@ function readHomework(form: FormData, path: string) {
 }
 
 // Adds the homework with a "pending" result for each current student. Returns its id and the number of students.
-async function insertHomework(supabase: Supabase, batchId: string, path: string, fields: ReturnType<typeof readHomework> & { topic_id?: string }) {
+async function insertHomework(supabase: Supabase, batchId: string, path: string, fields: ReturnType<typeof readHomework> & { topic_id?: string; lesson_homework_id?: string }) {
   const { data: sheet, error } = await supabase
     .from('homework_sheets')
     .insert({ batch_id: batchId, ...fields })
@@ -165,7 +168,8 @@ async function insertHomework(supabase: Supabase, batchId: string, path: string,
     redirectWith(path, 'error', 'Could not set the homework.');
   }
 
-  // One "pending" result per current student, so reports count anyone who hasn't handed it in.
+  // One "pending" result per current student. This row is what gives a student the homework, so students
+  // who join the batch later don't get it (staff can still give it with "Give homework").
   const { data: members } = await supabase.from('enrolments').select('student_id').eq('batch_id', batchId).is('ended_on', null);
   if (members?.length) {
     const { error: resultError } = await supabase
@@ -256,6 +260,174 @@ export async function completeTopic(form: FormData) {
   revalidatePath('/');
   if (fileProblem) redirectWith(path, 'error', `${message} But: ${fileProblem}`);
   redirectWith(path, 'ok', message);
+}
+
+// Gives an older homework to one student who joined the batch after it was set.
+// New students only get homework set after they join; this adds the "not handed in" result by hand.
+export async function giveHomework(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const sheetId = text(form, 'sheet_id');
+  const studentId = text(form, 'student_id');
+  if (![batchId, sheetId, studentId].every((v) => UUID.test(v))) redirectWith('/batches', 'error', 'Homework not found.');
+  const path = `/batches/${batchId}`;
+
+  const supabase = await createClient();
+  const [{ data: sheet }, { data: member }] = await Promise.all([
+    supabase.from('homework_sheets').select('title').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
+    supabase.from('enrolments').select('id').eq('student_id', studentId).eq('batch_id', batchId).is('ended_on', null).maybeSingle(),
+  ]);
+  if (!sheet) redirectWith(path, 'error', 'Homework not found.');
+  if (!member) redirectWith(path, 'error', 'That student is not in this class.');
+
+  // ignoreDuplicates: pressing twice, or a student who already has it, changes nothing.
+  const { error } = await supabase
+    .from('homework_results')
+    .upsert({ sheet_id: sheetId, student_id: studentId }, { onConflict: 'sheet_id,student_id', ignoreDuplicates: true });
+  if (error) {
+    console.error('giveHomework failed:', error.message);
+    redirectWith(path, 'error', 'Could not give the homework.');
+  }
+
+  revalidatePath(path);
+  revalidatePath('/');
+  redirectWith(path, 'ok', `"${sheet.title}" given. The student can now see it and hand it in.`);
+}
+
+/* ---------- Lesson planner (lessons from the Lesson library) ---------- */
+
+// Start (Not started → In progress) and Undo (Completed → In progress, In progress → Not started).
+// Undoing a completed lesson keeps any homework it sent.
+export async function setLessonStatus(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const lessonId = text(form, 'lesson_id');
+  const status = text(form, 'status');
+  if (!UUID.test(batchId) || !UUID.test(lessonId)) redirectWith('/batches', 'error', 'Lesson not found.');
+  const path = `/batches/${batchId}`;
+  if (status !== 'not_started' && status !== 'in_progress') redirectWith(path, 'error', 'Unknown status.');
+
+  const supabase = await createClient();
+  const { error } = await supabase.from('batch_lessons').upsert({
+    batch_id: batchId, lesson_id: lessonId, status, completed_on: null,
+    ...(status === 'in_progress' ? { started_on: todayInUk() } : { started_on: null }),
+  }, { onConflict: 'batch_id,lesson_id' });
+  if (error) {
+    console.error('setLessonStatus failed:', error.message);
+    redirectWith(path, 'error', 'Could not change the lesson.');
+  }
+  revalidatePath(path);
+  redirectWith(lessonView(form, path), 'ok', status === 'in_progress' ? 'Lesson is now in progress.' : 'Lesson moved back to not started.');
+}
+
+// The batch page showing the term and module the action was on ("/batches/<id>?term=1&module=Geometry").
+function lessonView(form: FormData, path: string) {
+  const term = text(form, 'term');
+  const moduleName = text(form, 'module');
+  return term && moduleName ? `${path}?${new URLSearchParams({ term, module: moduleName })}` : path;
+}
+
+// Marks a lesson completed and sends the ticked homework sheets (Hw-1, Hw-2, Hw-3) to everyone in the batch,
+// each with its worksheet from the Lesson library. A sheet already sent to this batch is not sent again.
+export async function completeLesson(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const lessonId = text(form, 'lesson_id');
+  if (!UUID.test(batchId) || !UUID.test(lessonId)) redirectWith('/batches', 'error', 'Lesson not found.');
+  const path = `/batches/${batchId}`;
+  const view = lessonView(form, path);
+  const picked = form.getAll('hw').map(String).filter((v) => UUID.test(v));
+
+  const supabase = await createClient();
+  const [{ data: lesson }, { data: batch }] = await Promise.all([
+    supabase.from('lessons').select('id, name, subject_id, year_group, lesson_homework(id, slot, code, drive_file_id, url, file_name)')
+      .eq('id', lessonId).maybeSingle(),
+    supabase.from('batches').select('subject_id, year_group').eq('id', batchId).maybeSingle(),
+  ]);
+  if (!lesson || !batch || lesson.subject_id !== batch.subject_id || lesson.year_group !== batch.year_group) {
+    redirectWith(path, 'error', 'That lesson is not part of this class\'s plan.');
+  }
+  const { data: sent } = await supabase
+    .from('homework_sheets').select('lesson_homework_id').eq('batch_id', batchId).not('lesson_homework_id', 'is', null);
+  const alreadySent = new Set((sent ?? []).map((s) => s.lesson_homework_id as string));
+
+  const sheets = (lesson.lesson_homework ?? [])
+    .filter((h) => picked.includes(h.id) && !alreadySent.has(h.id))
+    .sort((a, b) => a.slot - b.slot);
+  const missing = sheets.find((h) => !h.drive_file_id);
+  if (missing) redirectWith(view, 'error', `${missing.code} has no worksheet yet. Upload it in the Lesson library first.`);
+
+  const titles: string[] = [];
+  let students = 0;
+  for (const h of sheets) {
+    const fields = readHomework(form, path, `${lesson.name} · Hw-${h.slot} (${h.code})`);
+    const result = await insertHomework(supabase, batchId, path, { ...fields, lesson_homework_id: h.id });
+    students = result.students;
+    // The worksheet is the library's Drive file, linked to this homework (no copy is made).
+    const { error } = await supabase.from('file_links').insert({
+      owner_type: 'homework_sheet', owner_id: result.sheetId, provider: 'google_drive',
+      external_id: h.drive_file_id, url: h.url, label: h.file_name ?? `${h.code}.pdf`,
+    });
+    if (error) console.error('completeLesson worksheet link failed:', error.message);
+    titles.push(h.code);
+  }
+
+  const { error } = await supabase.from('batch_lessons').upsert(
+    { batch_id: batchId, lesson_id: lessonId, status: 'complete', completed_on: todayInUk() },
+    { onConflict: 'batch_id,lesson_id' },
+  );
+  if (error) {
+    console.error('completeLesson failed:', error.message);
+    redirectWith(view, 'error', 'The homework was sent, but the lesson could not be marked completed.');
+  }
+
+  revalidatePath(path);
+  revalidatePath('/');
+  redirectWith(view, 'ok', titles.length
+    ? `Lesson completed. Homework ${titles.join(', ')} sent to ${students} student(s).`
+    : 'Lesson completed. No homework was sent.');
+}
+
+// Uploads the teacher's corrected sheet for one student's homework into the student's Drive Homework folder.
+// The student sees it on their Marked tab. Uploading again adds another file.
+export async function uploadCorrection(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const sheetId = text(form, 'sheet_id');
+  const studentId = text(form, 'student_id');
+  if (![batchId, sheetId, studentId].every((v) => UUID.test(v))) redirectWith('/batches', 'error', 'Homework not found.');
+  const path = `/batches/${batchId}`;
+  const file = form.get('correction');
+  if (!(file instanceof File) || file.size === 0) redirectWith(path, 'error', 'Choose the corrected sheet first.');
+  const kind = fileKind(file);
+  if (!kind) redirectWith(path, 'error', 'The corrected sheet must be a PDF, Word file or photo.');
+  if (file.size > MAX_BYTES) redirectWith(path, 'error', `${file.name} is too big (4 MB max).`);
+
+  const supabase = await createClient();
+  const [{ data: sheet }, { data: result }] = await Promise.all([
+    supabase.from('homework_sheets').select('title').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
+    supabase.from('homework_results').select('student_id').eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle(),
+  ]);
+  if (!sheet || !result) redirectWith(path, 'error', 'That student was not given this homework.');
+
+  try {
+    await ensureStudentDriveFolder(studentId);
+    const { data: folder } = await supabase
+      .from('file_links').select('external_id').eq('student_id', studentId).eq('owner_type', 'student_folder').maybeSingle();
+    if (!folder?.external_id) throw new Error('No Drive folder');
+    const homework = await findOrCreateFolder('Homework', folder.external_id);
+    // e.g. "2026-10-24 18.30 Digits and their places · Hw-1 (Y5-A001) - corrected.pdf"
+    const stamp = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/London' }).slice(0, 16).replace(':', '.');
+    const name = `${stamp} ${cleanName(sheet.title)} - corrected.${kind.ext}`;
+    const uploaded = await uploadFile(homework.id, name, kind.type, await file.arrayBuffer());
+    const { error } = await supabase.from('file_links').insert({
+      owner_type: 'homework_correction', owner_id: sheetId, student_id: studentId, provider: 'google_drive',
+      external_id: uploaded.id, url: uploaded.webViewLink, label: name,
+    });
+    if (error) throw new Error(error.message);
+  } catch (e) {
+    console.error('uploadCorrection failed:', e);
+    redirectWith(path, 'error', 'Could not upload the corrected sheet to Google Drive.');
+  }
+
+  revalidatePath(path);
+  redirectWith(path, 'ok', 'Corrected sheet uploaded. The student can see it now.');
 }
 
 // Records a mark, or "excused", for one student's homework.

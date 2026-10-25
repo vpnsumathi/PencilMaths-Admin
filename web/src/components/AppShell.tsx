@@ -21,6 +21,7 @@ const NAV = [
 ];
 const ADMIN_NAV = [
   { href: '/subjects', label: 'Subjects', icon: BookIcon, ready: true },
+  { href: '/lesson-library', label: 'Lesson library', icon: BookIcon, ready: true },
   { href: '/staff', label: 'Staff', icon: ShieldCheckIcon, ready: true },
 ];
 

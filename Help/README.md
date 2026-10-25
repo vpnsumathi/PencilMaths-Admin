@@ -13,6 +13,10 @@ Start here. The guides are numbered in reading order.
 | 07 | [Google Drive: student folders](07-gdrive-student-folders.md) | A Drive folder for every student (Phase 3) |
 | 08 | [Homework hand-in link](08-homework-handin-link.md) | The WhatsApp link families use to upload homework into Drive (Phase 4) |
 | 09 | [Setting and marking homework](09-homework-marking.md) | Set homework, see submissions, enter marks (Phase 5) |
+| 10 | [Testing guide](10-testing-guide.md) | How to test the app |
+| 12 | [Student login](12-student-login.md) | Student sign-in, dashboard, homework and hand-in for students |
+| 13 | [Staging and Production](13-staging-and-production.md) | The two environments, daily routine on `staging`, going live, Vercel settings, admin passwords |
+| 14 | [Lesson planner](14-lesson-planner.md) | Lesson library (import the term plan, upload worksheets), the batch page Term/Module lesson plan, sending Hw-1/2/3, corrected sheets |
 
 ## The homework feature end to end
 

@@ -47,6 +47,7 @@ Family's link: "✅ Marked: 16 / 20"      Dashboard: "to mark" and "handed in %"
 | **Mark** | Type the mark → **Save** |
 | **Excuse** | **Excuse** (clears any mark) |
 | **Delete** | **Delete homework** → confirm. Results go; files stay in Drive |
+| **Give older homework to a new student** | Under the homework's table, **Not given to** lists students who joined after it was set → **Give homework** (added 23 Oct 2026) |
 
 | Status | Badge | Meaning |
 |---|---|---|
@@ -54,6 +55,15 @@ Family's link: "✅ Marked: 16 / 20"      Dashboard: "to mark" and "handed in %"
 | `received` | To mark (blue) | Files handed in |
 | `marked` | Marked (green) | Mark entered |
 | `excused` | Excused (grey) | Doesn't need doing |
+
+### 2.1 New students only get future homework (23 Oct 2026)
+
+A homework is given to a student only when they have a `homework_results` row for it. **Set homework** and **Mark completed** add a row for everyone in the batch **at that moment**. So a student who joins a batch later:
+- does **not** see older homework on their login, WhatsApp link or dashboard;
+- **does** get every homework set after they join;
+- can be given an older homework by hand with **Give homework** (it then shows under **To hand in**).
+
+Database script: `supabase/migrations/20261023000001_homework_for_new_students.sql` (run on **Staging** first). It changes `handin_page`, `handin_target`, `handin_record`, `my_dashboard` and `my_homework_file` to need the result row, and adds missing rows for students who were already in the batch when each homework was set, so nothing disappears for current students.
 
 ---
 
@@ -104,7 +114,7 @@ Removes the sheet's `file_links` rows (they have no database link to the sheet),
 ### 5.4 `HomeworkSection.tsx`
 - One query: the batch's sheets with each result and the student's name (`homework_results(…, students(first_name, last_name))`), newest first.
 - A second query: all `homework_submission` file records for those sheets.
-- Rows = current batch members + anyone with a result who has left.
+- Rows = students with a result for that homework (the ones it was given to). Current members without one are listed under **Not given to** with a **Give homework** button (`giveHomework` in `actions.ts`: checks the homework is in the batch and the student is in the class, then adds a `pending` result).
 - `<details open={toMark > 0}>` folds each homework away unless it needs marking.
 - `as unknown as Result[]`: Supabase can't tell `students(...)` is one row here, so the type is set by hand.
 
@@ -121,6 +131,9 @@ Removes the sheet's `file_links` rows (they have no database link to the sheet),
 | Enter 25 → Save | "The mark can't be more than 20." |
 | **Excuse** another student | **Excused** |
 | Dashboard | "to mark" and "handed in %" change |
+| Add a new student to a batch that already has homework | Batch page: they are under **Not given to**; their login shows no old homework |
+| **Give homework** for them | They move into the table as **Not handed in**; it appears under **To hand in** on their login |
+| Set a new homework | The new student gets it straight away |
 | **Delete homework** → OK | Gone from the batch and the link; files still in Drive |
 
 ---

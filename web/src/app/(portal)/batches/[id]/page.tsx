@@ -10,19 +10,20 @@ import { setBatchClosed, setTopicStatus } from '../actions';
 import { CompleteTopic } from '../CompleteTopic';
 import { BatchForm } from '../BatchForm';
 import { HomeworkSection } from '../HomeworkSection';
+import { LessonPlanner } from '../LessonPlanner';
 
 export const metadata = { title: 'Batch' };
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ ok?: string; error?: string; term?: string; module?: string }>;
 };
 
 const TOPIC_STATUS: Record<string, string> = { not_started: 'Not started', in_progress: 'In progress', complete: 'Completed' };
 
 export default async function BatchPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { ok, error: problem } = await searchParams;
+  const { ok, error: problem, term, module: moduleName } = await searchParams;
   if (!UUID.test(id)) notFound();
 
   const supabase = await createClient();
@@ -45,6 +46,11 @@ export default async function BatchPage({ params, searchParams }: Props) {
       supabase.from('teachers').select('id, first_name, last_name, subject_id').neq('status', 'left').order('first_name'),
     ]);
   if (!batch) notFound();
+  // Classes whose subject and year are in the Lesson library use the term and module lesson planner.
+  const { count: libraryLessons } = await supabase
+    .from('lessons').select('id', { count: 'exact', head: true })
+    .eq('subject_id', batch.subject_id).eq('year_group', batch.year_group);
+  const usesLibrary = (libraryLessons ?? 0) > 0;
   // Homework already sent by completing a topic, by topic.
   const { data: topicHomework } = await supabase
     .from('homework_sheets').select('topic_id, title').eq('batch_id', id).not('topic_id', 'is', null);
@@ -80,7 +86,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
         teachers={teachers ?? []}
       />
 
-      <div className={ui.columns}>
+      <div className={usesLibrary ? undefined : ui.columns}>
         <section className={ui.card}>
           <h2>Students</h2>
           {students.length === 0 ? (
@@ -97,7 +103,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
           )}
         </section>
 
-        <section className={ui.card}>
+        {!usesLibrary && <section className={ui.card}>
           <h2>Lesson plan</h2>
           {(topics ?? []).length === 0 ? (
             <p className={ui.empty}>No topics. Add some to the subject&apos;s curriculum first.</p>
@@ -142,8 +148,12 @@ export default async function BatchPage({ params, searchParams }: Props) {
               ))}
             </ol>
           )}
-        </section>
+        </section>}
       </div>
+
+      {usesLibrary && (
+        <LessonPlanner batch={batch} students={students.length} today={today} term={term} moduleName={moduleName} />
+      )}
 
       <HomeworkSection batchId={batch.id} members={students} />
     </>

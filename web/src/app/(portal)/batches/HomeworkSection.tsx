@@ -5,7 +5,9 @@ import ui from '@/components/ui.module.css';
 import { formatDate } from '@/lib/format';
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
-import { addHomeworkFile, createHomework, deleteHomework, markHomework, removeHomeworkFile } from './actions';
+import {
+  addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile, uploadCorrection,
+} from './actions';
 
 // Label and badge colour for each homework status.
 const STATUS: Record<string, { tone: string; label: string }> = {
@@ -33,14 +35,17 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
     .order('set_on', { ascending: false })
     .order('created_at', { ascending: false });
   const sheetIds = (sheets ?? []).map((s) => s.id);
-  const { data: files } = sheetIds.length
+  const { data: allFiles } = sheetIds.length
     ? await supabase
         .from('file_links')
-        .select('owner_id, student_id, url, label')
-        .eq('owner_type', 'homework_submission')
+        .select('owner_type, owner_id, student_id, url, label')
+        .in('owner_type', ['homework_submission', 'homework_correction'])
         .in('owner_id', sheetIds)
         .order('created_at')
     : { data: [] };
+  // What students handed in, and the teacher's corrected sheets.
+  const files = (allFiles ?? []).filter((f) => f.owner_type === 'homework_submission');
+  const corrections = (allFiles ?? []).filter((f) => f.owner_type === 'homework_correction');
   const { data: sheetFiles } = sheetIds.length
     ? await supabase
         .from('file_links')
@@ -85,13 +90,12 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
         // Supabase can't tell students(...) is a single row here, so the type is set by hand.
         const results = sheet.homework_results as unknown as Result[];
         const byStudent = new Map(results.map((r) => [r.student_id, r]));
-        // Everyone in the batch now, plus anyone with a result who has since left it.
-        const rows = members.map((m) => ({ id: m.id, name: `${m.first_name} ${m.last_name}` }));
-        for (const r of results) {
-          if (!rows.some((row) => row.id === r.student_id)) {
-            rows.push({ id: r.student_id, name: `${r.students.first_name} ${r.students.last_name}` });
-          }
-        }
+        // Students the homework was given to (a result row): everyone in the batch when it was set,
+        // plus anyone given it later. Students who joined after it was set are listed under "Not given to".
+        const rows = results
+          .map((r) => ({ id: r.student_id, name: `${r.students.first_name} ${r.students.last_name}` }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        const notGiven = members.filter((m) => !byStudent.has(m.id));
         const toMark = results.filter((r) => r.status === 'received').length;
 
         return (
@@ -135,7 +139,8 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                   {rows.map((student) => {
                     const r = byStudent.get(student.id);
                     const status = STATUS[r?.status ?? 'pending'];
-                    const theirFiles = (files ?? []).filter((f) => f.owner_id === sheet.id && f.student_id === student.id);
+                    const theirFiles = files.filter((f) => f.owner_id === sheet.id && f.student_id === student.id);
+                    const corrected = corrections.filter((f) => f.owner_id === sheet.id && f.student_id === student.id);
                     return (
                       <tr key={student.id}>
                         <td>{student.name}</td>
@@ -144,11 +149,16 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                           {r?.received_on && <span className={ui.muted}> {formatDate(r.received_on)}</span>}
                         </td>
                         <td>
-                          {theirFiles.length === 0 ? '—' : (
+                          {theirFiles.length === 0 && corrected.length === 0 ? '—' : (
                             <span className={ui.files}>
                               {theirFiles.map((f, i) => (
                                 <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
                                   File {i + 1}
+                                </a>
+                              ))}
+                              {corrected.map((f, i) => (
+                                <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
+                                  ✏️ Corrected{corrected.length > 1 ? ` ${i + 1}` : ''}
                                 </a>
                               ))}
                             </span>
@@ -164,6 +174,16 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                             <button className={ui.button}>Save</button>
                             <button name="excuse" value="true" className={ui.button}>Excuse</button>
                           </form>
+                          {(theirFiles.length > 0 || r?.status === 'marked') && (
+                            <form action={uploadCorrection} className={ui.formActions} style={{ marginTop: 6 }}>
+                              <input type="hidden" name="batch_id" value={batchId} />
+                              <input type="hidden" name="sheet_id" value={sheet.id} />
+                              <input type="hidden" name="student_id" value={student.id} />
+                              <input name="correction" type="file" required accept={SHEET_ACCEPT} className={ui.input}
+                                aria-label={`Corrected sheet for ${student.name}`} />
+                              <button className={ui.button}>Upload corrected</button>
+                            </form>
+                          )}
                         </td>
                       </tr>
                     );
@@ -171,6 +191,22 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                 </tbody>
               </table>
             </div>
+
+            {notGiven.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <strong>Not given to: </strong>
+                <span className={ui.muted}>joined the class after this homework was set</span>
+                {notGiven.map((m) => (
+                  <form key={m.id} action={giveHomework} className={ui.formActions} style={{ marginTop: 6 }}>
+                    <input type="hidden" name="batch_id" value={batchId} />
+                    <input type="hidden" name="sheet_id" value={sheet.id} />
+                    <input type="hidden" name="student_id" value={m.id} />
+                    <span>{m.first_name} {m.last_name}</span>
+                    <button className={ui.button}>Give homework</button>
+                  </form>
+                ))}
+              </div>
+            )}
 
             <form action={deleteHomework} style={{ marginTop: 10 }}>
               <input type="hidden" name="batch_id" value={batchId} />
