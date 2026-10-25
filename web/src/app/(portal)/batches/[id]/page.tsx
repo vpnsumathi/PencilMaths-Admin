@@ -8,6 +8,7 @@ import { STUDENT_STATUSES, todayInUk, UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { setBatchClosed, setTopicStatus } from '../actions';
 import { CompleteTopic } from '../CompleteTopic';
+import { GivePastHomework, type PastHomework } from '../GivePastHomework';
 import { BatchForm } from '../BatchForm';
 import { HomeworkSection } from '../HomeworkSection';
 import { LessonPlanner } from '../LessonPlanner';
@@ -51,6 +52,14 @@ export default async function BatchPage({ params, searchParams }: Props) {
     .from('lessons').select('id', { count: 'exact', head: true })
     .eq('subject_id', batch.subject_id).eq('year_group', batch.year_group);
   const usesLibrary = (libraryLessons ?? 0) > 0;
+  // All homework of the batch with who it was given to, for "Give past homework" next to each student.
+  const { data: allHomework } = await supabase
+    .from('homework_sheets').select('id, title, set_on, homework_results(student_id)').eq('batch_id', id)
+    .order('set_on', { ascending: false }).order('created_at', { ascending: false });
+  const hasHomework = (allHomework ?? []).length > 0;
+  const notGiven = (studentId: string): PastHomework[] => (allHomework ?? [])
+    .filter((h) => !(h.homework_results as { student_id: string }[]).some((r) => r.student_id === studentId))
+    .map((h) => ({ id: h.id, title: h.title, set_on: h.set_on }));
   // Homework already sent by completing a topic, by topic.
   const { data: topicHomework } = await supabase
     .from('homework_sheets').select('topic_id, title').eq('batch_id', id).not('topic_id', 'is', null);
@@ -67,7 +76,11 @@ export default async function BatchPage({ params, searchParams }: Props) {
       <Link href="/batches" className={ui.back}>← All batches</Link>
       <div className={ui.header}>
         <div>
-          <h1 className={ui.title}>{batch.code} · {subjectName} · Year {batch.year_group}</h1>
+          <h1 className={ui.title} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+            {batch.code} · {subjectName} · Year {batch.year_group}
+            {/* Jumps to the latest active homework, which is open (or to the section if there is none yet). */}
+            <a href={hasHomework ? '#latest-homework' : '#homework'} className={`${ui.button} ${ui.highlightButton}`}>📘 Homework</a>
+          </h1>
           <p className={ui.subtitle}>
             {students.length} of {batch.capacity} places used{batch.closed_on ? ` · closed ${formatDate(batch.closed_on)}` : ''}
           </p>
@@ -96,7 +109,12 @@ export default async function BatchPage({ params, searchParams }: Props) {
               {students.map((s) => (
                 <li key={s.id}>
                   <Link href={`/students/${s.id}`} className={ui.link}>{s.first_name} {s.last_name}</Link>
-                  <span className={ui.muted}>Year {s.year_group} · <StatusBadge status={s.status} label={STUDENT_STATUSES[s.status] ?? s.status} /></span>
+                  <span className={ui.formActions}>
+                    <span className={ui.muted}>Year {s.year_group} · <StatusBadge status={s.status} label={STUDENT_STATUSES[s.status] ?? s.status} /></span>
+                    {notGiven(s.id).length > 0 && (
+                      <GivePastHomework batchId={batch.id} student={{ id: s.id, name: `${s.first_name} ${s.last_name}` }} homework={notGiven(s.id)} />
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>

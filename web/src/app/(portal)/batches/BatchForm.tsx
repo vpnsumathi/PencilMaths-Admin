@@ -79,12 +79,12 @@ export function BatchForm({ batch, subjects, teachers }: { batch?: Batch; subjec
             <input name={`slot_time_${i}`} type="time" defaultValue={formatTime(slot.start_time)} className={ui.input} aria-label={`Class ${i + 1} time`} />
           </div>
         ))}
+        {/* Saves the whole form (batch details and class times). */}
+        <div className={ui.formActions} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          <button className={ui.primaryButton}>{batch ? 'Save' : 'Create batch'}</button>
+          <Link href="/batches" className={ui.button}>Cancel</Link>
+        </div>
       </section>
-
-      <div className={ui.formActions}>
-        <button className={ui.primaryButton}>{batch ? 'Save changes' : 'Create batch'}</button>
-        <Link href="/batches" className={ui.button}>Cancel</Link>
-      </div>
     </form>
   );
 }

@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/format';
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import {
-  addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile, uploadCorrection,
+  addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile,
 } from './actions';
 
 // Label and badge colour for each homework status.
@@ -55,9 +55,15 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
         .order('created_at')
     : { data: [] };
 
+  // The latest active homework (newest one someone still has to hand in or have marked) is open and
+  // highlighted; the rest are folded away. With nothing active, the newest homework is the latest.
+  const latestId = (sheets ?? []).find((s) =>
+    (s.homework_results as unknown as Result[]).some((r) => r.status === 'pending' || r.status === 'received'),
+  )?.id ?? sheets?.[0]?.id;
+
   return (
-    <section className={ui.card} style={{ marginTop: 16 }}>
-      <h2>Homework</h2>
+    <section id="homework" className={ui.card} style={{ marginTop: 16, scrollMarginTop: 16 }}>
+      <h2>Upload Homework</h2>
 
       <form action={createHomework} className={ui.fieldGrid} style={{ marginBottom: 16 }}>
         <input type="hidden" name="batch_id" value={batchId} />
@@ -99,7 +105,8 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
         const toMark = results.filter((r) => r.status === 'received').length;
 
         return (
-          <details key={sheet.id} className={ui.homework} open={toMark > 0}>
+          <details key={sheet.id} id={sheet.id === latestId ? 'latest-homework' : undefined}
+            className={`${ui.homework} ${sheet.id === latestId ? ui.homeworkLatest : ''}`} open={sheet.id === latestId}>
             <summary>
               <strong>{sheet.title}</strong>
               <span className={ui.muted}>
@@ -107,6 +114,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                 {sheet.due_on && ` · due ${formatDate(sheet.due_on)}`}
                 {sheet.max_mark && ` · out of ${sheet.max_mark}`}
               </span>
+              {sheet.id === latestId && <> <StatusBadge status="in_progress" label="Latest" /></>}
               {toMark > 0 && <> <StatusBadge status="trial" label={`${toMark} to mark`} /></>}
             </summary>
 
@@ -165,25 +173,18 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                           )}
                         </td>
                         <td>
+                          {/* One Save: the mark, plus the corrected sheet if one is chosen. */}
                           <form action={markHomework} className={ui.formActions}>
                             <input type="hidden" name="batch_id" value={batchId} />
                             <input type="hidden" name="sheet_id" value={sheet.id} />
                             <input type="hidden" name="student_id" value={student.id} />
                             <input name="mark" type="number" min={0} max={sheet.max_mark ?? undefined} step="0.5"
                               defaultValue={r?.mark ?? ''} className={ui.input} style={{ width: 80 }} aria-label={`Mark for ${student.name}`} />
+                            <input name="correction" type="file" accept={SHEET_ACCEPT} className={ui.input}
+                              title="Corrected sheet (optional)" aria-label={`Corrected sheet for ${student.name} (optional)`} />
                             <button className={ui.button}>Save</button>
                             <button name="excuse" value="true" className={ui.button}>Excuse</button>
                           </form>
-                          {(theirFiles.length > 0 || r?.status === 'marked') && (
-                            <form action={uploadCorrection} className={ui.formActions} style={{ marginTop: 6 }}>
-                              <input type="hidden" name="batch_id" value={batchId} />
-                              <input type="hidden" name="sheet_id" value={sheet.id} />
-                              <input type="hidden" name="student_id" value={student.id} />
-                              <input name="correction" type="file" required accept={SHEET_ACCEPT} className={ui.input}
-                                aria-label={`Corrected sheet for ${student.name}`} />
-                              <button className={ui.button}>Upload corrected</button>
-                            </form>
-                          )}
                         </td>
                       </tr>
                     );

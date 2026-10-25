@@ -262,35 +262,41 @@ export async function completeTopic(form: FormData) {
   redirectWith(path, 'ok', message);
 }
 
-// Gives an older homework to one student who joined the batch after it was set.
-// New students only get homework set after they join; this adds the "not handed in" result by hand.
+// Gives one or more older homework to one student who joined the batch after they were set
+// (from "Not given to" under a homework, or "Give past homework" next to the student).
+// New students only get homework set after they join; this adds the "not handed in" results by hand.
 export async function giveHomework(form: FormData) {
   const batchId = text(form, 'batch_id');
-  const sheetId = text(form, 'sheet_id');
   const studentId = text(form, 'student_id');
-  if (![batchId, sheetId, studentId].every((v) => UUID.test(v))) redirectWith('/batches', 'error', 'Homework not found.');
+  const sheetIds = [...new Set(form.getAll('sheet_id').map(String))];
+  if (!UUID.test(batchId) || !UUID.test(studentId)) redirectWith('/batches', 'error', 'Homework not found.');
   const path = `/batches/${batchId}`;
+  if (sheetIds.length === 0) redirectWith(path, 'error', 'Tick at least one homework to give.');
+  if (!sheetIds.every((v) => UUID.test(v))) redirectWith(path, 'error', 'Homework not found.');
 
   const supabase = await createClient();
-  const [{ data: sheet }, { data: member }] = await Promise.all([
-    supabase.from('homework_sheets').select('title').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
-    supabase.from('enrolments').select('id').eq('student_id', studentId).eq('batch_id', batchId).is('ended_on', null).maybeSingle(),
+  const [{ data: sheets }, { data: member }] = await Promise.all([
+    supabase.from('homework_sheets').select('id, title').in('id', sheetIds).eq('batch_id', batchId),
+    supabase.from('enrolments').select('students(first_name)').eq('student_id', studentId).eq('batch_id', batchId).is('ended_on', null).maybeSingle(),
   ]);
-  if (!sheet) redirectWith(path, 'error', 'Homework not found.');
+  if (!sheets || sheets.length !== sheetIds.length) redirectWith(path, 'error', 'Homework not found.');
   if (!member) redirectWith(path, 'error', 'That student is not in this class.');
 
   // ignoreDuplicates: pressing twice, or a student who already has it, changes nothing.
   const { error } = await supabase
     .from('homework_results')
-    .upsert({ sheet_id: sheetId, student_id: studentId }, { onConflict: 'sheet_id,student_id', ignoreDuplicates: true });
+    .upsert(sheets.map((s) => ({ sheet_id: s.id, student_id: studentId })), { onConflict: 'sheet_id,student_id', ignoreDuplicates: true });
   if (error) {
     console.error('giveHomework failed:', error.message);
     redirectWith(path, 'error', 'Could not give the homework.');
   }
 
+  const name = (member.students as unknown as { first_name: string } | null)?.first_name ?? 'The student';
   revalidatePath(path);
   revalidatePath('/');
-  redirectWith(path, 'ok', `"${sheet.title}" given. The student can now see it and hand it in.`);
+  redirectWith(path, 'ok', sheets.length === 1
+    ? `"${sheets[0].title}" given. ${name} can now see it and hand it in.`
+    : `${sheets.length} homework given. ${name} can now see them under To hand in.`);
 }
 
 /* ---------- Lesson planner (lessons from the Lesson library) ---------- */
@@ -385,27 +391,12 @@ export async function completeLesson(form: FormData) {
     : 'Lesson completed. No homework was sent.');
 }
 
-// Uploads the teacher's corrected sheet for one student's homework into the student's Drive Homework folder.
-// The student sees it on their Marked tab. Uploading again adds another file.
-export async function uploadCorrection(form: FormData) {
-  const batchId = text(form, 'batch_id');
-  const sheetId = text(form, 'sheet_id');
-  const studentId = text(form, 'student_id');
-  if (![batchId, sheetId, studentId].every((v) => UUID.test(v))) redirectWith('/batches', 'error', 'Homework not found.');
-  const path = `/batches/${batchId}`;
-  const file = form.get('correction');
-  if (!(file instanceof File) || file.size === 0) redirectWith(path, 'error', 'Choose the corrected sheet first.');
+// Uploads the teacher's corrected sheet for one student's homework into the student's Drive Homework folder
+// and records it, so the student sees it with the mark. Returns a message if it failed, otherwise null.
+async function saveCorrection(supabase: Supabase, sheet: { id: string; title: string }, studentId: string, file: File) {
   const kind = fileKind(file);
-  if (!kind) redirectWith(path, 'error', 'The corrected sheet must be a PDF, Word file or photo.');
-  if (file.size > MAX_BYTES) redirectWith(path, 'error', `${file.name} is too big (4 MB max).`);
-
-  const supabase = await createClient();
-  const [{ data: sheet }, { data: result }] = await Promise.all([
-    supabase.from('homework_sheets').select('title').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
-    supabase.from('homework_results').select('student_id').eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle(),
-  ]);
-  if (!sheet || !result) redirectWith(path, 'error', 'That student was not given this homework.');
-
+  if (!kind) return 'The corrected sheet must be a PDF, Word file or photo.';
+  if (file.size > MAX_BYTES) return `${file.name} is too big (4 MB max).`;
   try {
     await ensureStudentDriveFolder(studentId);
     const { data: folder } = await supabase
@@ -417,20 +408,20 @@ export async function uploadCorrection(form: FormData) {
     const name = `${stamp} ${cleanName(sheet.title)} - corrected.${kind.ext}`;
     const uploaded = await uploadFile(homework.id, name, kind.type, await file.arrayBuffer());
     const { error } = await supabase.from('file_links').insert({
-      owner_type: 'homework_correction', owner_id: sheetId, student_id: studentId, provider: 'google_drive',
+      owner_type: 'homework_correction', owner_id: sheet.id, student_id: studentId, provider: 'google_drive',
       external_id: uploaded.id, url: uploaded.webViewLink, label: name,
     });
     if (error) throw new Error(error.message);
+    return null;
   } catch (e) {
-    console.error('uploadCorrection failed:', e);
-    redirectWith(path, 'error', 'Could not upload the corrected sheet to Google Drive.');
+    console.error('saveCorrection failed:', e);
+    return 'Could not upload the corrected sheet to Google Drive.';
   }
-
-  revalidatePath(path);
-  redirectWith(path, 'ok', 'Corrected sheet uploaded. The student can see it now.');
 }
 
-// Records a mark, or "excused", for one student's homework.
+// Records a mark, or "excused", for one student's homework, together with the corrected sheet if one is chosen.
+// Marked homework shows on the student's dashboard under Recently marked for 14 days.
+// A homework that is already marked can get a corrected sheet without typing the mark again.
 export async function markHomework(form: FormData) {
   const batchId = text(form, 'batch_id');
   const sheetId = text(form, 'sheet_id');
@@ -439,32 +430,44 @@ export async function markHomework(form: FormData) {
   const path = `/batches/${batchId}`;
   const excuse = form.get('excuse') === 'true';
   const mark = optionalNumber(form, 'mark');
+  const upload = form.get('correction');
+  const file = !excuse && upload instanceof File && upload.size > 0 ? upload : null;
 
   const supabase = await createClient();
   // The maximum mark comes from the database, not the form, so it can't be tampered with.
-  const { data: sheet } = await supabase
-    .from('homework_sheets').select('max_mark').eq('id', sheetId).eq('batch_id', batchId).maybeSingle();
+  const [{ data: sheet }, { data: result }] = await Promise.all([
+    supabase.from('homework_sheets').select('id, title, max_mark').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
+    supabase.from('homework_results').select('status').eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle(),
+  ]);
   if (!sheet) redirectWith(path, 'error', 'Homework not found.');
-  if (!excuse) {
-    if (mark === null || !(mark >= 0)) redirectWith(path, 'error', 'Enter a mark of 0 or more.');
+  const onlyFile = !excuse && mark === null && file !== null && result?.status === 'marked';
+  if (!excuse && !onlyFile) {
+    if (mark === null || !(mark >= 0)) redirectWith(path, 'error', 'Enter a mark of 0 or more, then Save.');
     if (sheet.max_mark !== null && mark > sheet.max_mark) redirectWith(path, 'error', `The mark can't be more than ${sheet.max_mark}.`);
   }
 
-  const row = excuse
-    ? { status: 'excused', mark: null, marked_on: null }
-    : { status: 'marked', mark, marked_on: todayInUk() };
-  // upsert = update the result if it exists, otherwise add it.
-  const { error } = await supabase
-    .from('homework_results')
-    .upsert({ sheet_id: sheetId, student_id: studentId, ...row }, { onConflict: 'sheet_id,student_id' });
-  if (error) {
-    console.error('markHomework failed:', error.message);
-    redirectWith(path, 'error', 'Could not save the mark.');
+  if (!onlyFile) {
+    const row = excuse
+      ? { status: 'excused', mark: null, marked_on: null }
+      : { status: 'marked', mark, marked_on: todayInUk() };
+    // upsert = update the result if it exists, otherwise add it.
+    const { error } = await supabase
+      .from('homework_results')
+      .upsert({ sheet_id: sheetId, student_id: studentId, ...row }, { onConflict: 'sheet_id,student_id' });
+    if (error) {
+      console.error('markHomework failed:', error.message);
+      redirectWith(path, 'error', 'Could not save the mark.');
+    }
   }
+  const fileProblem = file ? await saveCorrection(supabase, sheet, studentId, file) : null;
 
   revalidatePath(path);
   revalidatePath('/');
-  redirectWith(path, 'ok', excuse ? 'Marked as excused.' : 'Mark saved.');
+  if (fileProblem) redirectWith(path, 'error', onlyFile ? fileProblem : `Mark saved, but: ${fileProblem}`);
+  redirectWith(path, 'ok', excuse ? 'Marked as excused.'
+    : onlyFile ? 'Corrected sheet uploaded. The student can see it now.'
+    : file ? 'Mark and corrected sheet saved. The student can see them now.'
+    : 'Mark saved.');
 }
 
 // Deletes a homework and its results. Handed-in files stay in Google Drive.
