@@ -74,7 +74,7 @@ export async function LessonPlanner({ batch, students, today, term: askedTerm, m
             </>
           );
           return (
-            <li key={l.id} style={{ flexWrap: 'wrap' }}>
+            <li key={l.id} style={{ flexWrap: 'wrap' }} className={status === 'in_progress' ? ui.rowLive : undefined}>
               <span>
                 <strong>{l.code}</strong> {l.name}
                 <span className={ui.muted}>
@@ -84,7 +84,7 @@ export async function LessonPlanner({ batch, students, today, term: askedTerm, m
               </span>
               <span className={ui.formActions}>
                 <StatusBadge
-                  status={status === 'complete' ? 'active' : status === 'in_progress' ? 'trial' : 'closed'}
+                  status={status === 'complete' ? 'active' : status === 'in_progress' ? 'in_progress' : 'closed'}
                   label={status === 'complete' && p?.completed_on ? `Completed ${formatDate(p.completed_on as string)}` : STATUS[status]}
                 />
                 {status === 'not_started' && (

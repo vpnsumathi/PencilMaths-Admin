@@ -110,14 +110,14 @@ export default async function BatchPage({ params, searchParams }: Props) {
           ) : (
             <ol className={ui.list}>
               {(topics ?? []).map((t) => (
-                <li key={t.id} style={{ flexWrap: 'wrap' }}>
+                <li key={t.id} style={{ flexWrap: 'wrap' }} className={t.status === 'in_progress' ? ui.rowLive : undefined}>
                   <span>
                     {t.position}. {t.name}
                     {sentFor.has(t.id) && <span className={ui.muted}> · homework sent: {sentFor.get(t.id)}</span>}
                   </span>
                   <span className={ui.formActions}>
                     <StatusBadge
-                      status={t.status === 'complete' ? 'active' : t.status === 'in_progress' ? 'trial' : 'closed'}
+                      status={t.status === 'complete' ? 'active' : t.status === 'in_progress' ? 'in_progress' : 'closed'}
                       label={t.status === 'complete' && t.completed_on
                         ? `Completed ${formatDate(t.completed_on)}`
                         : TOPIC_STATUS[t.status] ?? t.status}

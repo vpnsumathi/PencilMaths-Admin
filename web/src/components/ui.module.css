@@ -59,6 +59,9 @@
 .badgeDanger { background: var(--danger-soft); color: var(--danger); }
 .badgeBrand { background: var(--brand-ring); color: var(--brand-strong); }
 .badgeMuted { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+/* In progress (lesson plans): solid green so the current lesson stands out. */
+.badgeLive { background: var(--ok); color: #fff; font-weight: 600; }
+.list li.rowLive { background: var(--ok-soft); border-left: 4px solid var(--ok); padding: 8px 10px; border-radius: 8px; }
 
 /* Forms */
 .form { display: grid; gap: 16px; max-width: 900px; }
