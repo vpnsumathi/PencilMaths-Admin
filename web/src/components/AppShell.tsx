@@ -24,11 +24,17 @@ const ADMIN_NAV = [
   { href: '/lesson-library', label: 'Lesson library', icon: BookIcon, ready: true },
   { href: '/staff', label: 'Staff', icon: ShieldCheckIcon, ready: true },
 ];
+// Teachers see only their own batches and the students in them.
+const TEACHER_NAV = [
+  { href: '/', label: 'Dashboard', icon: HomeIcon, ready: true },
+  { href: '/batches', label: 'My batches', icon: CalendarIcon, ready: true },
+  { href: '/students', label: 'My students', icon: UsersIcon, ready: true },
+];
 
 export function AppShell({ staff, children }: { staff: Staff; children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false); // mobile menu open?
-  const links = staff.role === 'admin' ? [...NAV, ...ADMIN_NAV] : NAV;
+  const links = staff.role === 'teacher' ? TEACHER_NAV : staff.role === 'admin' ? [...NAV, ...ADMIN_NAV] : NAV;
 
   return (
     <div className={styles.shell}>

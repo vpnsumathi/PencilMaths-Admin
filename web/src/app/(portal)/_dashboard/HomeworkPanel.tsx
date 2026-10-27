@@ -9,8 +9,10 @@ const SHOW = 8; // rows shown in each list before "+N more"
 
 // The dashboard's Homework section: five numbers, the marking queue, students falling behind and
 // each batch's on-time hand-in rate. Numbers are worked out in homework.ts.
-export async function HomeworkPanel() {
-  const h = await loadHomework();
+// For a teacher, everything is already limited to their own batches, and there's no WhatsApp nudge
+// (that needs a parent's phone number, which teachers can't see).
+export async function HomeworkPanel({ teacher = false }: { teacher?: boolean }) {
+  const h = await loadHomework(!teacher);
   const s = h.summary;
 
   return (
@@ -88,7 +90,7 @@ export async function HomeworkPanel() {
                       <strong>{b.name}</strong>
                       <span>{b.batches} · <b className={styles.down}>{b.overdue} overdue</b> · oldest due {formatDate(b.oldestDue)}</span>
                     </Link>
-                    <NudgeButton student={b} />
+                    {!teacher && <NudgeButton student={b} />}
                   </div>
                 </li>
               ))}

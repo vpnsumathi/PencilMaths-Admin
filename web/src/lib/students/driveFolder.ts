@@ -1,11 +1,14 @@
 import 'server-only';
 import { createStudentFolder } from '@/lib/google/drive';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
 // Makes sure a student has a Google Drive folder recorded in file_links, and returns its link.
 // Safe to call more than once: an existing Drive folder is simply returned.
-export async function ensureStudentDriveFolder(studentId: string) {
-  const supabase = await createClient();
+// `client` is the full-rights connection, passed only when a teacher marks homework for a student who has no
+// folder yet (teachers can't read or add student folders), after their access to the student was checked.
+export async function ensureStudentDriveFolder(studentId: string, client?: SupabaseClient) {
+  const supabase = client ?? await createClient();
   const [{ data: student }, { data: existing }] = await Promise.all([
     supabase.from('students').select('id, code, first_name, last_name').eq('id', studentId).maybeSingle(),
     supabase

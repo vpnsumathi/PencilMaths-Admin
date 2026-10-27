@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { requireStaff } from '@/lib/auth';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { todayInUk, UUID, YEARS } from '@/lib/options';
 import { uploadFile } from '@/lib/google/drive';
@@ -43,6 +44,7 @@ function commonProblem(row: ReturnType<typeof readCommon>) {
 }
 
 export async function createBatch(form: FormData) {
+  await requireStaff();
   const common = readCommon(form);
   const subjectId = text(form, 'subject_id');
   const yearGroup = Number(text(form, 'year_group'));
@@ -79,6 +81,7 @@ export async function createBatch(form: FormData) {
 }
 
 export async function updateBatch(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (!UUID.test(id)) redirectWith('/batches', 'error', 'Batch not found.');
   const path = `/batches/${id}`;
@@ -115,6 +118,7 @@ export async function updateBatch(form: FormData) {
 }
 
 export async function setBatchClosed(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (!UUID.test(id)) redirectWith('/batches', 'error', 'Batch not found.');
   const path = `/batches/${id}`;
@@ -495,6 +499,7 @@ export async function sendMarkedDraft(form: FormData) {
 
 // Deletes a homework and its results. Handed-in files stay in Google Drive.
 export async function deleteHomework(form: FormData) {
+  await requireStaff();
   const batchId = text(form, 'batch_id');
   const sheetId = text(form, 'sheet_id');
   if (!UUID.test(batchId) || !UUID.test(sheetId)) redirectWith('/batches', 'error', 'Homework not found.');

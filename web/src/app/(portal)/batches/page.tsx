@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
+import { isTeacher } from '@/lib/auth';
 import { formatDate } from '@/lib/format';
 import { createClient } from '@/lib/supabase/server';
 
@@ -12,6 +13,8 @@ type Props = { searchParams: Promise<{ ok?: string; error?: string }> };
 export default async function BatchesPage({ searchParams }: Props) {
   const { ok, error: problem } = await searchParams;
   const supabase = await createClient();
+  // Teachers only get their own open batches back (database rules), and can't add batches.
+  const teacher = await isTeacher();
 
   // batch_list is a database view: each batch with its teacher, members, schedule and progress.
   const { data: batches, error } = await supabase
@@ -24,16 +27,16 @@ export default async function BatchesPage({ searchParams }: Props) {
   return (
     <>
       <div className={ui.header}>
-        <h1 className={ui.title}>Batches</h1>
-        <Link href="/batches/new" className={ui.primaryButton}>New batch</Link>
+        <h1 className={ui.title}>{teacher ? 'My batches' : 'Batches'}</h1>
+        {!teacher && <Link href="/batches/new" className={ui.primaryButton}>New batch</Link>}
       </div>
       <Alerts ok={ok} problem={problem} />
 
-      {batches.length === 0 ? <p className={ui.empty}>No batches yet.</p> : (
+      {batches.length === 0 ? <p className={ui.empty}>{teacher ? 'No batches are assigned to you yet.' : 'No batches yet.'}</p> : (
         <div className={ui.tableWrap}>
           <table className={ui.table}>
             <thead>
-              <tr><th>Batch</th><th>Subject</th><th>Year</th><th>Teacher</th><th>Times</th><th>Places</th><th>Lesson plan</th><th>Last class</th><th>Status</th></tr>
+              <tr><th>Batch</th><th>Subject</th><th>Year</th>{!teacher && <th>Teacher</th>}<th>Times</th><th>Places</th><th>Lesson plan</th><th>Last class</th><th>Status</th></tr>
             </thead>
             <tbody>
               {batches.map((b) => (
@@ -41,7 +44,7 @@ export default async function BatchesPage({ searchParams }: Props) {
                   <td><Link href={`/batches/${b.id}`} className={ui.link}>{b.code}</Link></td>
                   <td>{b.subject}</td>
                   <td>{b.year_group}</td>
-                  <td>{b.teacher}</td>
+                  {!teacher && <td>{b.teacher}</td>}
                   <td>{b.schedule ?? '—'}</td>
                   <td>{b.member_count} / {b.capacity}</td>
                   <td>{b.topics_done} of {b.topics_total} done</td>

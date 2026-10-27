@@ -1,19 +1,27 @@
 import 'server-only';
+import { isTeacher } from '@/lib/auth';
 import { fileInfo, findOrCreateFolder, trashFile } from '@/lib/google/drive';
 import { cleanName } from '@/lib/homework/handin';
 import { todayInUk } from '@/lib/options';
 import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { createClient } from '@/lib/supabase/server';
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 // The student's Drive Homework folder (made if missing), where corrected sheets go.
+// student_drive_folder works for staff and for the student's own teacher, and refuses anyone else.
 export async function studentHomeworkFolder(supabase: Supabase, studentId: string) {
-  await ensureStudentDriveFolder(studentId);
-  const { data: folder } = await supabase
-    .from('file_links').select('external_id').eq('student_id', studentId).eq('owner_type', 'student_folder').maybeSingle();
-  if (!folder?.external_id) throw new Error('No Drive folder');
-  return findOrCreateFolder('Homework', folder.external_id);
+  const first = await supabase.rpc('student_drive_folder', { p_student: studentId });
+  if (first.error) throw new Error(first.error.message);
+  let folderId = first.data;
+  if (!folderId) {
+    // No Drive folder yet. Staff make it as usual; for a teacher (just checked above) the full-rights connection does.
+    await ensureStudentDriveFolder(studentId, (await isTeacher()) ? createAdminClient() : undefined);
+    ({ data: folderId } = await supabase.rpc('student_drive_folder', { p_student: studentId }));
+  }
+  if (!folderId) throw new Error('No Drive folder');
+  return findOrCreateFolder('Homework', folderId as string);
 }
 
 // e.g. "2026-10-24 18.30 Digits and their places · Hw-1 (Y5-A001) - corrected.pdf"

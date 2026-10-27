@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
+import { isTeacher } from '@/lib/auth';
 import { formatPercent } from '@/lib/format';
 import { STUDENT_STATUSES } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
@@ -13,6 +14,8 @@ type Props = { searchParams: Promise<{ ok?: string; error?: string; q?: string; 
 export default async function StudentsPage({ searchParams }: Props) {
   const { ok, error: problem, q = '', status = '' } = await searchParams;
   const supabase = await createClient();
+  // Teachers only get the students in their own batches back (database rules), and can't add students.
+  const teacher = await isTeacher();
 
   // student_list is a database view: each student with subjects, teachers, batches and their 28-day stats.
   let query = supabase
@@ -32,8 +35,8 @@ export default async function StudentsPage({ searchParams }: Props) {
   return (
     <>
       <div className={ui.header}>
-        <h1 className={ui.title}>Students</h1>
-        <Link href="/students/new" className={ui.primaryButton}>Add student</Link>
+        <h1 className={ui.title}>{teacher ? 'My students' : 'Students'}</h1>
+        {!teacher && <Link href="/students/new" className={ui.primaryButton}>Add student</Link>}
       </div>
       <Alerts ok={ok} problem={problem} />
 
@@ -52,7 +55,7 @@ export default async function StudentsPage({ searchParams }: Props) {
           <table className={ui.table}>
             <thead>
               <tr>
-                <th>Code</th><th>Name</th><th>Year</th><th>Subjects</th><th>Teachers</th><th>Batches</th>
+                <th>Code</th><th>Name</th><th>Year</th><th>Subjects</th>{!teacher && <th>Teachers</th>}<th>Batches</th>
                 <th>Attendance</th><th>Homework</th><th>Status</th><th></th>
               </tr>
             </thead>
@@ -63,7 +66,7 @@ export default async function StudentsPage({ searchParams }: Props) {
                   <td><Link href={`/students/${s.id}`} className={ui.link}>{s.first_name} {s.last_name}</Link></td>
                   <td>{s.year_group}</td>
                   <td>{s.subjects || '—'}</td>
-                  <td>{s.teachers || '—'}</td>
+                  {!teacher && <td>{s.teachers || '—'}</td>}
                   <td>{s.batches || '—'}</td>
                   <td>{formatPercent(s.attendance_pct)}</td>
                   <td>{formatPercent(s.homework_pct)}</td>

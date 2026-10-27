@@ -10,3 +10,17 @@ export function createAdminClient() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+// The login id for an email, or null. Supabase has no lookup by email, so page through the logins (fine at this size).
+export async function findUserByEmail(email: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const wanted = email.toLowerCase();
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw new Error(error.message);
+    const user = data.users.find((u) => u.email?.toLowerCase() === wanted);
+    if (user) return user.id;
+    if (data.users.length < 200) return null;
+  }
+  return null;
+}

@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
+import { isTeacher } from '@/lib/auth';
 import { formatDate } from '@/lib/format';
-import { STUDENT_STATUSES, todayInUk, UUID } from '@/lib/options';
+import { STUDENT_STATUSES, todayInUk, UUID, WEEKDAYS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { setBatchClosed, setTopicStatus } from '../actions';
 import { CompleteTopic } from '../CompleteTopic';
@@ -28,6 +29,8 @@ export default async function BatchPage({ params, searchParams }: Props) {
   if (!UUID.test(id)) notFound();
 
   const supabase = await createClient();
+  // A teacher (only ever sees their own batches) gets the class without the batch settings or Close.
+  const teacher = await isTeacher();
   const [{ data: batch }, { data: slots }, { data: members }, { data: topics }, { data: subjects }, { data: teachers }] =
     await Promise.all([
       supabase
@@ -44,7 +47,9 @@ export default async function BatchPage({ params, searchParams }: Props) {
         .is('ended_on', null),
       supabase.from('batch_topics').select('id, position, name, status, completed_on').eq('batch_id', id).order('position'),
       supabase.from('subjects').select('id, name').order('sort'),
-      supabase.from('teachers').select('id, first_name, last_name, subject_id').neq('status', 'left').order('first_name'),
+      teacher
+        ? Promise.resolve({ data: [] })
+        : supabase.from('teachers').select('id, first_name, last_name, subject_id').neq('status', 'left').order('first_name'),
     ]);
   if (!batch) notFound();
   // Classes whose subject and year are in the Lesson library use the term and module lesson planner.
@@ -73,7 +78,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <Link href="/batches" className={ui.back}>← All batches</Link>
+      <Link href="/batches" className={ui.back}>← {teacher ? 'My batches' : 'All batches'}</Link>
       <div className={ui.header}>
         <div>
           <h1 className={ui.title} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
@@ -83,27 +88,34 @@ export default async function BatchPage({ params, searchParams }: Props) {
           </h1>
           <p className={ui.subtitle}>
             {students.length} of {batch.capacity} places used{batch.closed_on ? ` · closed ${formatDate(batch.closed_on)}` : ''}
+            {teacher && (slots ?? []).length > 0 && (
+              <> · {(slots ?? []).map((s) => `${WEEKDAYS[s.weekday]} ${s.start_time.slice(0, 5)}`).join(', ')}</>
+            )}
           </p>
         </div>
-        <form action={setBatchClosed}>
-          <input type="hidden" name="id" value={batch.id} />
-          <input type="hidden" name="close" value={String(!batch.closed_on)} />
-          <button className={batch.closed_on ? ui.button : ui.dangerButton}>{batch.closed_on ? 'Reopen batch' : 'Close batch'}</button>
-        </form>
+        {!teacher && (
+          <form action={setBatchClosed}>
+            <input type="hidden" name="id" value={batch.id} />
+            <input type="hidden" name="close" value={String(!batch.closed_on)} />
+            <button className={batch.closed_on ? ui.button : ui.dangerButton}>{batch.closed_on ? 'Reopen batch' : 'Close batch'}</button>
+          </form>
+        )}
       </div>
       <Alerts ok={ok} problem={problem} />
 
-      <BatchForm
-        batch={{ ...batch, slots: slots ?? [] }}
-        subjects={subjects ?? []}
-        teachers={teachers ?? []}
-      />
+      {!teacher && (
+        <BatchForm
+          batch={{ ...batch, slots: slots ?? [] }}
+          subjects={subjects ?? []}
+          teachers={teachers ?? []}
+        />
+      )}
 
       <div className={usesLibrary ? undefined : ui.columns}>
         <section className={ui.card}>
           <h2>Students</h2>
           {students.length === 0 ? (
-            <p className={ui.empty}>No students yet. Add them from a student&apos;s page.</p>
+            <p className={ui.empty}>{teacher ? 'No students in this batch yet.' : <>No students yet. Add them from a student&apos;s page.</>}</p>
           ) : (
             <ul className={ui.list}>
               {students.map((s) => (
@@ -173,7 +185,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
         <LessonPlanner batch={batch} students={students.length} today={today} term={term} moduleName={moduleName} />
       )}
 
-      <HomeworkSection batchId={batch.id} members={students} />
+      <HomeworkSection batchId={batch.id} members={students} teacher={teacher} />
     </>
   );
 }

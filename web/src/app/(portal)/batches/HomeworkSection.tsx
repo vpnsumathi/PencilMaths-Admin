@@ -5,6 +5,7 @@ import ui from '@/components/ui.module.css';
 import { formatDate } from '@/lib/format';
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
+import { CorrectionPicker } from './CorrectionPicker';
 import { MarkButtons } from './MarkButtons';
 import {
   addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile, sendMarkedDraft,
@@ -27,7 +28,11 @@ type Result = {
 };
 
 // Homework for one batch: set new homework, see who handed in, open their files, enter marks.
-export async function HomeworkSection({ batchId, members }: { batchId: string; members: Member[] }) {
+// For a teacher: no Delete homework, and Drive files open through the app (/files/…), because teachers
+// don't have access to the Pencil Maths Google Drive.
+export async function HomeworkSection({ batchId, members, teacher = false }: { batchId: string; members: Member[]; teacher?: boolean }) {
+  const open = (f: { id: string; provider: string; url: string | null }) =>
+    teacher && f.provider === 'google_drive' ? `/files/${f.id}` : f.url ?? undefined;
   const supabase = await createClient();
   const { data: sheets } = await supabase
     .from('homework_sheets')
@@ -39,7 +44,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
   const { data: allFiles } = sheetIds.length
     ? await supabase
         .from('file_links')
-        .select('owner_type, owner_id, student_id, url, label')
+        .select('id, provider, owner_type, owner_id, student_id, url, label')
         .in('owner_type', ['homework_submission', 'homework_correction'])
         .in('owner_id', sheetIds)
         .order('created_at')
@@ -55,7 +60,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
   const { data: sheetFiles } = sheetIds.length
     ? await supabase
         .from('file_links')
-        .select('id, owner_id, url, label')
+        .select('id, provider, owner_id, url, label')
         .eq('owner_type', 'homework_sheet')
         .in('owner_id', sheetIds)
         .order('created_at')
@@ -131,7 +136,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                 <form key={f.id} action={removeHomeworkFile} style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginRight: 12 }}>
                   <input type="hidden" name="batch_id" value={batchId} />
                   <input type="hidden" name="file_id" value={f.id} />
-                  <a href={f.url} target="_blank" rel="noreferrer" className={ui.link}>{f.label}</a>
+                  <a href={open(f)} target="_blank" rel="noreferrer" className={ui.link}>{f.label}</a>
                   <ConfirmButton className={ui.button} message={`Remove "${f.label}" from this homework? An uploaded file stays in Google Drive.`}>
                     Remove
                   </ConfirmButton>
@@ -167,7 +172,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                           {theirFiles.length === 0 && corrected.length === 0 ? '—' : (
                             <span className={ui.files}>
                               {theirFiles.map((f, i) => (
-                                <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
+                                <a key={f.id} href={open(f)} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
                                   View File{theirFiles.length > 1 ? ` ${i + 1}` : ''}
                                 </a>
                               ))}
@@ -178,7 +183,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                                 </a>
                               )}
                               {corrected.map((f, i) => (
-                                <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
+                                <a key={f.id} href={open(f)} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
                                   ✏️ Corrected{corrected.length > 1 ? ` ${i + 1}` : ''}
                                 </a>
                               ))}
@@ -196,14 +201,13 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                         </td>
                         <td>
                           {/* One Save: the mark, plus the corrected sheet if one is chosen. */}
-                          <form action={markHomework} className={ui.formActions}>
+                          <form action={markHomework} className={ui.markForm}>
                             <input type="hidden" name="batch_id" value={batchId} />
                             <input type="hidden" name="sheet_id" value={sheet.id} />
                             <input type="hidden" name="student_id" value={student.id} />
                             <input name="mark" type="number" min={0} max={sheet.max_mark ?? undefined} step="0.5"
                               defaultValue={r?.mark ?? ''} className={ui.input} style={{ width: 80 }} aria-label={`Mark for ${student.name}`} />
-                            <input name="correction" type="file" accept={SHEET_ACCEPT} className={ui.input}
-                              title="Corrected sheet (optional)" aria-label={`Corrected sheet for ${student.name} (optional)`} />
+                            <CorrectionPicker accept={SHEET_ACCEPT} label={`Corrected sheet for ${student.name} (optional)`} />
                             <MarkButtons />
                           </form>
                         </td>
@@ -230,13 +234,15 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
               </div>
             )}
 
-            <form action={deleteHomework} style={{ marginTop: 10 }}>
-              <input type="hidden" name="batch_id" value={batchId} />
-              <input type="hidden" name="sheet_id" value={sheet.id} />
-              <ConfirmButton className={ui.dangerButton} message={`Delete "${sheet.title}" and its marks? Files stay in Google Drive.`}>
-                Delete homework
-              </ConfirmButton>
-            </form>
+            {!teacher && (
+              <form action={deleteHomework} style={{ marginTop: 10 }}>
+                <input type="hidden" name="batch_id" value={batchId} />
+                <input type="hidden" name="sheet_id" value={sheet.id} />
+                <ConfirmButton className={ui.dangerButton} message={`Delete "${sheet.title}" and its marks? Files stay in Google Drive.`}>
+                  Delete homework
+                </ConfirmButton>
+              </form>
+            )}
           </details>
         );
       })}

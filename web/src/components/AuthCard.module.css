@@ -1,0 +1,74 @@
+/* A small centred card with the logo, for the pages people reach from an email:
+   choosing a password (/reset-password) and accepting an invite (/auth/accept). */
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+  background: var(--bg);
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  padding: 36px 32px 32px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 12px 32px -16px rgba(15, 23, 42, 0.18);
+}
+
+.logo { display: block; margin: 0 auto 24px; height: auto; }
+
+.title { margin: 0; text-align: center; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+.subtitle { margin: 8px 0 24px; text-align: center; color: var(--muted); font-size: 15px; line-height: 1.5; }
+
+.form { display: grid; gap: 16px; }
+.field { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--text); }
+.input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px; /* 16px stops iPhones zooming in when the field is tapped */
+  font-weight: 400;
+}
+.input:hover { border-color: var(--border-strong); }
+.input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-ring); }
+
+.submit {
+  height: 48px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.submit:hover { background: var(--brand-strong); }
+.submit:focus-visible { outline: 3px solid var(--brand-ring); outline-offset: 2px; }
+
+.error {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.text { margin: 0 0 12px; color: var(--text); font-size: 15px; line-height: 1.6; text-align: center; }
+.text a { color: var(--brand); font-weight: 600; }
+.reason { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
+
+.foot { margin: 24px 0 0; text-align: center; font-size: 13px; color: var(--subtle); }
+.foot a { color: var(--muted); }

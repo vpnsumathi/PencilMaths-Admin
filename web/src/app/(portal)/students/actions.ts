@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { unstable_rethrow } from 'next/navigation';
+import { requireStaff } from '@/lib/auth';
 import { redirectWith, text } from '@/lib/form';
 import { EMAIL, STUDENT_STATUSES, UUID, YEARS } from '@/lib/options';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient, findUserByEmail } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
 import { siteUrl } from '@/lib/siteUrl';
@@ -12,6 +13,7 @@ import { siteUrl } from '@/lib/siteUrl';
 // Adds or updates a student. The database function save_student (file 4) saves the student,
 // family, main parent, subjects and folder link together, so a half-saved student is impossible.
 export async function saveStudent(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (id && !UUID.test(id)) redirectWith('/students', 'error', 'Student not found.');
   const formPath = id ? `/students/${id}` : '/students/new';
@@ -73,6 +75,7 @@ redirectWith(`/students/${studentId}`, 'ok', id ? 'Student updated.' : 'Student 
 }
 // "Create Drive folder" button on the student page (existing students, or after a Drive problem).
 export async function createDriveFolder(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (!UUID.test(id)) redirectWith('/students', 'error', 'Student not found.');
   const path = `/students/${id}`;
@@ -90,6 +93,7 @@ export async function createDriveFolder(form: FormData) {
 }
 // Makes a new secret hand-in code; the old WhatsApp link stops working immediately.
 export async function resetHandInLink(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (!UUID.test(id)) redirectWith('/students', 'error', 'Student not found.');
   const path = `/students/${id}`;
@@ -125,6 +129,7 @@ async function studentForAccess(form: FormData) {
 
 // Sends an invite email. The student clicks it, chooses a password and lands on their dashboard.
 export async function givePortalAccess(form: FormData) {
+  await requireStaff();
   const { supabase, student, path } = await studentForAccess(form);
   const email = text(form, 'email').toLowerCase();
   if (!EMAIL.test(email)) redirectWith(path, 'error', 'Enter a valid email address.');
@@ -164,7 +169,8 @@ export async function givePortalAccess(form: FormData) {
   if (error || data.length === 0) {
     console.error('givePortalAccess save failed:', error?.message ?? 'no rows updated');
     if (!existing) await createAdminClient().auth.admin.deleteUser(invitedId); // don't leave a new login linked to nobody
-    redirectWith(path, 'error', 'Could not save the login.');
+    // P0001: refused on purpose, e.g. the email is a teacher's login.
+    redirectWith(path, 'error', error?.code === 'P0001' ? error.message : 'Could not save the login.');
   }
   revalidatePath(path);
   redirectWith(
@@ -178,21 +184,9 @@ export async function givePortalAccess(form: FormData) {
   );
 }
 
-// Supabase has no lookup by email, so page through the logins (fine at this size).
-async function findUserByEmail(email: string): Promise<string | null> {
-  const admin = createAdminClient();
-  for (let page = 1; page <= 50; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) throw new Error(error.message);
-    const user = data.users.find((u) => u.email?.toLowerCase() === email);
-    if (user) return user.id;
-    if (data.users.length < 200) return null;
-  }
-  return null;
-}
-
 // Sends the invite email again (only while it has not been accepted).
 export async function resendPortalInvite(form: FormData) {
+  await requireStaff();
   const { student, path } = await studentForAccess(form);
   if (!student.auth_user_id) redirectWith(path, 'error', 'This student has no login yet.');
   try {
@@ -214,6 +208,7 @@ export async function resendPortalInvite(form: FormData) {
 
 // Deletes the student's login. Their record, homework and marks are kept.
 export async function removePortalAccess(form: FormData) {
+  await requireStaff();
   const { supabase, student, path } = await studentForAccess(form);
   if (!student.auth_user_id) redirectWith(path, 'error', 'This student has no login.');
 

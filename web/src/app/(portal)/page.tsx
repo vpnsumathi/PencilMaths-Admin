@@ -2,7 +2,7 @@ import Link from 'next/link';
 import {
   AlertIcon, CalendarIcon, ClipboardCheckIcon, MailIcon, UsersIcon,
 } from '@/components/icons';
-import { createClient } from '@/lib/supabase/server';
+import { getViewer } from '@/lib/auth';
 import { BarChart } from './_dashboard/BarChart';
 import { loadDashboard, RANGES, type AttentionItem } from './_dashboard/data';
 import { HomeworkPanel } from './_dashboard/HomeworkPanel';
@@ -25,15 +25,14 @@ function greeting() {
 
 export default async function Dashboard({ searchParams }: Props) {
   const { range } = await searchParams;
-  const days = RANGES.find((r) => String(r.days) === range)?.days ?? 28;
+  const days = RANGES.find((r) => String(r.days) === range)?.days ?? 7;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: me }, d] = await Promise.all([
-    supabase.from('staff').select('full_name').eq('id', user!.id).maybeSingle(),
-    loadDashboard(days),
-  ]);
-  const firstName = me?.full_name?.split(' ')[0] ?? '';
+  // A teacher sees the same dashboard, filled only with their own batches and students (database rules),
+  // without enquiries.
+  const [viewer, d] = await Promise.all([getViewer(), loadDashboard(days)]);
+  const teacher = viewer?.kind === 'teacher';
+  const firstName = viewer?.fullName.split(' ')[0] ?? '';
+  const attention = teacher ? d.attention.filter((a) => a.kind !== 'enquiry') : d.attention;
   const rangeLabel = RANGES.find((r) => r.days === days)!.label;
   const longDate = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/London' });
 
@@ -57,7 +56,7 @@ export default async function Dashboard({ searchParams }: Props) {
       {/* ---------- Headline tiles ---------- */}
       <section className={styles.kpis}>
         <Link href="/students" className={styles.kpi}>
-          <span className={styles.kpiLabel}>Current students</span>
+          <span className={styles.kpiLabel}>{teacher ? 'My students' : 'Current students'}</span>
           <strong className={styles.kpiValue}>{d.studentCounts.current}</strong>
           <span className={styles.kpiSub}>
             {d.studentCounts.active} active · {d.studentCounts.trial} trial
@@ -95,14 +94,19 @@ export default async function Dashboard({ searchParams }: Props) {
           </span>
         </div>
 
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Open enquiries</span>
-          <strong className={styles.kpiValue}>{d.enquirySummary.open}</strong>
-          <span className={styles.kpiSub}>
-            {d.enquirySummary.conversion === null ? 'No decisions yet' : `${d.enquirySummary.conversion}% convert to enrolment`}
-          </span>
-        </div>
+        {!teacher && (
+          <div className={styles.kpi}>
+            <span className={styles.kpiLabel}>Open enquiries</span>
+            <strong className={styles.kpiValue}>{d.enquirySummary.open}</strong>
+            <span className={styles.kpiSub}>
+              {d.enquirySummary.conversion === null ? 'No decisions yet' : `${d.enquirySummary.conversion}% convert to enrolment`}
+            </span>
+          </div>
+        )}
       </section>
+
+      {/* ---------- Homework: numbers, marking queue, falling behind, hand-in rate ---------- */}
+      <HomeworkPanel teacher={teacher} />
 
       {/* ---------- Attendance trend + needs attention ---------- */}
       <section className={styles.mainGrid}>
@@ -116,21 +120,18 @@ export default async function Dashboard({ searchParams }: Props) {
         </article>
 
         <article className={styles.card}>
-          <h2>Needs attention <span className={styles.count}>{d.attention.length}</span></h2>
+          <h2>Needs attention <span className={styles.count}>{attention.length}</span></h2>
           <p className={styles.cardSub}>Click an item to sort it out</p>
-          {d.attention.length === 0 ? (
+          {attention.length === 0 ? (
             <p className={styles.allClear}>Nothing needs attention. 🎉</p>
           ) : (
             <ul className={styles.attention}>
-              {d.attention.slice(0, 7).map((a, i) => <AttentionRow key={i} item={a} />)}
+              {attention.slice(0, 7).map((a, i) => <AttentionRow key={i} item={a} />)}
             </ul>
           )}
-          {d.attention.length > 7 && <p className={styles.more}>+{d.attention.length - 7} more</p>}
+          {attention.length > 7 && <p className={styles.more}>+{attention.length - 7} more</p>}
         </article>
       </section>
-
-      {/* ---------- Homework: numbers, marking queue, falling behind, hand-in rate ---------- */}
-      <HomeworkPanel />
 
       {/* ---------- Students ---------- */}
       <section className={styles.pair}>
@@ -157,13 +158,13 @@ export default async function Dashboard({ searchParams }: Props) {
           <BarChart bars={d.places} orientation="rows" max={Math.max(...d.places.map((b) => b.max ?? 0), 1)} ariaLabel="Places used per batch"
             emptyText="No open batches." />
         </article>
-        <article className={styles.card}>
+        {!teacher && <article className={styles.card}>
           <h2>Enquiry pipeline</h2>
           <p className={styles.cardSub}>
             Open enquiries at each stage · {d.enquirySummary.enrolled} enrolled, {d.enquirySummary.lost} not proceeding so far
           </p>
           <BarChart bars={d.pipeline} orientation="rows" max={Math.max(...d.pipeline.map((b) => b.value ?? 0), 1)} ariaLabel="Enquiries by stage" />
-        </article>
+        </article>}
       </section>
     </>
   );

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
+import { requireStaff } from '@/lib/auth';
 import { ENQUIRY_STAGES, OPEN_STAGES, stageTone, UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { convertToStudent, setStage } from '../actions';
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export default async function EnquiryPage({ params, searchParams }: Props) {
+  await requireStaff();
   const { id } = await params;
   const { ok, error: problem } = await searchParams;
   if (!UUID.test(id)) notFound();

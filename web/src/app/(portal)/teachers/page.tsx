@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
+import { requireStaff } from '@/lib/auth';
 import { yearRange } from '@/lib/format';
 import { TEACHER_STATUSES } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
@@ -11,6 +12,7 @@ export const metadata = { title: 'Teachers' };
 type Props = { searchParams: Promise<{ ok?: string; error?: string }> };
 
 export default async function TeachersPage({ searchParams }: Props) {
+  await requireStaff();
   const { ok, error: problem } = await searchParams;
   const supabase = await createClient();
 

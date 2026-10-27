@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
+import { requireStaff } from '@/lib/auth';
 import { ENQUIRY_STAGES, stageTone } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
@@ -10,6 +11,7 @@ export const metadata = { title: 'Enquiries' };
 type Props = { searchParams: Promise<{ ok?: string; error?: string; stage?: string }> };
 
 export default async function EnquiriesPage({ searchParams }: Props) {
+  await requireStaff();
   const { ok, error: problem, stage = 'open' } = await searchParams;
   const supabase = await createClient();
 

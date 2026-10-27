@@ -202,7 +202,7 @@ export async function loadDashboard(days: number) {
     attention.push({
       tone: 'warn', kind: 'homework',
       title: `${b.code}: ${b.to_mark} homework to mark`,
-      detail: `${b.subject} Y${b.year_group} · ${b.teacher}`,
+      detail: `${b.subject} Y${b.year_group} · ${b.teacher ?? 'you'}`, // empty in a teacher's own view
       href: `/batches/${b.id}`,
     });
   }

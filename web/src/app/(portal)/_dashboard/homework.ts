@@ -41,7 +41,8 @@ export type Behind = {
   oldestDue: string; phone: string | null; group: string | null; parent: string | null;
 };
 
-export async function loadHomework() {
+// withContacts: false skips the parent phone numbers (a teacher's dashboard has no nudge button).
+export async function loadHomework(withContacts = true) {
   const supabase = await createClient();
   const today = todayInUk();
   // Monday of this week (getUTCDay: 0 = Sunday).
@@ -106,7 +107,7 @@ export async function loadHomework() {
 
   // Parent contact for the WhatsApp nudge: the family's main guardian, and the family's group name.
   const familyIds = [...new Set(behindRows.map(([, rows]) => rows[0].students.family_id).filter((f): f is string => !!f))];
-  const [families, guardians] = familyIds.length
+  const [families, guardians] = withContacts && familyIds.length
     ? await Promise.all([
         supabase.from('families').select('id, whatsapp_group_name').in('id', familyIds),
         supabase.from('guardians').select('family_id, full_name, phone, is_primary').in('family_id', familyIds),
