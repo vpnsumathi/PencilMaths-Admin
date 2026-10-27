@@ -7,6 +7,7 @@ import { EMAIL, STUDENT_STATUSES, UUID, YEARS } from '@/lib/options';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
+import { siteUrl } from '@/lib/siteUrl';
 
 // Adds or updates a student. The database function save_student (file 4) saves the student,
 // family, main parent, subjects and folder link together, so a half-saved student is impossible.
@@ -136,7 +137,7 @@ export async function givePortalAccess(form: FormData) {
     const admin = createAdminClient();
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
       data: { role: 'student' },
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/accept`,
+      redirectTo: `${await siteUrl()}/auth/accept`,
     });
     if (error) {
       // The email already has a login (staff, or used before): link that login instead.
@@ -196,7 +197,7 @@ export async function resendPortalInvite(form: FormData) {
     if (!data.user?.email) throw new Error('login not found');
     if (data.user.last_sign_in_at) redirectWith(path, 'error', 'The invite was already accepted.');
     const { error } = await admin.auth.admin.inviteUserByEmail(data.user.email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/accept`,
+      redirectTo: `${await siteUrl()}/auth/accept`,
     });
     if (error) throw new Error(error.message);
   } catch (e) {

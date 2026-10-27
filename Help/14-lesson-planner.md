@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Last updated** | 24 October 2026 |
+| **Last updated** | 25 October 2026 |
 | **Pages** | `/lesson-library` (admin), batch page › **Lesson plan**, student **My homework** |
 | **Database script** | `supabase/migrations/20261024000001_lesson_planner.sql` (Staging first, Prod at go-live) |
 | **Source files** | `Lesson planner/Term Lesson Plan - Year 5.xlsx` and `Lesson planner/Year 5 Term 1 worksheets/` |
@@ -24,7 +24,9 @@
 6. [Files and code](#6-files-and-code)
 7. [How to test](#7-how-to-test)
 8. [Troubleshooting](#8-troubleshooting)
-9. [Later](#9-later)
+9. [Batch page layout](#9-batch-page-layout)
+10. [Change history](#10-change-history)
+11. [Later](#11-later)
 
 ---
 
@@ -38,7 +40,7 @@ Teacher: batch page › Term › Module › lesson: Start → Mark completed
                                    ▼
 Student: My homework › To hand in › 📄 worksheet › Hand in (photos/files → one PDF)
                                    │
-Staff: batch page › Homework › File 1 › mark › Upload corrected
+Staff: batch page › Upload Homework › File 1 › mark + corrected sheet › Save
                                    ▼
 Student: My homework › Marked › ✅ mark · 📎 their file · ✏️ corrected sheet
 ```
@@ -71,8 +73,8 @@ Any class whose **subject and year** are in the library (e.g. a Maths Year 5 bat
 
 | Status | Buttons |
 |---|---|
-| Not started | **Start** |
-| In progress | **Mark completed**, **Undo** (back to Not started) |
+| Not started (grey) | **Start** |
+| In progress (**solid green label, row shaded green**) | **Mark completed**, **Undo** (back to Not started) |
 | Completed (with date) | **Undo** (back to In progress; homework already sent stays) |
 
 **Mark completed** pop-up:
@@ -81,18 +83,28 @@ Any class whose **subject and year** are in the library (e.g. a Maths Year 5 bat
 - **Set on** (today), **Due on** (+5 days), **Maximum mark** (10).
 - **Complete and send** creates one homework per ticked sheet, titled e.g. `Digits and their places · Hw-1 (Y5-A001)`, with the worksheet attached, for every student in the class now. With nothing ticked, the lesson is just marked completed.
 
-Homework follows the 23 Oct rule: students who join later don't get it automatically (**Give homework** in the Homework section).
+### 3.1 Students who join late: giving past homework
+
+Homework only goes to the students in the class **when it is set**. A student who joins later gets every homework from then on, but none of the older ones, unless staff give it to them:
+
+- **For one student, several homework at once:** in the **Students** box, a student who is missing older homework has **Give past homework (3)** (the number of homework they don't have). It opens a pop-up listing that homework with **all ticked**. Untick any they shouldn't do › **Give ticked homework**. They appear under the student's **To hand in** straight away, with their worksheets.
+- **For one homework:** open it under **Upload Homework**. Below the table, **Not given to** lists students who joined after it was set, each with **Give homework**.
+
+Either way, the student then appears in that homework's table as **Not handed in**, and the button disappears once they have everything.
 
 ---
 
 ## 4. Marking and corrected sheets
 
-Batch page › **Homework** › open a homework:
+Batch page › **Upload Homework** › open a homework (the latest active one is already open):
 - **File 1, File 2…**: the student's hand-in (opens in Google Drive, download from there).
-- Enter the **mark** › **Save** (or **Excuse**).
-- **Upload corrected** (shown once something is handed in or marked): choose the marked-up PDF or photo. It goes into the student's Drive `Homework` folder as `2026-10-24 18.30 <title> - corrected.pdf` and shows as **✏️ Corrected** in the Files column.
+- Enter the **mark**, optionally choose the **corrected sheet** (PDF or photo) in the box next to it, then **Save** (one button saves both). Or **Excuse**.
+- The corrected sheet goes into the student's Drive `Homework` folder as `2026-10-24 18.30 <title> - corrected.pdf` and shows as **✏️ Corrected** in the Files column.
+- For a homework already marked, choose a file and **Save** with the mark box left as it is (or empty) to add a corrected sheet.
 
-The student sees it at once on **My homework › Marked** (or Handed in) under "Corrected by your teacher". Uploading again adds another file.
+The student sees the mark on their dashboard under **Recently marked** (for 14 days) and on **My homework › Marked**, with the corrected sheet under "Corrected by your teacher".
+
+> Saving the mark is what makes it **Marked**. A corrected sheet on its own doesn't mark the homework.
 
 ---
 
@@ -125,9 +137,12 @@ The student sees it at once on **My homework › Marked** (or Handed in) under "
 | `web/src/app/(portal)/batches/LessonPlanner.tsx` | Batch page lesson plan: works out the current lesson, lists the chosen module |
 | `web/src/app/(portal)/batches/PlannerPicker.tsx` | Term and Module dropdowns (change the address `?term=1&module=…`) |
 | `web/src/app/(portal)/batches/CompleteLesson.tsx` | Mark completed pop-up with Hw-1/2/3 ticks |
-| `web/src/app/(portal)/batches/actions.ts` | `setLessonStatus`, `completeLesson`, `uploadCorrection` |
-| `web/src/app/(portal)/batches/HomeworkSection.tsx` | ✏️ Corrected links and the **Upload corrected** form |
-| `web/src/app/(portal)/batches/[id]/page.tsx` | Shows the lesson planner for library classes, the old list otherwise |
+| `web/src/app/(portal)/batches/actions.ts` | `setLessonStatus`, `completeLesson`; `markHomework` (mark + optional corrected sheet via `saveCorrection`); `giveHomework` (one or more past homework to one student) |
+| `web/src/app/(portal)/batches/HomeworkSection.tsx` | **Upload Homework** section: latest active homework open and highlighted, ✏️ Corrected links, mark + corrected sheet form, **Not given to** |
+| `web/src/app/(portal)/batches/GivePastHomework.tsx` | **Give past homework (N)** pop-up next to a student |
+| `web/src/app/(portal)/batches/[id]/page.tsx` | Lesson planner for library classes (old list otherwise), green **📘 Homework** button, past homework per student |
+| `web/src/app/(portal)/batches/BatchForm.tsx` | **Save** button inside the Weekly class times box |
+| `web/src/components/ui.module.css`, `StatusBadge.tsx` | Green In progress label and row, latest homework highlight, green button, section header bars |
 | `web/src/app/(student)/me/homework/page.tsx` | "Corrected by your teacher" files |
 | `web/src/components/AppShell.tsx` | **Lesson library** link for admins |
 | `web/src/lib/form.ts` | `redirectWith` works with addresses that already have `?term=…` |
@@ -148,11 +163,15 @@ The student sees it at once on **My homework › Marked** (or Handed in) under "
 | **Mark completed** | Pop-up: Hw-1 Y5-A001 ticked, View links work |
 | Tick Hw-2 too › Send | "Homework Y5-A001, Y5-A002 sent to N student(s)"; lesson Completed with today's date; two homework in the Homework section |
 | Student login › My homework | Both under To hand in, each with 📄 Y5-A001.pdf / Y5-A002.pdf that opens |
-| Hand in, then staff mark it and **Upload corrected** | ✏️ Corrected in the Files column |
+| Hand in, then staff enter a mark, choose the corrected sheet and **Save** | "Mark and corrected sheet saved"; ✏️ Corrected in the Files column |
+| Student dashboard | The homework under **Recently marked** with its mark |
 | Student › Marked | Mark, their file and "Corrected by your teacher" ✏️ file that opens |
 | **Undo** then **Mark completed** again | Hw-1 and Hw-2 show "already sent"; Hw-3 can still be sent |
 | A lesson with ⚠️ sheets | Those can't be ticked |
 | A Science batch | Old topic list as before |
+| Batch page **📘 Homework** button | Jumps to the latest active homework, open and highlighted green with a **Latest** label; others collapsed |
+| Add a new student to a batch that has 3 homework | **Give past homework (3)** next to them in Students |
+| Open it, untick one › **Give ticked homework** | "2 homework given…"; button now says (1); the student sees 2 under To hand in |
 
 ---
 
@@ -171,7 +190,33 @@ The student sees it at once on **My homework › Marked** (or Handed in) under "
 
 ---
 
-## 9. Later
+## 9. Batch page layout
+
+From the top:
+1. Title, e.g. **B-001 · Maths · Year 5**, with a green **📘 Homework** button that jumps to the latest active homework.
+2. **Batch** details and **Weekly class times (UK time)**, with **Save** and **Cancel** at the bottom of the class times box (saves both boxes).
+3. **Students**, with **Give past homework** where needed.
+4. **Lesson plan** (term and module planner, or the old topic list).
+5. **Upload Homework**: set a homework by hand, then one block per homework, newest first. The **latest active** one (the newest that someone still has to hand in or have marked; otherwise the newest) is open, green and labelled **Latest**. The rest are collapsed; click a title to open it.
+
+Every section heading is a header bar: soft purple tint, purple stripe on the left, bold text.
+
+---
+
+## 10. Change history
+
+| Date | Change |
+|---|---|
+| 24 Oct 2026 | Lesson library, batch lesson planner, Mark completed with Hw-1/2/3, corrected sheets |
+| 25 Oct 2026 | In progress lessons in green |
+| 25 Oct 2026 | Mark and corrected sheet saved with one **Save**, so marked homework shows under the student's **Recently marked** |
+| 25 Oct 2026 | Homework section renamed **Upload Homework**; latest active homework open and highlighted; **📘 Homework** button |
+| 25 Oct 2026 | Section headings shown as header bars; class times **Save** button moved inside its box |
+| 25 Oct 2026 | **Give past homework** for students who joined late |
+
+---
+
+## 11. Later
 
 - Class numbers, dates, revisions, tests and reports from `Copy of Year 5 - LT - Model.xlsx`.
 - Email and WhatsApp messages when homework is sent or marked.

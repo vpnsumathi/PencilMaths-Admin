@@ -882,6 +882,16 @@ You then commit `Help/01-project-guide.md` as usual (section 11).
 
 Newest first.
 
+### 2026-10-25 — Batch page updates and past homework
+**What changed:**
+- In progress lessons shown in green; mark and corrected sheet saved together; **Upload Homework** section with the latest active homework open; green **📘 Homework** button; section header bars; class times **Save** inside its box.
+- **Give past homework (N)** next to a student who joined after homework was set.
+
+**Files added / changed / removed:**
+- `web/src/app/(portal)/batches/GivePastHomework.tsx` — new.
+- `web/src/app/(portal)/batches/` `actions.ts`, `HomeworkSection.tsx`, `BatchForm.tsx`, `LessonPlanner.tsx`, `[id]/page.tsx`; `web/src/components/ui.module.css`, `StatusBadge.tsx` — changed.
+- `Help/14-lesson-planner.md` — sections 3.1, 9 and 10 added.
+
 ### 2026-10-24 — Lesson planner
 **What changed:**
 - New **Lesson library** (admin): import a "Term Lesson Plan - Year N" spreadsheet and upload the worksheets (Year 5 Maths: 95 lessons, 285 homework codes).
