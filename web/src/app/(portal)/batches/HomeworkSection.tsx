@@ -168,7 +168,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                             <span className={ui.files}>
                               {theirFiles.map((f, i) => (
                                 <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
-                                  File {i + 1}
+                                  View File{theirFiles.length > 1 ? ` ${i + 1}` : ''}
                                 </a>
                               ))}
                               {theirFiles.length > 0 && (
