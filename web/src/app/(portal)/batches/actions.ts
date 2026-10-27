@@ -92,7 +92,8 @@ export async function updateBatch(form: FormData) {
   const { data, error } = await supabase.from('batches').update(common).eq('id', id).select('id');
   if (error || data.length === 0) {
     console.error('updateBatch failed:', error?.message ?? 'no rows updated');
-    redirectWith(path, 'error', 'Could not save the batch.');
+    // P0001 = a message raised on purpose, e.g. places lower than the students already in the batch.
+    redirectWith(path, 'error', error?.code === 'P0001' ? error.message : 'Could not save the batch.');
   }
 
   // Students in the batch follow its teacher (the enrolment trigger copies it from the batch).

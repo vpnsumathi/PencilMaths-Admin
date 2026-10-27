@@ -123,7 +123,7 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
                 <option value="">No batch yet</option>
                 {options.batches.filter((b) => b.subject_id === s.id).map((b) => (
                   <option key={b.id} value={b.id} data-year={b.year_group}>
-                    {b.code} · Year {b.year_group} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity})
+                    {b.code} · Year {b.year_group} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity}{b.member_count >= b.capacity && b.id !== e?.batch_id ? ' · full' : ''})
                   </option>
                 ))}
               </select>
