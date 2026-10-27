@@ -5,6 +5,7 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { BarChart } from './_dashboard/BarChart';
 import { loadDashboard, RANGES, type AttentionItem } from './_dashboard/data';
+import { HomeworkPanel } from './_dashboard/HomeworkPanel';
 import { Sparkline } from './_dashboard/Sparkline';
 import styles from './dashboard.module.css';
 
@@ -75,11 +76,11 @@ export default async function Dashboard({ searchParams }: Props) {
           </span>
         </div>
 
-        <div className={styles.kpi}>
+        <a href="#homework" className={styles.kpi}>
           <span className={styles.kpiLabel}>Homework handed in</span>
           <strong className={styles.kpiValue}>{d.homeworkSummary.rate ?? '–'}{d.homeworkSummary.rate !== null && '%'}</strong>
           <span className={styles.kpiSub}>{d.homeworkSummary.toMark} waiting to be marked</span>
-        </div>
+        </a>
 
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>Classes logged · {rangeLabel}</span>
@@ -127,6 +128,9 @@ export default async function Dashboard({ searchParams }: Props) {
           {d.attention.length > 7 && <p className={styles.more}>+{d.attention.length - 7} more</p>}
         </article>
       </section>
+
+      {/* ---------- Homework: numbers, marking queue, falling behind, hand-in rate ---------- */}
+      <HomeworkPanel />
 
       {/* ---------- Students ---------- */}
       <section className={styles.pair}>
