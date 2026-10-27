@@ -882,6 +882,20 @@ You then commit `Help/01-project-guide.md` as usual (section 11).
 
 Newest first.
 
+### 2026-10-27 — Family login, batch places and fixes
+**What changed:**
+- **Family login:** one email and password opens several children; the parent switches child from the top bar. Give access with the same email to link brothers and sisters (guide 12, section 7.1).
+- **Batch places:** a student can't be added to a full batch, and a batch's places can't go below its current students. Full batches show "full" in the student form.
+- **Student form:** the Teacher dropdown is removed; the teacher comes from the batch.
+- **Corrected sheet:** Save and Excuse are disabled while saving (a double click saved it twice); a new upload replaces the earlier one.
+- **Invite and reset links** use the address of the site in use, so Staging no longer sends localhost links.
+
+**Files added / changed / removed:**
+- `supabase/migrations/20261027000001_batch_capacity.sql`, `20261027000002_family_login.sql` — new (run on Staging; Prod at go-live).
+- `web/src/lib/siteUrl.ts`, `web/src/app/(portal)/batches/MarkButtons.tsx`, `web/src/app/(student)/StudentSwitcher.tsx`, `web/src/app/(student)/actions.ts` — new.
+- `web/src/app/(portal)/students/` `actions.ts`, `StudentForm.tsx`, `PortalAccess.tsx`; `web/src/app/(portal)/batches/` `actions.ts`, `HomeworkSection.tsx`; `web/src/app/login/actions.ts`; `web/src/app/(student)/layout.tsx`, `student.module.css`; `web/src/components/ui.module.css` — changed.
+- `Help/12-student-login.md` — section 7.1 added.
+
 ### 2026-10-25 — Batch page updates and past homework
 **What changed:**
 - In progress lessons shown in green; mark and corrected sheet saved together; **Upload Homework** section with the latest active homework open; green **📘 Homework** button; section header bars; class times **Save** inside its box.

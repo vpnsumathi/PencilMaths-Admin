@@ -155,8 +155,10 @@ export async function givePortalAccess(form: FormData) {
     redirectWith(path, 'error', 'Could not send the invite. Check SUPABASE_SECRET_KEY is set.');
   }
 
-  // One login opens one student, so move it here if another student had it.
-  if (existing) await supabase.from('students').update({ auth_user_id: null }).eq('auth_user_id', invitedId);
+  // Family login: an email that already opens a brother or sister now opens this student too.
+  const { data: siblings } = existing
+    ? await supabase.from('students').select('first_name').eq('auth_user_id', invitedId).neq('id', student.id)
+    : { data: [] };
 
   const { data, error } = await supabase.from('students').update({ auth_user_id: invitedId }).eq('id', student.id).select('id');
   if (error || data.length === 0) {
@@ -168,9 +170,11 @@ export async function givePortalAccess(form: FormData) {
   redirectWith(
     path,
     'ok',
-    existing
-      ? `${email} already had a login, so it is now linked to this student. They sign in with that password (or use Forgot password).`
-      : `Invite sent to ${email}.`,
+    siblings?.length
+      ? `Linked to the existing login for ${email}, which also opens ${siblings.map((x) => x.first_name).join(', ')}. They sign in as before and switch child from the top bar.`
+      : existing
+        ? `${email} already had a login, so it is now linked to this student. They sign in with that password (or use Forgot password).`
+        : `Invite sent to ${email}.`,
   );
 }
 
@@ -213,12 +217,17 @@ export async function removePortalAccess(form: FormData) {
   const { supabase, student, path } = await studentForAccess(form);
   if (!student.auth_user_id) redirectWith(path, 'error', 'This student has no login.');
 
-  // A staff login is only unlinked, never deleted.
-  const { data: staff } = await supabase.from('staff').select('id').eq('id', student.auth_user_id).maybeSingle();
-  if (staff) {
+  // A staff login, or a family login a brother or sister still uses, is only unlinked, never deleted.
+  const [{ data: staff }, { data: siblings }] = await Promise.all([
+    supabase.from('staff').select('id').eq('id', student.auth_user_id).maybeSingle(),
+    supabase.from('students').select('first_name').eq('auth_user_id', student.auth_user_id).neq('id', student.id),
+  ]);
+  if (staff || siblings?.length) {
     await supabase.from('students').update({ auth_user_id: null }).eq('id', student.id);
     revalidatePath(path);
-    redirectWith(path, 'ok', 'Unlinked. That login belongs to staff, so it was kept.');
+    redirectWith(path, 'ok', staff
+      ? 'Unlinked. That login belongs to staff, so it was kept.'
+      : `Unlinked. The login is kept because it also opens ${siblings!.map((x) => x.first_name).join(', ')}.`);
   }
 
   try {

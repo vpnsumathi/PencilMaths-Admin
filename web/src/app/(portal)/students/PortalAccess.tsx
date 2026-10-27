@@ -1,5 +1,6 @@
 import ui from '@/components/ui.module.css';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { givePortalAccess, removePortalAccess, resendPortalInvite } from './actions';
 
 type Login = { email: string; accepted: boolean } | null | 'unknown';
@@ -21,6 +22,11 @@ export async function PortalAccess({ studentId, authUserId, suggestedEmail }: {
   studentId: string; authUserId: string | null; suggestedEmail: string | null;
 }) {
   const login = await loadLogin(authUserId);
+  // Family login: brothers and sisters opened by the same login.
+  const { data: siblings } = authUserId
+    ? await (await createClient()).from('students').select('id, first_name, last_name')
+      .eq('auth_user_id', authUserId).neq('id', studentId).order('first_name')
+    : { data: [] };
 
   return (
     <section className={ui.card} style={{ marginBottom: 16, maxWidth: 900 }}>
@@ -29,6 +35,7 @@ export async function PortalAccess({ studentId, authUserId, suggestedEmail }: {
         <form action={givePortalAccess}>
           <p className={ui.hint}>
             The student signs in to see their classes and homework, and can hand in homework. Use an email the family checks.
+            For brothers and sisters, use the same email: one login opens all of them.
           </p>
           <input type="hidden" name="id" value={studentId} />
           <div className={ui.formActions}>
@@ -45,6 +52,13 @@ export async function PortalAccess({ studentId, authUserId, suggestedEmail }: {
               : login.accepted
                 ? `Can sign in as ${login.email}.`
                 : `Invite sent to ${login.email}. Waiting for the student to accept it.`}
+            {siblings && siblings.length > 0 && (
+              <> Shared with{' '}
+                {siblings.map((x, i) => (
+                  <span key={x.id}>{i > 0 && ', '}<a href={`/students/${x.id}`} className={ui.link}>{x.first_name} {x.last_name}</a></span>
+                ))}
+                : one login, switching child from the top bar.</>
+            )}
           </p>
           <div className={ui.formActions}>
             {login !== 'unknown' && !login.accepted && (

@@ -123,10 +123,32 @@
 - **Give portal access** (`givePortalAccess`):
   - a new email gets Supabase's invite
   - an email that already has a login (including staff) is linked to the student straight away; they use that password or **Forgot password**
-  - one login opens one student, so linking moves it from any other student
+  - an email that already opens a brother or sister **adds** this student to that login (see 7.1)
 - **Resend invite** sends the email again while it hasn't been accepted.
-- **Remove access** deletes the login. A staff login is only unlinked, never deleted.
+- **Remove access** deletes the login. A staff login, or a family login a brother or sister still uses, is only unlinked, never deleted.
 - The invite link lands on `/auth/accept`, which saves the sign-in and goes to `/reset-password`. If the link is used or too old, the page shows **Reason:** with Supabase's message. `/auth/confirm` is kept for a customised template later.
+- Invite and reset links use the address of the site the button was pressed on (`web/src/lib/siteUrl.ts`), so Staging sends Staging links and localhost sends localhost links. Each address must be in that Supabase project's **Redirect URLs**.
+
+### 7.1 Families: one login for brothers and sisters (added 27 Oct)
+
+A parent with several children uses **one email and password** for all of them.
+
+**Staff:** on each child's page, **Give portal access** with the **same email**.
+- First child: the invite email is sent as usual.
+- Each brother or sister: no email is sent. The message says *"Linked to the existing login for … which also opens …"*.
+- The Student login card shows **Shared with** and links to the other children.
+- **Remove access** on one child only unlinks that child. The login is deleted when its last child is removed.
+
+**Parent:** the top bar shows the child's name as a dropdown, next to 🔑 Password. Picking another child reloads the dashboard, classes and homework for that child. The app remembers the last child picked; the first time, it opens on the first child by first name. Children who have left are not listed.
+
+**How it works:** script `20261027000002_family_login.sql`.
+- `students.auth_user_id` is no longer unique, so one login can be linked to several students.
+- `login_current_student` stores the child each login last picked (no direct access; only through the functions below).
+- `current_student_id()` returns the picked child if it is still linked to the login and hasn't left, otherwise the first child. Every `my_…` function goes through it, so a parent only ever sees their own children.
+- `my_students()` lists the children for the dropdown; `switch_student(id)` changes the pick and refuses a child not linked to the login.
+- Files: `web/src/app/(student)/StudentSwitcher.tsx` and `actions.ts` (new); `(student)/layout.tsx`, `student.module.css`, `(portal)/students/actions.ts`, `PortalAccess.tsx` (changed).
+
+**Test:** give two test students access with the same email, sign in, switch child from the top bar, check each child's homework shows, then remove access on one child and check the other can still sign in.
 
 ---
 

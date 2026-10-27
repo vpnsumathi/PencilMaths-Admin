@@ -18,6 +18,12 @@
   background: var(--brand); border-color: var(--brand); color: #fff;
 }
 .who { font-weight: 600; color: var(--text); white-space: nowrap; }
+/* Family login: the child's name as a dropdown. */
+.switcher {
+  padding: 8px 30px 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+  background: var(--surface); color: var(--text); font: inherit; font-weight: 600; max-width: 220px;
+}
+.switcher:hover { border-color: var(--border-strong); }
 .signOut {
   padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
   background: var(--surface); color: var(--muted); font: inherit; font-size: 14px;
