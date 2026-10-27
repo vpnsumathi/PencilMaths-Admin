@@ -1,3 +1,4 @@
+import { Alerts } from '@/components/Alerts';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronDownIcon, ChevronUpIcon } from '@/components/icons';
@@ -45,8 +46,7 @@ export default async function CurriculumPage({ params, searchParams }: Props) {
         &ldquo;All year groups&rdquo; topics. Existing batches keep their own plan.
       </p>
 
-      {ok && <p className={`${styles.alert} ${styles.alertOk}`} role="status">{ok}</p>}
-      {problem && <p className={`${styles.alert} ${styles.alertError}`} role="alert">{problem}</p>}
+      <Alerts ok={ok} problem={problem} />
 
       <form action={addTopic} className={styles.panel}>
         <input type="hidden" name="subject_id" value={subject.id} />

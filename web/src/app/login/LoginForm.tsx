@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { FocusMessage } from '@/components/FocusMessage';
 import { signIn, sendReset } from './actions';
 import styles from './login.module.css';
 import {
@@ -34,14 +35,14 @@ export function LoginForm() {
       </div>
 
       {state?.error && (
-        <div className={`${styles.alert} ${styles.alertError}`} role="alert">
+        <FocusMessage as="div" className={`${styles.alert} ${styles.alertError}`} role="alert" signal={state}>
           <AlertIcon size={18} /> <span>{state.error}</span>
-        </div>
+        </FocusMessage>
       )}
       {state?.ok && (
-        <div className={`${styles.alert} ${styles.alertOk}`} role="status">
+        <FocusMessage as="div" className={`${styles.alert} ${styles.alertOk}`} role="status" signal={state}>
           <CheckCircleIcon size={18} /> <span>{state.ok}</span>
-        </div>
+        </FocusMessage>
       )}
 
       <form action={isSignIn ? signInAction : resetAction} className={styles.form}>

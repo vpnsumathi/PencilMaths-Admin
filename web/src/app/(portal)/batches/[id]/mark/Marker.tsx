@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { PDFPageProxy } from 'pdfjs-dist';
 import ui from '@/components/ui.module.css';
+import { FocusMessage } from '@/components/FocusMessage';
 import { finishMarking, saveMarkingDraft, startMarkedUpload, uploadMarkedViaServer } from './actions';
 import { asPdf, drawMarks, HIGHLIGHT, markAt, markedPdf, type Drawings, type Mark, type PageView } from './marks';
 import styles from './marker.module.css';
@@ -387,10 +388,10 @@ export function Marker({ ids, file, maxMark, mark, marked, saved, unsent }: Prop
         </p>
       )}
       {message && (
-        <p className={`${ui.alert} ${message.ok ? ui.alertOk : ui.alertError}`} role={message.ok ? 'status' : 'alert'}>
+        <FocusMessage className={`${ui.alert} ${message.ok ? ui.alertOk : ui.alertError}`} role={message.ok ? 'status' : 'alert'} signal={message}>
           {message.text}{' '}
           {message.ok && <Link href={`/batches/${ids.batchId}#homework`} className={ui.link}>Back to the batch</Link>}
-        </p>
+        </FocusMessage>
       )}
 
       <p className={styles.extra}>

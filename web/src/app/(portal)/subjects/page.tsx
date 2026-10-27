@@ -1,3 +1,4 @@
+import { Alerts } from '@/components/Alerts';
 import Link from 'next/link';
 import { ChevronDownIcon, ChevronUpIcon } from '@/components/icons';
 import { requireAdmin } from '@/lib/auth';
@@ -25,8 +26,7 @@ export default async function SubjectsPage({ searchParams }: Props) {
       <h1 className={styles.title}>Subjects</h1>
       <p className={styles.lead}>The subjects Pencil Maths teaches, in the order they appear across the portal.</p>
 
-      {ok && <p className={`${styles.alert} ${styles.alertOk}`} role="status">{ok}</p>}
-      {problem && <p className={`${styles.alert} ${styles.alertError}`} role="alert">{problem}</p>}
+      <Alerts ok={ok} problem={problem} />
 
       <form action={addSubject} className={styles.panel}>
         <input name="name" placeholder="New subject name" required className={styles.input} aria-label="New subject name" />

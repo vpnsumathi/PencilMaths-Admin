@@ -1,3 +1,4 @@
+import { Alerts } from '@/components/Alerts';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { setActive, updateRole } from './actions';
@@ -32,8 +33,7 @@ export default async function StaffPage({ searchParams }: Props) {
     <>
       <h1 className={styles.title}>Staff</h1>
 
-      {ok && <p className={`${styles.alert} ${styles.alertOk}`} role="status">{ok}</p>}
-      {problem && <p className={`${styles.alert} ${styles.alertError}`} role="alert">{problem}</p>}
+      <Alerts ok={ok} problem={problem} />
 
       <div className={styles.tableWrap}>
         <table className={styles.table}>

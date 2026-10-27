@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { FocusMessage } from '@/components/FocusMessage';
 import { updatePassword } from './actions';
 
 // Reached from the reset email (via /auth/callback), so the user is already signed in here.
@@ -12,7 +13,7 @@ export default async function ResetPassword({ searchParams }: { searchParams: Pr
   return (
     <main style={{ padding: 24, maxWidth: 360 }}>
       <h1>Choose a new password</h1>
-      {error && <p role="alert">{error}</p>}
+      {error && <FocusMessage key={Date.now()} role="alert">{error}</FocusMessage>}
       <form action={updatePassword}>
         <p><label>New password<br /><input name="password" type="password" autoComplete="new-password" required /></label></p>
         <p><label>Confirm password<br /><input name="confirm" type="password" autoComplete="new-password" required /></label></p>
