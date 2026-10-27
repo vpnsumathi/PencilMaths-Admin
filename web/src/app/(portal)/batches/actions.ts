@@ -408,11 +408,15 @@ async function saveCorrection(supabase: Supabase, sheet: { id: string; title: st
     const stamp = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/London' }).slice(0, 16).replace(':', '.');
     const name = `${stamp} ${cleanName(sheet.title)} - corrected.${kind.ext}`;
     const uploaded = await uploadFile(homework.id, name, kind.type, await file.arrayBuffer());
-    const { error } = await supabase.from('file_links').insert({
+    const { data: added, error } = await supabase.from('file_links').insert({
       owner_type: 'homework_correction', owner_id: sheet.id, student_id: studentId, provider: 'google_drive',
       external_id: uploaded.id, url: uploaded.webViewLink, label: name,
-    });
+    }).select('id').single();
     if (error) throw new Error(error.message);
+    // One corrected sheet per student per homework: a new upload replaces the earlier one in the app.
+    // The earlier file stays in the student's Drive Homework folder.
+    await supabase.from('file_links').delete()
+      .eq('owner_type', 'homework_correction').eq('owner_id', sheet.id).eq('student_id', studentId).neq('id', added.id);
     return null;
   } catch (e) {
     console.error('saveCorrection failed:', e);

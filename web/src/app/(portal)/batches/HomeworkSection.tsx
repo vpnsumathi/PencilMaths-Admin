@@ -5,6 +5,7 @@ import ui from '@/components/ui.module.css';
 import { formatDate } from '@/lib/format';
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
+import { MarkButtons } from './MarkButtons';
 import {
   addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile,
 } from './actions';
@@ -182,8 +183,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                               defaultValue={r?.mark ?? ''} className={ui.input} style={{ width: 80 }} aria-label={`Mark for ${student.name}`} />
                             <input name="correction" type="file" accept={SHEET_ACCEPT} className={ui.input}
                               title="Corrected sheet (optional)" aria-label={`Corrected sheet for ${student.name} (optional)`} />
-                            <button className={ui.button}>Save</button>
-                            <button name="excuse" value="true" className={ui.button}>Excuse</button>
+                            <MarkButtons />
                           </form>
                         </td>
                       </tr>
