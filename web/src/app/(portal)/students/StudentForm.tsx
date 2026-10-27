@@ -21,19 +21,18 @@ export type Enrolment = { id: string; subject_id: string; teacher_id: string | n
 
 type Options = Awaited<ReturnType<typeof loadStudentFormOptions>>;
 
-// The choices the form needs: subjects, teachers (not left) and open batches.
+// The choices the form needs: subjects and open batches.
 export async function loadStudentFormOptions() {
   const supabase = await createClient();
-  const [{ data: subjects }, { data: teachers }, { data: batches }] = await Promise.all([
+  const [{ data: subjects }, { data: batches }] = await Promise.all([
     supabase.from('subjects').select('id, name, active').order('sort'),
-    supabase.from('teachers').select('id, first_name, last_name, subject_id').neq('status', 'left').order('first_name'),
     supabase
       .from('batch_list')
       .select('id, code, subject_id, year_group, schedule, member_count, capacity')
       .is('closed_on', null)
       .order('code'),
   ]);
-  return { subjects: subjects ?? [], teachers: teachers ?? [], batches: batches ?? [] };
+  return { subjects: subjects ?? [], batches: batches ?? [] };
 }
 
 type Props = {
@@ -107,7 +106,7 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
       <section className={ui.card}>
         <h2>Subjects</h2>
         <p className={ui.hint}>
-          Tick each subject the student takes. Choosing a batch also sets the teacher. Unticking a subject ends it.
+          Tick each subject the student takes. The teacher comes from the batch. Unticking a subject ends it.
           Batches are listed for the year group chosen above.
         </p>
         <YearBatchFilter />
@@ -127,12 +126,8 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
                   </option>
                 ))}
               </select>
-              <select name={`teacher_${s.id}`} defaultValue={e?.teacher_id ?? ''} className={ui.select} aria-label={`${s.name} teacher`}>
-                <option value="">No teacher yet</option>
-                {options.teachers.filter((t) => !t.subject_id || t.subject_id === s.id).map((t) => (
-                  <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
-                ))}
-              </select>
+              {/* The teacher comes from the batch. A teacher set earlier without a batch is kept. */}
+              {e?.teacher_id && <input type="hidden" name={`teacher_${s.id}`} value={e.teacher_id} />}
             </div>
           );
         })}

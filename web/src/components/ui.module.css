@@ -102,7 +102,7 @@
 @media (min-width: 768px) {
   .fieldGrid { grid-template-columns: 1fr 1fr; }
   .full { grid-column: 1 / -1; }
-  .subjectRow { grid-template-columns: 180px 1fr 1fr; align-items: center; }
+  .subjectRow { grid-template-columns: 180px 1fr; align-items: center; }
 }
 @media (min-width: 1024px) {
   .columns { grid-template-columns: 1fr 1fr; }
