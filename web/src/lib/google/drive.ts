@@ -93,6 +93,41 @@ export async function uploadFile(parentId: string, name: string, mimeType: strin
   if (!res.ok) throw new Error(`Google Drive upload error: ${json.error?.message ?? res.status}`);
   return json as { id: string; webViewLink: string };
 }
+// Starts an upload the browser finishes itself (big files skip the server's 4.5 MB limit).
+// Returns a one-off upload address; the browser PUTs the file there. The Origin must be the site's
+// address, or the browser is not allowed to use it.
+export async function startBrowserUpload(parentId: string, name: string, mimeType: string, size: number, origin: string) {
+  const res = await fetch(`${UPLOAD}?uploadType=resumable&fields=id,webViewLink`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${await accessToken()}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': mimeType,
+      'X-Upload-Content-Length': String(size),
+      Origin: origin,
+    },
+    body: JSON.stringify({ name, parents: [parentId] }),
+    cache: 'no-store',
+  });
+  const location = res.headers.get('location');
+  if (!res.ok || !location) throw new Error(`Google Drive upload error: ${res.status}`);
+  return location;
+}
+
+// Moves a file this app made to the Drive bin (e.g. a marked sheet that was replaced before it was sent).
+export async function trashFile(fileId: string) {
+  await drive(`/files/${encodeURIComponent(fileId)}?fields=id`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trashed: true }),
+  });
+}
+
+// A file's folder and link, to check a browser upload landed where it should.
+export async function fileInfo(fileId: string): Promise<{ id: string; parents?: string[]; webViewLink: string; trashed: boolean }> {
+  return drive(`/files/${encodeURIComponent(fileId)}?fields=id,parents,webViewLink,trashed`);
+}
+
 // Fetches a file's contents (for files this app uploaded). Returns Google's response to pass on.
 export async function downloadFile(fileId: string) {
   const res = await fetch(`${DRIVE}/files/${encodeURIComponent(fileId)}?alt=media`, {

@@ -7,7 +7,7 @@ import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { MarkButtons } from './MarkButtons';
 import {
-  addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile,
+  addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile, sendMarkedDraft,
 } from './actions';
 
 // Label and badge colour for each homework status.
@@ -47,6 +47,11 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
   // What students handed in, and the teacher's corrected sheets.
   const files = (allFiles ?? []).filter((f) => f.owner_type === 'homework_submission');
   const corrections = (allFiles ?? []).filter((f) => f.owner_type === 'homework_correction');
+  // Sheets marked in the browser with Save & close: saved, waiting for Send.
+  const { data: drafts } = sheetIds.length
+    ? await supabase.from('homework_markups').select('sheet_id, student_id, draft_mark')
+        .in('sheet_id', sheetIds).not('draft_file_id', 'is', null)
+    : { data: [] };
   const { data: sheetFiles } = sheetIds.length
     ? await supabase
         .from('file_links')
@@ -150,6 +155,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                     const status = STATUS[r?.status ?? 'pending'];
                     const theirFiles = files.filter((f) => f.owner_id === sheet.id && f.student_id === student.id);
                     const corrected = corrections.filter((f) => f.owner_id === sheet.id && f.student_id === student.id);
+                    const draft = (drafts ?? []).find((d) => d.sheet_id === sheet.id && d.student_id === student.id);
                     return (
                       <tr key={student.id}>
                         <td>{student.name}</td>
@@ -165,12 +171,27 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                                   File {i + 1}
                                 </a>
                               ))}
+                              {theirFiles.length > 0 && (
+                                <a href={`/batches/${batchId}/mark?sheet=${sheet.id}&student=${student.id}`} target="_blank"
+                                  rel="noreferrer" className={ui.link} title="Mark in the browser, then send it to the student">
+                                  🖊️ Mark
+                                </a>
+                              )}
                               {corrected.map((f, i) => (
                                 <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
                                   ✏️ Corrected{corrected.length > 1 ? ` ${i + 1}` : ''}
                                 </a>
                               ))}
                             </span>
+                          )}
+                          {draft && (
+                            <form action={sendMarkedDraft} className={ui.formActions} style={{ marginTop: 6 }}>
+                              <input type="hidden" name="batch_id" value={batchId} />
+                              <input type="hidden" name="sheet_id" value={sheet.id} />
+                              <input type="hidden" name="student_id" value={student.id} />
+                              <span className={ui.muted}>Marked, not sent{draft.draft_mark !== null ? ` (mark ${draft.draft_mark})` : ''}</span>
+                              <button className={ui.primaryButton} title="Send the marked sheet (and mark) to the student">📤 Send</button>
+                            </form>
                           )}
                         </td>
                         <td>

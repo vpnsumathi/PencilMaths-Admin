@@ -67,6 +67,28 @@ Database script: `supabase/migrations/20261023000001_homework_for_new_students.s
 
 ---
 
+### 2.2 Marking in the browser (27 Oct 2026)
+
+On the batch page, under **Upload Homework**, each student who handed in a file has a **🖊️ Mark** link. It opens the marking page in a new tab.
+
+- **Tools:** ✏️ pen, 🖍️ highlighter, **T** text (click where it goes, then type), ✓ tick, ✗ cross, ⌫ eraser (click a mark to remove it), ✋ scroll (no drawing, handy on a tablet). Four colours, Thin/Thick, and ↶ Undo / ↷ Redo (Ctrl+Z / Ctrl+Y).
+- **Mark** box and **Save & send**: the marks are written into the PDF, which becomes the student's corrected sheet (it replaces any earlier one). The mark is saved too. If the homework is already marked, the Mark box can be left empty.
+- **Save & close**: keeps the marked sheet (and the mark, if typed) **without sending it**, and closes the tab. On the batch page the student's row then shows *Marked, not sent* with a **📤 Send** button. Send makes it the corrected sheet and saves the mark. Reopening **🖊️ Mark** before sending lets you change it; saving again replaces the unsent copy (the old one goes to the Drive bin).
+- **Download marked PDF** saves it to the computer instead; **Open original** shows the student's file as handed in.
+- With several hand-in files, buttons at the top choose **File 1, File 2…**.
+- **Reopening** the page shows the marks sent before, so they can be changed and sent again.
+- **Nothing is lost:** marks are kept in the browser as you go. If the tab closes or the connection drops before sending, opening the page again brings them back. The browser also warns before closing a tab with unsent marks.
+- Photos handed in (JPG, PNG) are turned into a one-page PDF to mark. Other files (Word, HEIC) show **Open original** instead.
+
+**How it works:**
+- `web/src/app/(portal)/batches/[id]/mark/`: `page.tsx` (loads the homework), `Marker.tsx` (the tools; shows pages with Mozilla's pdf.js, `pdfjs-dist`, "legacy" build for older browsers), `marks.ts` (draws the marks and writes them into the PDF with `pdf-lib`), `actions.ts` (saving), `marker.module.css`.
+- **Saving:** `startMarkedUpload` checks the mark and asks Google Drive for an upload address; the browser sends the PDF straight to Drive (so Vercel's 4.5 MB limit doesn't apply); `finishMarking` checks the file is in the student's Drive Homework folder, records it as the corrected sheet, saves the mark and the drawings. **Save & close** uses `saveMarkingDraft` instead: the file waits in the Homework folder, recorded in `homework_markups.draft_file_id` and `draft_mark`, until **📤 Send** (`sendMarkedDraft` in `batches/actions.ts`). Both send paths share `sendMarkedSheet` in `web/src/lib/homework/corrections.ts`. If the browser can't reach Drive directly, `uploadMarkedViaServer` sends it through the server instead (4 MB max).
+- `web/src/app/(portal)/files/[id]/route.ts`: opens a hand-in from Drive for staff.
+- `web/src/lib/homework/corrections.ts`: shared by this page and the corrected-sheet upload on the batch page.
+- The drawings are kept in table `homework_markups` (script `20261027000003_homework_marking.sql`), one row per student per homework.
+
+**Test:** hand in a PDF as a test student; on the batch page click **🖊️ Mark**; draw, add a tick and some text, enter a mark, **Save & send**. The student's My homework › Marked shows the marked sheet. Reopen **🖊️ Mark**: the marks are there to change.
+
 ## 3. Why it's built this way
 
 | Choice | Reason |

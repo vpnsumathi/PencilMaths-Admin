@@ -3,10 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { todayInUk, UUID, YEARS } from '@/lib/options';
-import { findOrCreateFolder, uploadFile } from '@/lib/google/drive';
-import { cleanName, fileKind, MAX_BYTES } from '@/lib/homework/handin';
+import { uploadFile } from '@/lib/google/drive';
+import { correctionName, recordCorrection, sendMarkedSheet, studentHomeworkFolder } from '@/lib/homework/corrections';
+import { fileKind, MAX_BYTES } from '@/lib/homework/handin';
 import { attachSheetFiles } from '@/lib/homework/sheets';
-import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
 import { createClient } from '@/lib/supabase/server';
 
 type Slot = { weekday: number; start_time: string };
@@ -399,24 +399,10 @@ async function saveCorrection(supabase: Supabase, sheet: { id: string; title: st
   if (!kind) return 'The corrected sheet must be a PDF, Word file or photo.';
   if (file.size > MAX_BYTES) return `${file.name} is too big (4 MB max).`;
   try {
-    await ensureStudentDriveFolder(studentId);
-    const { data: folder } = await supabase
-      .from('file_links').select('external_id').eq('student_id', studentId).eq('owner_type', 'student_folder').maybeSingle();
-    if (!folder?.external_id) throw new Error('No Drive folder');
-    const homework = await findOrCreateFolder('Homework', folder.external_id);
-    // e.g. "2026-10-24 18.30 Digits and their places · Hw-1 (Y5-A001) - corrected.pdf"
-    const stamp = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/London' }).slice(0, 16).replace(':', '.');
-    const name = `${stamp} ${cleanName(sheet.title)} - corrected.${kind.ext}`;
+    const homework = await studentHomeworkFolder(supabase, studentId);
+    const name = correctionName(sheet.title, kind.ext);
     const uploaded = await uploadFile(homework.id, name, kind.type, await file.arrayBuffer());
-    const { data: added, error } = await supabase.from('file_links').insert({
-      owner_type: 'homework_correction', owner_id: sheet.id, student_id: studentId, provider: 'google_drive',
-      external_id: uploaded.id, url: uploaded.webViewLink, label: name,
-    }).select('id').single();
-    if (error) throw new Error(error.message);
-    // One corrected sheet per student per homework: a new upload replaces the earlier one in the app.
-    // The earlier file stays in the student's Drive Homework folder.
-    await supabase.from('file_links').delete()
-      .eq('owner_type', 'homework_correction').eq('owner_id', sheet.id).eq('student_id', studentId).neq('id', added.id);
+    await recordCorrection(supabase, sheet.id, studentId, uploaded, name);
     return null;
   } catch (e) {
     console.error('saveCorrection failed:', e);
@@ -473,6 +459,38 @@ export async function markHomework(form: FormData) {
     : onlyFile ? 'Corrected sheet uploaded. The student can see it now.'
     : file ? 'Mark and corrected sheet saved. The student can see them now.'
     : 'Mark saved.');
+}
+
+// "Send" on a sheet marked in the browser with Save & close: the student now sees the marked sheet,
+// with the mark typed on the marking page (or the mark already saved).
+export async function sendMarkedDraft(form: FormData) {
+  const batchId = text(form, 'batch_id');
+  const sheetId = text(form, 'sheet_id');
+  const studentId = text(form, 'student_id');
+  if (![batchId, sheetId, studentId].every((v) => UUID.test(v))) redirectWith('/batches', 'error', 'Homework not found.');
+  const path = `/batches/${batchId}`;
+
+  const supabase = await createClient();
+  const [{ data: sheet }, { data: result }, { data: draft }] = await Promise.all([
+    supabase.from('homework_sheets').select('id, max_mark').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
+    supabase.from('homework_results').select('status').eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle(),
+    supabase.from('homework_markups').select('draft_file_id, draft_name, draft_mark').eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle(),
+  ]);
+  if (!sheet || !result) redirectWith(path, 'error', 'Homework not found.');
+  if (!draft?.draft_file_id) redirectWith(path, 'error', 'There is no saved marked sheet to send.');
+  const mark = draft.draft_mark === null ? null : Number(draft.draft_mark);
+  if (mark === null && result.status !== 'marked') {
+    redirectWith(path, 'error', 'Enter a mark first: open 🖊️ Mark and use Save & send, or type the mark and Save.');
+  }
+  if (mark !== null && sheet.max_mark !== null && mark > Number(sheet.max_mark)) {
+    redirectWith(path, 'error', `The mark can't be more than ${sheet.max_mark}.`);
+  }
+
+  const problem = await sendMarkedSheet(supabase, sheetId, studentId, { id: draft.draft_file_id, name: draft.draft_name ?? 'Marked sheet.pdf' }, mark);
+  revalidatePath(path);
+  revalidatePath('/');
+  if (problem) redirectWith(path, 'error', problem);
+  redirectWith(path, 'ok', 'Marked sheet sent. The student can see it now.');
 }
 
 // Deletes a homework and its results. Handed-in files stay in Google Drive.

@@ -884,6 +884,7 @@ Newest first.
 
 ### 2026-10-27 — Family login, batch places and fixes
 **What changed:**
+- **Marking in the browser:** a **🖊️ Mark** link next to each hand-in opens it in a new tab to draw, type and tick on, then **Save & send** makes it the student's corrected sheet (guide 09, section 2.2). New script `20261027000003_homework_marking.sql`; new packages `pdfjs-dist` (run `npm install` in `web`).
 - **Family login:** one email and password opens several children; the parent switches child from the top bar. Give access with the same email to link brothers and sisters (guide 12, section 7.1).
 - **Batch places:** a student can't be added to a full batch, and a batch's places can't go below its current students. Full batches show "full" in the student form.
 - **Student form:** the Teacher dropdown is removed; the teacher comes from the batch.
@@ -895,6 +896,7 @@ Newest first.
 - `web/src/lib/siteUrl.ts`, `web/src/app/(portal)/batches/MarkButtons.tsx`, `web/src/app/(student)/StudentSwitcher.tsx`, `web/src/app/(student)/actions.ts` — new.
 - `web/src/app/(portal)/students/` `actions.ts`, `StudentForm.tsx`, `PortalAccess.tsx`; `web/src/app/(portal)/batches/` `actions.ts`, `HomeworkSection.tsx`; `web/src/app/login/actions.ts`; `web/src/app/(student)/layout.tsx`, `student.module.css`; `web/src/components/ui.module.css` — changed.
 - `Help/12-student-login.md` — section 7.1 added.
+- Marking: `web/src/app/(portal)/batches/[id]/mark/` (`page.tsx`, `Marker.tsx`, `marks.ts`, `actions.ts`, `marker.module.css`), `web/src/app/(portal)/files/[id]/route.ts`, `web/src/lib/homework/corrections.ts`, `supabase/migrations/20261027000003_homework_marking.sql` — new; `web/package.json`, `web/src/lib/google/drive.ts`, `batches/actions.ts`, `batches/HomeworkSection.tsx` — changed; `Help/09-homework-marking.md` — section 2.2 added.
 
 ### 2026-10-25 — Batch page updates and past homework
 **What changed:**
