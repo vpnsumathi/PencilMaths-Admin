@@ -35,7 +35,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
     await Promise.all([
       supabase
         .from('batches')
-        .select('id, code, subject_id, year_group, teacher_id, capacity, started_on, closed_on, subjects(name)')
+        .select('id, code, name, subject_id, year_group, teacher_id, capacity, started_on, closed_on, subjects(name)')
         .eq('id', id)
         .maybeSingle(),
       supabase.from('batch_slots').select('weekday, start_time').eq('batch_id', id).order('weekday').order('start_time'),
@@ -82,7 +82,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
       <div className={ui.header}>
         <div>
           <h1 className={ui.title} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
-            {batch.code} · {subjectName} · Year {batch.year_group}
+            {batch.code}{batch.name ? ` · ${batch.name}` : ''} · {subjectName} · Year {batch.year_group}
             {/* Jumps to the latest active homework, which is open (or to the section if there is none yet). */}
             <a href={hasHomework ? '#latest-homework' : '#homework'} className={`${ui.button} ${ui.highlightButton}`}>📘 Homework</a>
           </h1>

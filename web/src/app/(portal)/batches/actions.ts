@@ -34,6 +34,8 @@ function readCommon(form: FormData) {
     teacher_id: text(form, 'teacher_id'),
     capacity: Number(text(form, 'capacity')),
     started_on: text(form, 'started_on') || todayInUk(),
+    // Optional name such as "Batch 1"; Bulk import finds the batch again by its year and name.
+    name: text(form, 'name').replace(/\s+/g, ' ') || null,
   };
 }
 
@@ -64,7 +66,8 @@ export async function createBatch(form: FormData) {
     .single();
   if (error) {
     console.error('createBatch failed:', error.message);
-    redirectWith('/batches/new', 'error', 'Could not create the batch.');
+    // 23505 = the name is taken by another open batch of the same subject and year.
+    redirectWith('/batches/new', 'error', error.code === '23505' ? `Another open batch of this subject and year is already called "${common.name}".` : 'Could not create the batch.');
   }
 
   if (typeof slots !== 'string' && slots.length > 0) {
@@ -96,7 +99,9 @@ export async function updateBatch(form: FormData) {
   if (error || data.length === 0) {
     console.error('updateBatch failed:', error?.message ?? 'no rows updated');
     // P0001 = a message raised on purpose, e.g. places lower than the students already in the batch.
-    redirectWith(path, 'error', error?.code === 'P0001' ? error.message : 'Could not save the batch.');
+    redirectWith(path, 'error', error?.code === 'P0001' ? error.message
+      : error?.code === '23505' ? `Another open batch of this subject and year is already called "${common.name}".`
+      : 'Could not save the batch.');
   }
 
   // Students in the batch follow its teacher (the enrolment trigger copies it from the batch).

@@ -19,7 +19,7 @@ export default async function BatchesPage({ searchParams }: Props) {
   // batch_list is a database view: each batch with its teacher, members, schedule and progress.
   const { data: batches, error } = await supabase
     .from('batch_list')
-    .select('id, code, subject, year_group, teacher, capacity, member_count, schedule, topics_done, topics_total, last_class_on, closed_on')
+    .select('id, code, name, subject, year_group, teacher, capacity, member_count, schedule, topics_done, topics_total, last_class_on, closed_on')
     .order('closed_on', { ascending: false, nullsFirst: true })
     .order('code');
   if (error) throw error;
@@ -41,7 +41,7 @@ export default async function BatchesPage({ searchParams }: Props) {
             <tbody>
               {batches.map((b) => (
                 <tr key={b.id}>
-                  <td><Link href={`/batches/${b.id}`} className={ui.link}>{b.code}</Link></td>
+                  <td><Link href={`/batches/${b.id}`} className={ui.link}>{b.code}</Link>{b.name && <span className={ui.muted}> · {b.name}</span>}</td>
                   <td>{b.subject}</td>
                   <td>{b.year_group}</td>
                   {!teacher && <td>{b.teacher}</td>}

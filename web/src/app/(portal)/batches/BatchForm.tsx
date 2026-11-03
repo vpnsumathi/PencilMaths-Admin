@@ -12,6 +12,7 @@ export type Batch = {
   teacher_id: string;
   capacity: number;
   started_on: string;
+  name: string | null;
   slots: { weekday: number; start_time: string }[];
 };
 type Subject = { id: string; name: string };
@@ -48,6 +49,9 @@ export function BatchForm({ batch, subjects, teachers }: { batch?: Batch; subjec
               </Field>
             </>
           )}
+          <Field label="Name (optional)">
+            <input name="name" defaultValue={batch?.name ?? ''} placeholder="e.g. Batch 1" maxLength={40} className={ui.input} />
+          </Field>
           <Field label="Teacher">
             <select name="teacher_id" required defaultValue={batch?.teacher_id ?? ''} className={ui.select}>
               <option value="" disabled>Choose…</option>

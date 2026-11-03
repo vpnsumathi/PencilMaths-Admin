@@ -31,8 +31,8 @@ export function TeacherForm({ teacher, subjects }: { teacher?: Teacher; subjects
           <Field label="First name">
             <input name="first_name" required defaultValue={teacher?.first_name} className={ui.input} />
           </Field>
-          <Field label="Last name">
-            <input name="last_name" required defaultValue={teacher?.last_name} className={ui.input} />
+          <Field label="Last name (optional)">
+            <input name="last_name" defaultValue={teacher?.last_name} className={ui.input} />
           </Field>
           <Field label="Email">
             <input name="personal_email" type="email" defaultValue={teacher?.personal_email ?? ''} className={ui.input} />

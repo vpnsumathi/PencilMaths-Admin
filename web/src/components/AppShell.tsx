@@ -6,26 +6,33 @@ import { useState } from 'react';
 import { signOut } from '@/app/actions';
 import styles from './AppShell.module.css';
 import {
-  BookIcon, CalendarIcon, HomeIcon, LogOutIcon, MailIcon, MenuIcon, PencilIcon, ShieldCheckIcon, UsersIcon, XIcon,
+  BookIcon, CalendarIcon, HomeIcon, LogOutIcon, MailIcon, MenuIcon, PencilIcon, SettingsIcon, ShieldCheckIcon, UploadIcon, UsersIcon, XIcon,
 } from './icons';
 
 type Staff = { full_name: string; role: string };
+type NavLink = { href: string; label: string; icon: (p: { size?: number }) => React.ReactNode; ready: boolean; children?: NavLink[] };
 
 // Sidebar links. ready: false shows the link greyed out until that screen is built.
-const NAV = [
+const NAV: NavLink[] = [
   { href: '/', label: 'Dashboard', icon: HomeIcon, ready: true },
   { href: '/students', label: 'Students', icon: UsersIcon, ready: true },
   { href: '/teachers', label: 'Teachers', icon: PencilIcon, ready: true },
   { href: '/batches', label: 'Batches', icon: CalendarIcon, ready: true },
   { href: '/enquiries', label: 'Enquiries', icon: MailIcon, ready: true },
 ];
-const ADMIN_NAV = [
+const ADMIN_NAV: NavLink[] = [
   { href: '/subjects', label: 'Subjects', icon: BookIcon, ready: true },
   { href: '/lesson-library', label: 'Lesson library', icon: BookIcon, ready: true },
-  { href: '/staff', label: 'Staff', icon: ShieldCheckIcon, ready: true },
+  // Settings opens to show its pages while one of them is in use.
+  {
+    href: '/settings', label: 'Settings', icon: SettingsIcon, ready: true, children: [
+      { href: '/settings/staff', label: 'Staff', icon: ShieldCheckIcon, ready: true },
+      { href: '/settings/import', label: 'Bulk import', icon: UploadIcon, ready: true },
+    ],
+  },
 ];
 // Teachers see only their own batches and the students in them.
-const TEACHER_NAV = [
+const TEACHER_NAV: NavLink[] = [
   { href: '/', label: 'Dashboard', icon: HomeIcon, ready: true },
   { href: '/batches', label: 'My batches', icon: CalendarIcon, ready: true },
   { href: '/students', label: 'My students', icon: UsersIcon, ready: true },
@@ -52,17 +59,33 @@ export function AppShell({ staff, children }: { staff: Staff; children: React.Re
         </div>
 
         <nav className={styles.nav}>
-          {links.map(({ href, label, icon: Icon, ready }) => {
-            const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
-            return ready ? (
-              <Link key={href} href={href} onClick={() => setOpen(false)}
-                className={`${styles.link} ${active ? styles.active : ''}`} aria-current={active ? 'page' : undefined}>
-                <Icon size={18} /> {label}
-              </Link>
-            ) : (
-              <span key={href} className={`${styles.link} ${styles.disabled}`}>
-                <Icon size={18} /> {label} <em>Soon</em>
-              </span>
+          {links.map(({ href, label, icon: Icon, ready, children }) => {
+            const inside = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+            // A parent (Settings) is only highlighted on its own page; on a child page the child is.
+            const active = inside && !(children && pathname !== href);
+            if (!ready) {
+              return (
+                <span key={href} className={`${styles.link} ${styles.disabled}`}>
+                  <Icon size={18} /> {label} <em>Soon</em>
+                </span>
+              );
+            }
+            return (
+              <div key={href} className={styles.group}>
+                <Link href={href} onClick={() => setOpen(false)}
+                  className={`${styles.link} ${active ? styles.active : ''}`} aria-current={active ? 'page' : undefined}>
+                  <Icon size={18} /> {label}
+                </Link>
+                {children && inside && children.map((c) => {
+                  const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`);
+                  return (
+                    <Link key={c.href} href={c.href} onClick={() => setOpen(false)}
+                      className={`${styles.link} ${styles.sublink} ${childActive ? styles.active : ''}`} aria-current={childActive ? 'page' : undefined}>
+                      <c.icon size={16} /> {c.label}
+                    </Link>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>

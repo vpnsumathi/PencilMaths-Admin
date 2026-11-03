@@ -28,7 +28,8 @@ export async function saveTeacher(form: FormData) {
     joined_on: optional(form, 'joined_on'),
     notes: optional(form, 'notes'),
   };
-  if (!row.first_name || !row.last_name) redirectWith(formPath, 'error', 'Enter the first and last name.');
+  // The last name is optional: some teachers are known by one name.
+  if (!row.first_name) redirectWith(formPath, 'error', 'Enter the first name.');
   if (row.personal_email && !EMAIL.test(row.personal_email)) redirectWith(formPath, 'error', 'Enter a valid email address.');
   if (!(row.status in TEACHER_STATUSES)) redirectWith(formPath, 'error', 'Choose a valid status.');
   if (row.year_min && row.year_max && row.year_min > row.year_max) {

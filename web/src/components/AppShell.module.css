@@ -35,6 +35,9 @@
 .active, .active:hover { background: var(--brand-ring); color: var(--brand-strong); }
 .disabled, .disabled:hover { background: none; color: var(--subtle); cursor: default; }
 .disabled em { margin-left: auto; font-size: 11px; font-style: normal; }
+/* Pages inside a group (Settings › Staff, Bulk import): indented, a little smaller. */
+.group { display: flex; flex-direction: column; gap: 4px; }
+.sublink { margin-left: 22px; padding: 8px 12px; font-size: 14px; }
 
 .user {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;

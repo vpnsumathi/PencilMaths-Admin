@@ -28,7 +28,7 @@ export async function loadStudentFormOptions() {
     supabase.from('subjects').select('id, name, active').order('sort'),
     supabase
       .from('batch_list')
-      .select('id, code, subject_id, year_group, schedule, member_count, capacity')
+      .select('id, code, name, subject_id, year_group, schedule, member_count, capacity')
       .is('closed_on', null)
       .order('code'),
   ]);
@@ -59,8 +59,8 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
           <Field label="First name">
             <input name="first_name" required defaultValue={student?.first_name} className={ui.input} />
           </Field>
-          <Field label="Last name">
-            <input name="last_name" required defaultValue={student?.last_name} className={ui.input} />
+          <Field label="Last name (optional)">
+            <input name="last_name" defaultValue={student?.last_name} className={ui.input} />
           </Field>
           <Field label="Year group">
             <select name="year_group" required defaultValue={student?.year_group ?? ''} className={ui.select}>
@@ -122,7 +122,7 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
                 <option value="">No batch yet</option>
                 {options.batches.filter((b) => b.subject_id === s.id).map((b) => (
                   <option key={b.id} value={b.id} data-year={b.year_group}>
-                    {b.code} · Year {b.year_group} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity}{b.member_count >= b.capacity && b.id !== e?.batch_id ? ' · full' : ''})
+                    {b.code}{b.name ? ` ${b.name}` : ''} · Year {b.year_group} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity}{b.member_count >= b.capacity && b.id !== e?.batch_id ? ' · full' : ''})
                   </option>
                 ))}
               </select>
