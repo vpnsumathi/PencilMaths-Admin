@@ -38,11 +38,12 @@ export async function bulkImport(_prev: ImportState, form: FormData): Promise<Im
 
   const { data, error } = await supabase.rpc('bulk_import', { p_rows: read.rows, p_dry_run: !save });
   if (error) {
-    console.error('bulkImport failed:', error.message);
+    console.error('bulkImport failed:', error.code, error.message, error.details, error.hint);
     // P0001 = a message raised on purpose (e.g. "Only admins can bulk import."). Anything else: the script may be missing.
     const problem = error.code === 'P0001' ? error.message
       : error.code === 'PGRST202' ? 'The database is not ready for Bulk import yet: run 20261102000001_bulk_import.sql in Supabase first.'
-      : 'Could not check the file. Try again.';
+      // Admin-only page, so the database's own message is shown: it says what went wrong.
+      : `Could not ${save ? 'import' : 'check'} the file. Database message: ${error.message}${error.details ? ` (${error.details})` : ''}${error.code ? ` [${error.code}]` : ''}`;
     return { problem, fileName: file.name, at };
   }
 

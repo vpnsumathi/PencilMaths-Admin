@@ -29,7 +29,7 @@ export function LoginForm() {
         <h1 className={styles.title}>{isSignIn ? 'Welcome back' : 'Reset your password'}</h1>
         <p className={styles.subtitle}>
           {isSignIn
-            ? 'Sign in to the Pencil Maths admin portal.'
+            ? 'Sign in to your Pencil Maths account.'
             : 'Enter your email and we will send you a link to choose a new password.'}
         </p>
       </div>
