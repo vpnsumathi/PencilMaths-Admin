@@ -1,14 +1,14 @@
 import Link from 'next/link';
+import { Bone, Skeleton } from '@/components/Skeleton';
 import { formatDate } from '@/lib/format';
-import { BarChart } from './BarChart';
 import { loadHomework } from './homework';
 import { NudgeButton } from './NudgeButton';
 import styles from '../dashboard.module.css';
 
 const SHOW = 8; // rows shown in each list before "+N more"
 
-// The dashboard's Homework section: five numbers, the marking queue, students falling behind and
-// each batch's on-time hand-in rate. Numbers are worked out in homework.ts.
+// The dashboard's Homework section: five numbers, the marking queue and students falling behind.
+// Numbers are worked out in homework.ts. The dashboard shows HomeworkPanelLoading until it is ready.
 // For a teacher, everything is already limited to their own batches, and there's no WhatsApp nudge
 // (that needs a parent's phone number, which teachers can't see).
 export async function HomeworkPanel({ teacher = false }: { teacher?: boolean }) {
@@ -99,13 +99,36 @@ export async function HomeworkPanel({ teacher = false }: { teacher?: boolean }) 
           {h.behind.length > SHOW && <p className={styles.more}>+{h.behind.length - SHOW} more</p>}
         </article>
       </div>
+    </section>
+  );
+}
 
-      <article className={styles.card} style={{ marginBottom: 16 }}>
-        <h2>Hand-in rate by batch</h2>
-        <p className={styles.cardSub}>Share of homework handed in on or before its due date · last 4 weeks · click a batch to open its homework</p>
-        <BarChart bars={h.rate} orientation="rows" max={100} unit="%" ariaLabel="On-time hand-in rate per batch, last 4 weeks"
-          emptyText="No open batches." />
-      </article>
+// Shown in the Homework section's place while it loads, so the rest of the dashboard doesn't wait for it.
+export function HomeworkPanelLoading() {
+  return (
+    <section className={styles.homework} aria-labelledby="homework-title" aria-busy="true">
+      <h2 id="homework-title" className={styles.sectionTitle}>Homework</h2>
+      <Skeleton label="Loading homework">
+        <div className={styles.hwKpis}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className={styles.kpi}>
+              <Bone width="55%" />
+              <Bone width="35%" height={30} />
+              <Bone width="80%" />
+            </div>
+          ))}
+        </div>
+        <div className={styles.pair}>
+          {[0, 1].map((i) => (
+            <div key={i} className={styles.card}>
+              <Bone width="45%" height={18} />
+              <div style={{ display: 'grid', gap: 14, marginTop: 20 }}>
+                {[0, 1, 2, 3].map((j) => <Bone key={j} width={`${90 - j * 12}%`} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Skeleton>
     </section>
   );
 }

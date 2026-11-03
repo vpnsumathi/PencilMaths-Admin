@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
 import ui from '@/components/ui.module.css';
 import { redirect } from 'next/navigation';
+import { getViewer } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { setActive, updateRole } from './actions';
 import styles from './staff.module.css';
@@ -20,10 +21,9 @@ export default async function StaffPage({ searchParams }: Props) {
   const { ok, error: problem } = await searchParams;
   const supabase = await createClient();
 
-  // Admins only. The layout has already checked this person is active staff.
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: me } = await supabase.from('staff').select('role').eq('id', user!.id).single();
-  if (me?.role !== 'admin') redirect('/');
+  // Admins only (the same cached check as the portal layout, so no extra lookup).
+  const viewer = await getViewer();
+  if (viewer?.kind !== 'staff' || viewer.role !== 'admin') redirect('/');
 
   const { data: staff, error } = await supabase
     .from('staff')
@@ -45,7 +45,7 @@ export default async function StaffPage({ searchParams }: Props) {
           </thead>
           <tbody>
             {staff.map((s) => {
-              const isMe = s.id === user!.id;
+              const isMe = s.id === viewer.userId;
               return (
                 <tr key={s.id}>
                   <td>{s.full_name}{isMe && <span className={styles.you}>You</span>}</td>

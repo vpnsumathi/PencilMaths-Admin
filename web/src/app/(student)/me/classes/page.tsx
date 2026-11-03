@@ -1,17 +1,16 @@
 import Link from 'next/link';
 import { formatDate, formatTime } from '@/lib/format';
 import { WEEKDAYS } from '@/lib/options';
-import { createClient } from '@/lib/supabase/server';
 import styles from '../../student.module.css';
 import { type Dashboard, nextClass } from '../dashboard';
+import { getMyDashboard } from '../myDashboard';
 
 export const metadata = { title: 'My classes' };
 
 // One card per class the student is in: teacher, class times and homework for that class.
 export default async function MyClasses() {
-  const supabase = await createClient();
-  const { data } = await supabase.rpc('my_dashboard');
-  const me = data as Dashboard; // the layout has already checked this is a student
+  // The same answer the layout already asked for (cached), so no second call.
+  const me = (await getMyDashboard()) as Dashboard; // the layout has already checked this is a student
 
   return (
     <>

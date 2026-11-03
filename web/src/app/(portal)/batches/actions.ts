@@ -7,8 +7,17 @@ import { todayInUk, UUID, YEARS } from '@/lib/options';
 import { uploadFile } from '@/lib/google/drive';
 import { correctionName, recordCorrection, sendMarkedSheet, studentHomeworkFolder } from '@/lib/homework/corrections';
 import { fileKind, MAX_BYTES } from '@/lib/homework/handin';
-import { attachSheetFiles } from '@/lib/homework/sheets';
+import { discardUploads, prepareSheetFiles } from '@/lib/homework/sheets';
 import { createClient } from '@/lib/supabase/server';
+
+// The message to show when a database function refused or failed.
+// P0001 = a message raised on purpose (e.g. places lower than the students already in the batch): safe to show.
+// PGRST202 = the function doesn't exist yet: the database script hasn't been run on this Supabase project.
+function dbProblem(error: { code?: string; message: string }, fallback: string) {
+  if (error.code === 'P0001') return error.message;
+  if (error.code === 'PGRST202') return 'The database is not ready for this yet: run 20261103000001_atomic_saves.sql in Supabase first.';
+  return fallback;
+}
 
 type Slot = { weekday: number; start_time: string };
 
@@ -58,29 +67,22 @@ export async function createBatch(form: FormData) {
   if (problem) redirectWith('/batches/new', 'error', problem);
 
   const supabase = await createClient();
+  // One database function saves the batch and its class times together: all of it, or nothing.
   // Creating the batch also copies the subject's curriculum into its lesson plan (a database trigger).
-  const { data: batch, error } = await supabase
-    .from('batches')
-    .insert({ ...common, subject_id: subjectId, year_group: yearGroup })
-    .select('id')
-    .single();
-  if (error) {
-    console.error('createBatch failed:', error.message);
+  const { data: batchId, error } = await supabase.rpc('save_batch', {
+    p: { ...common, subject_id: subjectId, year_group: yearGroup, slots: typeof slots === 'string' ? [] : slots },
+  });
+  if (error || !batchId) {
+    console.error('createBatch failed:', error?.message ?? 'no id returned');
     // 23505 = the name is taken by another open batch of the same subject and year.
-    redirectWith('/batches/new', 'error', error.code === '23505' ? `Another open batch of this subject and year is already called "${common.name}".` : 'Could not create the batch.');
-  }
-
-  if (typeof slots !== 'string' && slots.length > 0) {
-    const { error: slotError } = await supabase.from('batch_slots').insert(slots.map((s) => ({ ...s, batch_id: batch.id })));
-    if (slotError) {
-      console.error('createBatch slots failed:', slotError.message);
-      redirectWith(`/batches/${batch.id}`, 'error', 'Batch created, but the class times could not be saved.');
-    }
+    redirectWith('/batches/new', 'error', error?.code === '23505'
+      ? `Another open batch of this subject and year is already called "${common.name}".`
+      : error ? dbProblem(error, 'Could not create the batch.') : 'Could not create the batch.');
   }
 
   revalidatePath('/batches');
   revalidatePath('/');
-  redirectWith(`/batches/${batch.id}`, 'ok', 'Batch created.');
+  redirectWith(`/batches/${batchId}`, 'ok', 'Batch created.');
 }
 
 export async function updateBatch(form: FormData) {
@@ -95,26 +97,16 @@ export async function updateBatch(form: FormData) {
   if (problem) redirectWith(path, 'error', problem);
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from('batches').update(common).eq('id', id).select('id');
-  if (error || data.length === 0) {
-    console.error('updateBatch failed:', error?.message ?? 'no rows updated');
-    // P0001 = a message raised on purpose, e.g. places lower than the students already in the batch.
-    redirectWith(path, 'error', error?.code === 'P0001' ? error.message
-      : error?.code === '23505' ? `Another open batch of this subject and year is already called "${common.name}".`
-      : 'Could not save the batch.');
-  }
-
-  // Students in the batch follow its teacher (the enrolment trigger copies it from the batch).
-  await supabase.from('enrolments').update({ teacher_id: common.teacher_id }).eq('batch_id', id).is('ended_on', null);
-
-  // Replace the weekly times with the ones on the form.
-  const { error: deleteError } = await supabase.from('batch_slots').delete().eq('batch_id', id);
-  const { error: slotError } = typeof slots !== 'string' && slots.length > 0
-    ? await supabase.from('batch_slots').insert(slots.map((s) => ({ ...s, batch_id: id })))
-    : { error: null };
-  if (deleteError || slotError) {
-    console.error('updateBatch slots failed:', (deleteError ?? slotError)?.message);
-    redirectWith(path, 'error', 'Batch saved, but the class times could not be updated.');
+  // One database function saves the batch, moves its students to its teacher and replaces the weekly times
+  // with the ones on the form, all together: if any part is refused, nothing changes.
+  const { error } = await supabase.rpc('save_batch', {
+    p: { ...common, id, slots: typeof slots === 'string' ? [] : slots },
+  });
+  if (error) {
+    console.error('updateBatch failed:', error.message);
+    redirectWith(path, 'error', error.code === '23505'
+      ? `Another open batch of this subject and year is already called "${common.name}".`
+      : dbProblem(error, 'Could not save the batch.'));
   }
 
   revalidatePath('/batches');
@@ -154,43 +146,27 @@ export async function setBatchClosed(form: FormData) {
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-// Reads and checks the homework fields shared by "Set homework" and "Mark completed".
-// The title comes from the form unless given (lesson homework is named after its lesson).
-function readHomework(form: FormData, path: string, title = text(form, 'title')) {
+// Reads and checks the dates and maximum mark shared by "Set homework", "Mark completed" (topic) and
+// "Complete lesson".
+function readHomeworkDates(form: FormData, path: string) {
   const setOn = text(form, 'set_on') || todayInUk();
   const dueOn = optional(form, 'due_on');
   const maxMark = optionalNumber(form, 'max_mark');
-  if (!title) redirectWith(path, 'error', 'Enter a homework title.');
   if (dueOn && dueOn < setOn) redirectWith(path, 'error', 'The due date cannot be before the date it is set.');
   if (maxMark !== null && !(maxMark > 0)) redirectWith(path, 'error', 'The maximum mark must be more than 0.');
-  return { title, set_on: setOn, due_on: dueOn, max_mark: maxMark };
+  return { set_on: setOn, due_on: dueOn, max_mark: maxMark };
 }
 
-// Adds the homework with a "pending" result for each current student. Returns its id and the number of students.
-async function insertHomework(supabase: Supabase, batchId: string, path: string, fields: ReturnType<typeof readHomework> & { topic_id?: string; lesson_homework_id?: string }) {
-  const { data: sheet, error } = await supabase
-    .from('homework_sheets')
-    .insert({ batch_id: batchId, ...fields })
-    .select('id')
-    .single();
-  if (error) {
-    console.error('insertHomework failed:', error.message);
-    redirectWith(path, 'error', 'Could not set the homework.');
-  }
-
-  // One "pending" result per current student. This row is what gives a student the homework, so students
-  // who join the batch later don't get it (staff can still give it with "Give homework").
-  const { data: members } = await supabase.from('enrolments').select('student_id').eq('batch_id', batchId).is('ended_on', null);
-  if (members?.length) {
-    const { error: resultError } = await supabase
-      .from('homework_results')
-      .insert(members.map((m) => ({ sheet_id: sheet.id, student_id: m.student_id })));
-    if (resultError) console.error('insertHomework results failed:', resultError.message);
-  }
-  return { sheetId: sheet.id as string, students: members?.length ?? 0 };
+// The same, with the homework title typed on the form.
+function readHomework(form: FormData, path: string) {
+  const title = text(form, 'title');
+  if (!title) redirectWith(path, 'error', 'Enter a homework title.');
+  return { title, ...readHomeworkDates(form, path) };
 }
 
 // Sets homework for the whole batch, with a "not handed in" result for each current student.
+// The worksheet file is uploaded to Google Drive first; then one database function (set_homework) saves the
+// homework, gives it to the students and records the file together, so it is never saved halfway.
 export async function createHomework(form: FormData) {
   const batchId = text(form, 'batch_id');
   if (!UUID.test(batchId)) redirectWith('/batches', 'error', 'Batch not found.');
@@ -198,12 +174,22 @@ export async function createHomework(form: FormData) {
   const fields = readHomework(form, path);
 
   const supabase = await createClient();
-  const { sheetId, students } = await insertHomework(supabase, batchId, path, fields);
-  const fileProblem = await attachSheetFiles(supabase, sheetId, form);
+  // Only staff and the batch's own teacher see the batch; checked before anything is uploaded to Drive.
+  const { data: batch } = await supabase.from('batches').select('id').eq('id', batchId).maybeSingle();
+  if (!batch) redirectWith('/batches', 'error', 'Batch not found.');
+
+  const sheets = await prepareSheetFiles(form);
+  const { data, error } = await supabase.rpc('set_homework', { p_batch: batchId, p: { ...fields, files: sheets.files } });
+  if (error) {
+    console.error('createHomework failed:', error.message);
+    await discardUploads(sheets);
+    redirectWith(path, 'error', dbProblem(error, 'Could not set the homework.'));
+  }
+  const students = Number(data?.students ?? 0);
 
   revalidatePath(path);
   revalidatePath('/');
-  if (fileProblem) redirectWith(path, 'error', `Homework set, but: ${fileProblem}`);
+  if (sheets.problem) redirectWith(path, 'error', `Homework set for ${students} student(s), but: ${sheets.problem}`);
   redirectWith(path, 'ok', `Homework set for ${students} student(s). It is now on their hand-in links.`);
 }
 
@@ -247,28 +233,29 @@ export async function completeTopic(form: FormData) {
   if (!topic) redirectWith(path, 'error', 'Topic not found.');
   if (topic.status === 'complete') redirectWith(path, 'error', 'This topic is already completed.');
 
-  let message: string;
-  let fileProblem: string | null = null;
-  if (sent) {
-    message = `Topic completed. Its homework "${sent.title}" was already sent, so it was not sent again.`;
-  } else {
-    const fields = readHomework(form, path);
-    const { sheetId, students } = await insertHomework(supabase, batchId, path, { ...fields, topic_id: topicId });
-    fileProblem = await attachSheetFiles(supabase, sheetId, form, fields.title);
-    message = `Topic completed. Homework "${fields.title}" sent to ${students} student(s).`;
-  }
+  // The homework file is only needed (and uploaded to Drive) when the topic hasn't sent its homework yet.
+  const fields = sent ? null : readHomework(form, path);
+  const sheets = fields ? await prepareSheetFiles(form, fields.title) : null;
 
-  const { error } = await supabase
-    .from('batch_topics').update({ status: 'complete', completed_on: todayInUk() }).eq('id', topicId);
+  // One database function sends the homework (once) and marks the topic completed, together.
+  const { data, error } = await supabase.rpc('complete_topic', {
+    p_batch: batchId, p_topic: topicId, p: fields ? { ...fields, files: sheets!.files } : {},
+  });
   if (error) {
     console.error('completeTopic failed:', error.message);
-    redirectWith(path, 'error', 'The homework was sent, but the topic could not be marked completed.');
+    if (sheets) await discardUploads(sheets);
+    redirectWith(path, 'error', dbProblem(error, 'Could not complete the topic. Nothing was sent.'));
   }
+  if (data?.already_sent && sheets) await discardUploads(sheets); // sent from another tab in the meantime
+
+  const message = data?.already_sent
+    ? `Topic completed. Its homework "${data.already_sent}" was already sent, so it was not sent again.`
+    : `Topic completed. Homework "${fields!.title}" sent to ${Number(data?.students ?? 0)} student(s).`;
 
   revalidatePath(path);
   revalidatePath('/batches');
   revalidatePath('/');
-  if (fileProblem) redirectWith(path, 'error', `${message} But: ${fileProblem}`);
+  if (sheets?.problem && !data?.already_sent) redirectWith(path, 'error', `${message} But: ${sheets.problem}`);
   redirectWith(path, 'ok', message);
 }
 
@@ -351,53 +338,25 @@ export async function completeLesson(form: FormData) {
   const view = lessonView(form, path);
   const picked = form.getAll('hw').map(String).filter((v) => UUID.test(v));
 
+  const fields = readHomeworkDates(form, view);
+
+  // One database function checks the lesson is in this class's plan, sends each ticked sheet that this class
+  // hasn't had yet (with its Lesson library worksheet, no copy is made) and marks the lesson completed, together.
+  // A ticked sheet with no worksheet yet stops it all, with a message, and nothing is sent.
   const supabase = await createClient();
-  const [{ data: lesson }, { data: batch }] = await Promise.all([
-    supabase.from('lessons').select('id, name, subject_id, year_group, lesson_homework(id, slot, code, drive_file_id, url, file_name)')
-      .eq('id', lessonId).maybeSingle(),
-    supabase.from('batches').select('subject_id, year_group').eq('id', batchId).maybeSingle(),
-  ]);
-  if (!lesson || !batch || lesson.subject_id !== batch.subject_id || lesson.year_group !== batch.year_group) {
-    redirectWith(path, 'error', 'That lesson is not part of this class\'s plan.');
-  }
-  const { data: sent } = await supabase
-    .from('homework_sheets').select('lesson_homework_id').eq('batch_id', batchId).not('lesson_homework_id', 'is', null);
-  const alreadySent = new Set((sent ?? []).map((s) => s.lesson_homework_id as string));
-
-  const sheets = (lesson.lesson_homework ?? [])
-    .filter((h) => picked.includes(h.id) && !alreadySent.has(h.id))
-    .sort((a, b) => a.slot - b.slot);
-  const missing = sheets.find((h) => !h.drive_file_id);
-  if (missing) redirectWith(view, 'error', `${missing.code} has no worksheet yet. Upload it in the Lesson library first.`);
-
-  const titles: string[] = [];
-  let students = 0;
-  for (const h of sheets) {
-    const fields = readHomework(form, path, `${lesson.name} · Hw-${h.slot} (${h.code})`);
-    const result = await insertHomework(supabase, batchId, path, { ...fields, lesson_homework_id: h.id });
-    students = result.students;
-    // The worksheet is the library's Drive file, linked to this homework (no copy is made).
-    const { error } = await supabase.from('file_links').insert({
-      owner_type: 'homework_sheet', owner_id: result.sheetId, provider: 'google_drive',
-      external_id: h.drive_file_id, url: h.url, label: h.file_name ?? `${h.code}.pdf`,
-    });
-    if (error) console.error('completeLesson worksheet link failed:', error.message);
-    titles.push(h.code);
-  }
-
-  const { error } = await supabase.from('batch_lessons').upsert(
-    { batch_id: batchId, lesson_id: lessonId, status: 'complete', completed_on: todayInUk() },
-    { onConflict: 'batch_id,lesson_id' },
-  );
+  const { data, error } = await supabase.rpc('complete_lesson', {
+    p_batch: batchId, p_lesson: lessonId, p: { ...fields, hw: picked },
+  });
   if (error) {
     console.error('completeLesson failed:', error.message);
-    redirectWith(view, 'error', 'The homework was sent, but the lesson could not be marked completed.');
+    redirectWith(view, 'error', dbProblem(error, 'Could not complete the lesson. Nothing was sent.'));
   }
+  const codes = (data?.codes ?? []) as string[];
 
   revalidatePath(path);
   revalidatePath('/');
-  redirectWith(view, 'ok', titles.length
-    ? `Lesson completed. Homework ${titles.join(', ')} sent to ${students} student(s).`
+  redirectWith(view, 'ok', codes.length
+    ? `Lesson completed. Homework ${codes.join(', ')} sent to ${Number(data?.students ?? 0)} student(s).`
     : 'Lesson completed. No homework was sent.');
 }
 
@@ -537,9 +496,20 @@ export async function addHomeworkFile(form: FormData) {
   const file = form.get('sheet_file');
   if (!(file instanceof File && file.size > 0) && !text(form, 'sheet_url')) redirectWith(path, 'error', 'Choose a file or paste a link.');
 
-  const problem = await attachSheetFiles(supabase, sheetId, form);
+  // Upload first, then record the file and/or link in one insert.
+  const sheets = await prepareSheetFiles(form);
+  if (sheets.files.length > 0) {
+    const { error } = await supabase.from('file_links').insert(sheets.files.map((f) => ({
+      owner_type: 'homework_sheet', owner_id: sheetId, ...f,
+    })));
+    if (error) {
+      console.error('addHomeworkFile failed:', error.message);
+      await discardUploads(sheets);
+      redirectWith(path, 'error', 'Could not save the homework file.');
+    }
+  }
   revalidatePath(path);
-  if (problem) redirectWith(path, 'error', problem);
+  if (sheets.problem) redirectWith(path, 'error', sheets.files.length ? `Homework file added, but: ${sheets.problem}` : sheets.problem);
   redirectWith(path, 'ok', 'Homework file added. Students can open it from My homework.');
 }
 

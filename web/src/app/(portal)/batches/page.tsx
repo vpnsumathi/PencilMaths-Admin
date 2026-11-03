@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
+import { CreatedModified } from '@/components/CreatedModified';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
@@ -14,14 +15,16 @@ export default async function BatchesPage({ searchParams }: Props) {
   const { ok, error: problem } = await searchParams;
   const supabase = await createClient();
   // Teachers only get their own open batches back (database rules), and can't add batches.
-  const teacher = await isTeacher();
-
   // batch_list is a database view: each batch with its teacher, members, schedule and progress.
-  const { data: batches, error } = await supabase
-    .from('batch_list')
-    .select('id, code, name, subject, year_group, teacher, capacity, member_count, schedule, topics_done, topics_total, last_class_on, closed_on')
-    .order('closed_on', { ascending: false, nullsFirst: true })
-    .order('code');
+  // Who is looking is worked out at the same time as the list loads, not before it.
+  const [teacher, { data: batches, error }] = await Promise.all([
+    isTeacher(),
+    supabase
+      .from('batch_list')
+      .select('id, code, name, subject, year_group, teacher, capacity, member_count, schedule, topics_done, topics_total, last_class_on, closed_on, created_at, updated_at')
+      .order('closed_on', { ascending: false, nullsFirst: true })
+      .order('code'),
+  ]);
   if (error) throw error;
 
   return (
@@ -36,7 +39,7 @@ export default async function BatchesPage({ searchParams }: Props) {
         <div className={ui.tableWrap}>
           <table className={ui.table}>
             <thead>
-              <tr><th>Batch</th><th>Subject</th><th>Year</th>{!teacher && <th>Teacher</th>}<th>Times</th><th>Places</th><th>Lesson plan</th><th>Last class</th><th>Status</th></tr>
+              <tr><th>Batch</th><th>Subject</th><th>Year</th>{!teacher && <th>Teacher</th>}<th>Times</th><th>Places</th><th>Lesson plan</th><th>Last class</th><th>Status</th><th>Created / modified</th></tr>
             </thead>
             <tbody>
               {batches.map((b) => (
@@ -50,6 +53,7 @@ export default async function BatchesPage({ searchParams }: Props) {
                   <td>{b.topics_done} of {b.topics_total} done</td>
                   <td>{formatDate(b.last_class_on)}</td>
                   <td>{b.closed_on ? <StatusBadge status="closed" label="Closed" /> : <StatusBadge status="open" label="Open" />}</td>
+                  <td><CreatedModified created={b.created_at} updated={b.updated_at} /></td>
                 </tr>
               ))}
             </tbody>

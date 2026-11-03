@@ -1,5 +1,6 @@
 import { Alerts } from '@/components/Alerts';
 import Link from 'next/link';
+import { CreatedModified } from '@/components/CreatedModified';
 import { ChevronDownIcon, ChevronUpIcon } from '@/components/icons';
 import { requireAdmin } from '@/lib/auth';
 import { addSubject, moveSubject, renameSubject, setSubjectActive } from './actions';
@@ -16,7 +17,7 @@ export default async function SubjectsPage({ searchParams }: Props) {
   // curriculum_topics(count) counts each subject's topics in the same query.
   const { data: subjects, error } = await supabase
     .from('subjects')
-    .select('id, name, active, curriculum_topics(count)')
+    .select('id, name, active, created_at, updated_at, curriculum_topics(count)')
     .order('sort')
     .order('name');
   if (error) throw error;
@@ -36,7 +37,7 @@ export default async function SubjectsPage({ searchParams }: Props) {
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
-            <tr><th>Order</th><th>Name</th><th>Curriculum</th><th>Status</th><th></th></tr>
+            <tr><th>Order</th><th>Name</th><th>Curriculum</th><th>Status</th><th>Created / modified</th><th></th></tr>
           </thead>
           <tbody>
             {subjects.map((s, i) => (
@@ -62,6 +63,7 @@ export default async function SubjectsPage({ searchParams }: Props) {
                 <td>
                   <span className={s.active ? styles.active : styles.inactive}>{s.active ? 'On' : 'Off'}</span>
                 </td>
+                <td><CreatedModified created={s.created_at} updated={s.updated_at} /></td>
                 <td>
                   <form action={setSubjectActive}>
                     <input type="hidden" name="id" value={s.id} />

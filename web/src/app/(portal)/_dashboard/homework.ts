@@ -1,10 +1,9 @@
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
-import type { ChartBar } from './data';
 
-// The dashboard's Homework section: headline numbers, the marking queue, students falling behind
-// and each batch's on-time hand-in rate. Not tied to the range filter: "this week" starts on Monday,
-// the rate covers the last 4 weeks, and overdue looks back 90 days (the hand-in link's window).
+// The dashboard's Homework section: headline numbers, the marking queue and students falling behind.
+// "This week" starts on Monday, and overdue looks back 90 days (the hand-in link's window).
+// (The hand-in rate by batch was taken off on 3 Nov 2026 to make the dashboard faster.)
 
 const DAY_MS = 86_400_000;
 const BEHIND_AT = 2; // overdue homeworks that put a student on the "falling behind" list
@@ -47,12 +46,11 @@ export async function loadHomework(withContacts = true) {
   const today = todayInUk();
   // Monday of this week (getUTCDay: 0 = Sunday).
   const weekStart = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7));
-  const rateFrom = addDays(today, -28);
   const lookBack = addDays(today, -90);
 
   const select = 'sheet_id, student_id, status, received_on, marked_on, homework_sheets!inner(id, title, due_on, set_on, batch_id, batches(code, closed_on)), students!inner(first_name, last_name, status, family_id)';
 
-  const [received, pending, handedThisWeek, markedThisWeek, recent, drafts, enrolments, batches] = await Promise.all([
+  const [received, pending, handedThisWeek, markedThisWeek, drafts, enrolments] = await Promise.all([
     // Handed in but not marked, however old.
     supabase.from('homework_results').select(select).eq('status', 'received').neq('students.status', 'left'),
     // Not handed in, for homework set in the last 90 days.
@@ -61,17 +59,11 @@ export async function loadHomework(withContacts = true) {
     supabase.from('homework_results').select('sheet_id', { count: 'exact', head: true }).gte('received_on', weekStart),
     supabase.from('homework_results').select('sheet_id', { count: 'exact', head: true })
       .eq('status', 'marked').gte('marked_on', weekStart),
-    // Homework due in the last 4 weeks (and already past its due date), for the on-time rate.
-    supabase.from('homework_results').select(select)
-      .gte('homework_sheets.due_on', rateFrom).lt('homework_sheets.due_on', today)
-      .neq('status', 'excused')
-      .neq('students.status', 'left'),
     // Marked with Save & close: the marked sheet is saved but not sent to the student yet.
     supabase.from('homework_markups').select('sheet_id, student_id').not('draft_file_id', 'is', null),
     supabase.from('enrolments').select('student_id, batch_id').is('ended_on', null),
-    supabase.from('batch_list').select('id, code, subject, year_group').is('closed_on', null).order('code'),
   ]);
-  for (const r of [received, pending, handedThisWeek, markedThisWeek, recent, drafts, enrolments, batches]) {
+  for (const r of [received, pending, handedThisWeek, markedThisWeek, drafts, enrolments]) {
     if (r.error) throw r.error;
   }
 
@@ -137,26 +129,6 @@ export async function loadHomework(withContacts = true) {
     })
     .sort((a, b) => b.overdue - a.overdue || a.oldestDue.localeCompare(b.oldestDue));
 
-  /* ---------- Hand-in rate by batch: handed in on or before the due date, last 4 weeks ---------- */
-  const recentRows = (recent.data ?? []) as unknown as Row[];
-  const rate: ChartBar[] = (batches.data ?? []).map((b) => {
-    const rows = recentRows.filter((r) => r.homework_sheets.batch_id === b.id);
-    // Paper homework marked without a hand-in has no received date, so the marking date stands in for it.
-    const onTime = rows.filter((r) => {
-      const handed = r.received_on ?? r.marked_on;
-      return handed !== null && handed <= r.homework_sheets.due_on!;
-    }).length;
-    const value = rows.length ? Math.round((100 * onTime) / rows.length) : null;
-    return {
-      key: b.id,
-      label: b.code,
-      value,
-      display: value === null ? 'No homework due' : `${value}%`,
-      detail: `${b.subject} · Year ${b.year_group} · ${onTime} of ${rows.length} on time`,
-      href: `/batches/${b.id}#homework`,
-    };
-  });
-
   return {
     summary: {
       toMark: toMark.length,
@@ -165,6 +137,6 @@ export async function loadHomework(withContacts = true) {
       markedThisWeek: markedThisWeek.count ?? 0,
       notSent: draftKeys.size,
     },
-    weekStart, toMark, behind, rate,
+    weekStart, toMark, behind,
   };
 }

@@ -1,14 +1,13 @@
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
-// Loads everything the dashboard shows for the chosen range (last N days, ending today),
-// then turns the raw rows into numbers and chart bars. Folders starting with _ are not web pages.
+// Loads everything the dashboard shows, then turns the raw rows into numbers and chart bars.
+// Only quick queries: no attendance, and no per-student statistics (those made the dashboard slow).
+// The Homework section loads separately (homework.ts) and fills in when ready.
+// Folders starting with _ are not web pages.
 
-export const RANGES = [
-  { days: 7, label: '7 days' },
-  { days: 28, label: '4 weeks' },
-  { days: 90, label: '90 days' },
-];
+// "+N new" on the students tile counts students who started in this many days.
+export const NEW_DAYS = 28;
 
 export const PIPELINE = [
   { stage: 'new', label: 'New' },
@@ -41,60 +40,53 @@ function daysBetween(from: string, to: string) {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }
 
-function shortDate(date: string, weekday = false) {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {
-    timeZone: 'UTC', day: 'numeric', month: 'short', ...(weekday ? { weekday: 'short' } : {}),
-  });
-}
-
 const pct = (part: number, whole: number) => (whole ? Math.round((100 * part) / whole) : null);
 
-export async function loadDashboard(days: number) {
+export async function loadDashboard() {
   const supabase = await createClient();
   const today = todayInUk();
-  const from = addDays(today, -(days - 1));
-  const yesterday = addDays(today, -1);
+  const newFrom = addDays(today, -(NEW_DAYS - 1));
 
-  const [subjects, students, teachers, batches, attendance, homework, expected, enquiries] = await Promise.all([
+  const [subjects, students, batches, enquiries] = await Promise.all([
     supabase.from('subjects').select('id, name').order('sort'),
+    // Current students with their current subjects, teacher and batch. Read from the tables, not from the
+    // student_list view, which also works out each student's attendance and homework figures.
     supabase
-      .from('student_list')
-      .select('id, first_name, last_name, year_group, status, start_date, subject_ids, missing_teacher, missing_batch'),
-    supabase.from('teachers').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      .from('students')
+      .select('id, first_name, last_name, year_group, status, start_date, enrolments(subject_id, teacher_id, batch_id)')
+      .neq('status', 'left')
+      .is('enrolments.ended_on', null),
     supabase
       .from('batch_list')
       .select('id, code, subject, year_group, teacher, member_count, capacity, to_mark')
       .is('closed_on', null)
       .order('code'),
-    // !inner joins the class and keeps only rows whose class is inside the range.
-    supabase
-      .from('attendance')
-      .select('status, class_sessions!inner(class_date)')
-      .gte('class_sessions.class_date', from)
-      .lte('class_sessions.class_date', today),
-    supabase
-      .from('homework_results')
-      .select('status, homework_sheets!inner(set_on, due_on)')
-      .gte('homework_sheets.set_on', from),
-    // Every class that should have happened (from batch timetables), with its log if there is one.
-    supabase.rpc('expected_classes', { p_from: from, p_to: yesterday }),
     supabase.from('enquiries').select('id, child_first_name, child_last_name, stage, stage_changed_at'),
   ]);
-  for (const r of [subjects, students, teachers, batches, attendance, homework, expected, enquiries]) {
+  for (const r of [subjects, students, batches, enquiries]) {
     if (r.error) throw r.error;
   }
 
   /* ---------- Students ---------- */
-  const current = (students.data ?? []).filter((s) => s.status !== 'left');
+  type Enrolment = { subject_id: string; teacher_id: string | null; batch_id: string | null };
+  const current = (students.data ?? []).map((s) => {
+    const enrolments = (s.enrolments ?? []) as Enrolment[];
+    return {
+      ...s,
+      subject_ids: enrolments.map((e) => e.subject_id),
+      missing_teacher: enrolments.some((e) => !e.teacher_id),
+      missing_batch: enrolments.some((e) => !e.batch_id),
+    };
+  });
   const studentCounts = {
     current: current.length,
     active: current.filter((s) => s.status === 'active').length,
     trial: current.filter((s) => s.status === 'trial').length,
-    newInRange: current.filter((s) => s.start_date >= from).length,
+    newInRange: current.filter((s) => s.start_date >= newFrom).length,
   };
 
   const bySubject: ChartBar[] = (subjects.data ?? []).map((sub) => {
-    const n = current.filter((s) => (s.subject_ids as string[]).includes(sub.id)).length;
+    const n = current.filter((s) => s.subject_ids.includes(sub.id)).length;
     return { key: sub.id, label: sub.name, value: n, display: String(n), detail: `${n} current student${n === 1 ? '' : 's'}` };
   });
 
@@ -107,49 +99,7 @@ export async function loadDashboard(days: number) {
     }
   }
 
-  /* ---------- Attendance: overall and per day/week ---------- */
-  const rows = (attendance.data ?? []).map((a) => ({
-    status: a.status as string,
-    date: (a.class_sessions as unknown as { class_date: string }).class_date,
-  }));
-  const attended = rows.filter((r) => r.status !== 'absent').length;
-  const attendanceSummary = {
-    rate: pct(attended, rows.length),
-    present: rows.filter((r) => r.status === 'present').length,
-    late: rows.filter((r) => r.status === 'late').length,
-    absent: rows.filter((r) => r.status === 'absent').length,
-  };
-
-  // 7 days → one bar per day; longer ranges → one bar per week. Oldest first.
-  const size = days === 7 ? 1 : 7;
-  const attendanceTrend: ChartBar[] = [];
-  for (let end = today; daysBetween(from, end) >= 0; end = addDays(end, -size)) {
-    const start = addDays(end, -(size - 1)) < from ? from : addDays(end, -(size - 1));
-    const inBucket = rows.filter((r) => r.date >= start && r.date <= end);
-    const rate = pct(inBucket.filter((r) => r.status !== 'absent').length, inBucket.length);
-    attendanceTrend.unshift({
-      key: start,
-      label: size === 1 ? shortDate(start, true) : shortDate(start),
-      value: rate,
-      display: rate === null ? 'No classes' : `${rate}%`,
-      detail: size === 1 ? shortDate(start, true) : `Week of ${shortDate(start)} · ${inBucket.length} attendance marks`,
-    });
-  }
-
-  /* ---------- Homework (sheets already due) ---------- */
-  const due = (homework.data ?? [])
-    .map((h) => ({ status: h.status as string, sheet: h.homework_sheets as unknown as { set_on: string; due_on: string | null } }))
-    .filter((h) => (h.sheet.due_on ?? h.sheet.set_on) < today && h.status !== 'excused');
   const openBatches = batches.data ?? [];
-  const homeworkSummary = {
-    rate: pct(due.filter((h) => h.status === 'received' || h.status === 'marked').length, due.length),
-    toMark: openBatches.reduce((sum, b) => sum + (b.to_mark ?? 0), 0),
-  };
-
-  /* ---------- Classes logged vs expected ---------- */
-  const expectedRows = (expected.data ?? []) as { batch_id: string; class_date: string; session_id: string | null }[];
-  const missing = expectedRows.filter((c) => !c.session_id);
-  const classSummary = { expected: expectedRows.length, logged: expectedRows.length - missing.length, missing: missing.length };
 
   /* ---------- Batches: places used ---------- */
   const places: ChartBar[] = openBatches.map((b) => ({
@@ -176,20 +126,6 @@ export async function loadDashboard(days: number) {
 
   /* ---------- Needs attention ---------- */
   const attention: AttentionItem[] = [];
-  const batchById = new Map(openBatches.map((b) => [b.id, b]));
-  const missingByBatch = new Map<string, string[]>();
-  for (const c of missing) missingByBatch.set(c.batch_id, [...(missingByBatch.get(c.batch_id) ?? []), c.class_date]);
-  for (const [batchId, dates] of missingByBatch) {
-    const b = batchById.get(batchId);
-    if (!b) continue;
-    const latest = dates.sort().at(-1)!;
-    attention.push({
-      tone: 'danger', kind: 'class',
-      title: `${b.code}: ${dates.length} class${dates.length === 1 ? '' : 'es'} not logged`,
-      detail: `${b.subject} Y${b.year_group} · latest ${shortDate(latest, true)}`,
-      href: `/batches/${batchId}`,
-    });
-  }
   for (const s of current.filter((s) => s.missing_batch || s.missing_teacher)) {
     attention.push({
       tone: 'warn', kind: 'student',
@@ -223,11 +159,8 @@ export async function loadDashboard(days: number) {
   attention.sort((a, b) => order[a.tone] - order[b.tone]);
 
   return {
-    today, from,
+    today,
     studentCounts,
-    activeTeachers: teachers.count ?? 0,
-    attendanceSummary, attendanceTrend,
-    homeworkSummary, classSummary,
     bySubject, byYear,
     places, placesSummary: { seats, filled, rate: pct(filled, seats), batches: openBatches.length },
     pipeline, enquirySummary: { open: openEnquiries.length, enrolled, lost, conversion: pct(enrolled, enrolled + lost) },

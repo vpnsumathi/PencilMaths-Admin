@@ -29,15 +29,30 @@ export default async function BatchPage({ params, searchParams }: Props) {
   if (!UUID.test(id)) notFound();
 
   const supabase = await createClient();
+  // Everything below loads at the same time, so the page waits for the slowest query, not for all of them in a row.
   // A teacher (only ever sees their own batches) gets the class without the batch settings or Close.
-  const teacher = await isTeacher();
-  const [{ data: batch }, { data: slots }, { data: members }, { data: topics }, { data: subjects }, { data: teachers }] =
+  const teacherCheck = isTeacher();
+  const batchQuery = (async () => supabase
+    .from('batches')
+    .select('id, code, name, subject_id, year_group, teacher_id, capacity, started_on, closed_on, subjects(name)')
+    .eq('id', id)
+    .maybeSingle())();
+  const [
+    teacher, { data: batch }, libraryLessons, { data: slots }, { data: members }, { data: topics }, { data: subjects },
+    teachers, { data: allHomework },
+  ] =
     await Promise.all([
-      supabase
-        .from('batches')
-        .select('id, code, name, subject_id, year_group, teacher_id, capacity, started_on, closed_on, subjects(name)')
-        .eq('id', id)
-        .maybeSingle(),
+      teacherCheck,
+      batchQuery,
+      // Classes whose subject and year are in the Lesson library use the term and module lesson planner.
+      // Needs the batch's subject and year, so it starts as soon as the batch has loaded.
+      batchQuery.then(async ({ data: b }) => {
+        if (!b) return 0;
+        const { count } = await supabase
+          .from('lessons').select('id', { count: 'exact', head: true })
+          .eq('subject_id', b.subject_id).eq('year_group', b.year_group);
+        return count ?? 0;
+      }),
       supabase.from('batch_slots').select('weekday, start_time').eq('batch_id', id).order('weekday').order('start_time'),
       // Current students: open enrolments in this batch, with the student's details joined in.
       supabase
@@ -47,28 +62,24 @@ export default async function BatchPage({ params, searchParams }: Props) {
         .is('ended_on', null),
       supabase.from('batch_topics').select('id, position, name, status, completed_on').eq('batch_id', id).order('position'),
       supabase.from('subjects').select('id, name').order('sort'),
-      teacher
-        ? Promise.resolve({ data: [] })
-        : supabase.from('teachers').select('id, first_name, last_name, subject_id').neq('status', 'left').order('first_name'),
+      // Teachers for the batch settings (staff only; a teacher can't read the teachers list anyway).
+      (async () => (await teacherCheck)
+        ? []
+        : (await supabase.from('teachers').select('id, first_name, last_name, subject_id').neq('status', 'left').order('first_name')).data)(),
+      // All homework of the batch with who it was given to, for "Give past homework" next to each student,
+      // and which topic sent it (for "already sent" in the lesson plan).
+      supabase
+        .from('homework_sheets').select('id, title, set_on, topic_id, homework_results(student_id)').eq('batch_id', id)
+        .order('set_on', { ascending: false }).order('created_at', { ascending: false }),
     ]);
   if (!batch) notFound();
-  // Classes whose subject and year are in the Lesson library use the term and module lesson planner.
-  const { count: libraryLessons } = await supabase
-    .from('lessons').select('id', { count: 'exact', head: true })
-    .eq('subject_id', batch.subject_id).eq('year_group', batch.year_group);
-  const usesLibrary = (libraryLessons ?? 0) > 0;
-  // All homework of the batch with who it was given to, for "Give past homework" next to each student.
-  const { data: allHomework } = await supabase
-    .from('homework_sheets').select('id, title, set_on, homework_results(student_id)').eq('batch_id', id)
-    .order('set_on', { ascending: false }).order('created_at', { ascending: false });
+  const usesLibrary = libraryLessons > 0;
   const hasHomework = (allHomework ?? []).length > 0;
   const notGiven = (studentId: string): PastHomework[] => (allHomework ?? [])
     .filter((h) => !(h.homework_results as { student_id: string }[]).some((r) => r.student_id === studentId))
     .map((h) => ({ id: h.id, title: h.title, set_on: h.set_on }));
   // Homework already sent by completing a topic, by topic.
-  const { data: topicHomework } = await supabase
-    .from('homework_sheets').select('topic_id, title').eq('batch_id', id).not('topic_id', 'is', null);
-  const sentFor = new Map((topicHomework ?? []).map((h) => [h.topic_id as string, h.title as string]));
+  const sentFor = new Map((allHomework ?? []).filter((h) => h.topic_id).map((h) => [h.topic_id as string, h.title as string]));
   const today = todayInUk();
 
   const subjectName = (batch.subjects as unknown as { name: string } | null)?.name ?? batch.subject_id;

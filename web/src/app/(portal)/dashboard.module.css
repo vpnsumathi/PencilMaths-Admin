@@ -1,12 +1,7 @@
-/* ---------- Header + range filter ---------- */
+/* ---------- Header ---------- */
 .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .date { margin: 0 0 4px; font-size: 13px; color: var(--muted); }
 .title { margin: 0; font-size: 26px; letter-spacing: -0.01em; }
-
-.range { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-.range a { padding: 6px 12px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; }
-.range a:hover { color: var(--text); background: var(--bg); }
-.range .rangeOn, .range .rangeOn:hover { background: var(--brand); color: #fff; }
 
 /* ---------- Headline tiles ---------- */
 .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
@@ -32,6 +27,7 @@ a.kpi:hover { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring
 .card h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; }
 .cardSub { margin: 4px 0 20px; font-size: 13px; color: var(--muted); padding-right: 64px; }
 .mainGrid, .pair { display: grid; gap: 16px; margin-bottom: 16px; }
+.attentionCard { margin-bottom: 16px; }
 
 /* ---------- Needs attention ---------- */
 .count { padding: 1px 8px; border-radius: 999px; background: var(--danger-soft); color: var(--danger); font-size: 12px; }
@@ -75,11 +71,13 @@ a.kpi:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0
 .behindName:hover strong { color: var(--brand); }
 
 @media (min-width: 768px) {
-  .kpis, .hwKpis { grid-template-columns: repeat(3, 1fr); }
+  /* The headline tiles (2 or 3) share one row equally. */
+  .kpis { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
+  .hwKpis { grid-template-columns: repeat(3, 1fr); }
   .kpi:last-child:nth-child(odd) { grid-column: auto; }
   .pair { grid-template-columns: 1fr 1fr; }
 }
 @media (min-width: 1280px) {
-  .kpis, .hwKpis { grid-template-columns: repeat(5, 1fr); }
+  .hwKpis { grid-template-columns: repeat(5, 1fr); }
   .mainGrid { grid-template-columns: 3fr 2fr; }
 }

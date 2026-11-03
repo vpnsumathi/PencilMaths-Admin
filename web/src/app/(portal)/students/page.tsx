@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
+import { CreatedModified } from '@/components/CreatedModified';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
@@ -14,13 +15,10 @@ type Props = { searchParams: Promise<{ ok?: string; error?: string; q?: string; 
 export default async function StudentsPage({ searchParams }: Props) {
   const { ok, error: problem, q = '', status = '' } = await searchParams;
   const supabase = await createClient();
-  // Teachers only get the students in their own batches back (database rules), and can't add students.
-  const teacher = await isTeacher();
-
   // student_list is a database view: each student with subjects, teachers, batches and their 28-day stats.
   let query = supabase
     .from('student_list')
-    .select('id, code, first_name, last_name, year_group, status, subjects, teachers, batches, missing_teacher, missing_batch, attendance_pct, homework_pct')
+    .select('id, code, first_name, last_name, year_group, status, subjects, teachers, batches, missing_teacher, missing_batch, attendance_pct, homework_pct, created_at, updated_at')
     .order('last_name')
     .order('first_name');
   // Default view hides students who have left.
@@ -29,7 +27,9 @@ export default async function StudentsPage({ searchParams }: Props) {
   const search = q.replace(/[^\p{L}\p{N}\s'-]/gu, '').trim();
   if (search) query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,code.ilike.%${search}%`);
 
-  const { data: students, error } = await query;
+  // Teachers only get the students in their own batches back (database rules), and can't add students.
+  // Who is looking is worked out at the same time as the list loads, not before it.
+  const [teacher, { data: students, error }] = await Promise.all([isTeacher(), query]);
   if (error) throw error;
 
   return (
@@ -56,7 +56,7 @@ export default async function StudentsPage({ searchParams }: Props) {
             <thead>
               <tr>
                 <th>Code</th><th>Name</th><th>Year</th><th>Subjects</th>{!teacher && <th>Teachers</th>}<th>Batches</th>
-                <th>Attendance</th><th>Homework</th><th>Status</th><th></th>
+                <th>Attendance</th><th>Homework</th><th>Status</th><th></th><th>Created / modified</th>
               </tr>
             </thead>
             <tbody>
@@ -75,6 +75,7 @@ export default async function StudentsPage({ searchParams }: Props) {
                     {s.missing_batch && <StatusBadge status="left" label="Needs batch" />}{' '}
                     {s.missing_teacher && <StatusBadge status="left" label="Needs teacher" />}
                   </td>
+                  <td><CreatedModified created={s.created_at} updated={s.updated_at} /></td>
                 </tr>
               ))}
             </tbody>

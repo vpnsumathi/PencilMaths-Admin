@@ -1,15 +1,14 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
 import styles from '../student.module.css';
 import { type Dashboard, nextClass } from './dashboard';
+import { getMyDashboard } from './myDashboard';
 
 export const metadata = { title: 'My dashboard' };
 
 // The student's home page: tiles for their classes and homework, then their class schedule.
 export default async function MyDashboard() {
-  const supabase = await createClient();
-  const { data } = await supabase.rpc('my_dashboard');
-  const me = data as Dashboard; // the layout has already checked this is a student
+  // The same answer the layout already asked for (cached), so no second call.
+  const me = (await getMyDashboard()) as Dashboard; // the layout has already checked this is a student
   const hw = me.homework;
   // Soonest class first; classes with no times yet go last.
   const schedule = me.classes

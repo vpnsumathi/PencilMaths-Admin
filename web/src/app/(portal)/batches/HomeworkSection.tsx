@@ -41,30 +41,31 @@ export async function HomeworkSection({ batchId, members, teacher = false }: { b
     .order('set_on', { ascending: false })
     .order('created_at', { ascending: false });
   const sheetIds = (sheets ?? []).map((s) => s.id);
-  const { data: allFiles } = sheetIds.length
-    ? await supabase
-        .from('file_links')
-        .select('id, provider, owner_type, owner_id, student_id, url, label')
-        .in('owner_type', ['homework_submission', 'homework_correction'])
-        .in('owner_id', sheetIds)
-        .order('created_at')
-    : { data: [] };
-  // What students handed in, and the teacher's corrected sheets.
+  // The three lookups below only need the homework ids, so they run at the same time.
+  const none = { data: [] };
+  const [{ data: allFiles }, { data: drafts }, { data: sheetFiles }] = sheetIds.length
+    ? await Promise.all([
+        // What students handed in, and the teacher's corrected sheets.
+        supabase
+          .from('file_links')
+          .select('id, provider, owner_type, owner_id, student_id, url, label')
+          .in('owner_type', ['homework_submission', 'homework_correction'])
+          .in('owner_id', sheetIds)
+          .order('created_at'),
+        // Sheets marked in the browser with Save & close: saved, waiting for Send.
+        supabase.from('homework_markups').select('sheet_id, student_id, draft_mark')
+          .in('sheet_id', sheetIds).not('draft_file_id', 'is', null),
+        // The homework sheets themselves (worksheet files and links).
+        supabase
+          .from('file_links')
+          .select('id, provider, owner_id, url, label')
+          .eq('owner_type', 'homework_sheet')
+          .in('owner_id', sheetIds)
+          .order('created_at'),
+      ])
+    : [none, none, none];
   const files = (allFiles ?? []).filter((f) => f.owner_type === 'homework_submission');
   const corrections = (allFiles ?? []).filter((f) => f.owner_type === 'homework_correction');
-  // Sheets marked in the browser with Save & close: saved, waiting for Send.
-  const { data: drafts } = sheetIds.length
-    ? await supabase.from('homework_markups').select('sheet_id, student_id, draft_mark')
-        .in('sheet_id', sheetIds).not('draft_file_id', 'is', null)
-    : { data: [] };
-  const { data: sheetFiles } = sheetIds.length
-    ? await supabase
-        .from('file_links')
-        .select('id, provider, owner_id, url, label')
-        .eq('owner_type', 'homework_sheet')
-        .in('owner_id', sheetIds)
-        .order('created_at')
-    : { data: [] };
 
   // The latest active homework (newest one someone still has to hand in or have marked) is open and
   // highlighted; the rest are folded away. With nothing active, the newest homework is the latest.

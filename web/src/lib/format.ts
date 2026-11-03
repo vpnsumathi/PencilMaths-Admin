@@ -6,6 +6,12 @@ export function formatDate(value: string | null | undefined) {
   return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
+// A moment ("2026-11-03T23:30:00+00:00") → the date it was in the UK, "3 Nov 2026".
+export function formatDay(value: string | null | undefined) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/London' });
+}
+
 // "17:00:00" → "17:00"
 export function formatTime(value: string | null | undefined) {
   return value ? value.slice(0, 5) : '';
