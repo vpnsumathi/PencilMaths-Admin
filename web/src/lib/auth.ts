@@ -52,6 +52,15 @@ export async function requireAdmin(redirectTo = '/') {
   return { supabase: await createClient(), viewer };
 }
 
+// For actions that staff and teachers may both use (homework, marking, the lesson plan): stops anyone else,
+// such as a student or family login, before any work starts. Which batches a teacher may change is still
+// decided by the database rules. Returns the viewer, or sends the caller away like requireStaff.
+export async function requireStaffOrTeacher(redirectTo = '/') {
+  const viewer = await getViewer();
+  if (!viewer) redirect((await getUserId()) ? redirectTo : '/login');
+  return viewer;
+}
+
 // For pages and actions that are for staff only, never teachers (students, enquiries, editing batches…).
 // The database rules block teachers too; this stops them earlier with a friendly page.
 export async function requireStaff(redirectTo = '/') {

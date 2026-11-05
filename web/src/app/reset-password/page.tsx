@@ -7,7 +7,7 @@ import { updatePassword } from './actions';
 
 export const metadata = { title: 'Choose your password' };
 
-// Reached from an invite or reset email (via /auth/accept or /auth/callback), so the user is already signed in here.
+// Reached from an invite or reset email (via /auth/accept), so the user is already signed in here.
 export default async function ResetPassword({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

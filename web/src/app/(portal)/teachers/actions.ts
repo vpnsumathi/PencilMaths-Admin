@@ -5,8 +5,7 @@ import { unstable_rethrow } from 'next/navigation';
 import { requireAdmin, requireStaff } from '@/lib/auth';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { EMAIL, TEACHER_STATUSES, UUID } from '@/lib/options';
-import { siteUrl } from '@/lib/siteUrl';
-import { createAdminClient, findUserByEmail } from '@/lib/supabase/admin';
+import { deleteLogin, discardNewLogin, inviteOrFindLogin, resendInvite } from '@/lib/logins';
 import { createClient } from '@/lib/supabase/server';
 
 // Adds a teacher, or updates one when the form includes an id.
@@ -72,23 +71,12 @@ export async function giveTeacherLogin(form: FormData) {
   if (teacher.status === 'left') redirectWith(path, 'error', 'This teacher has left, so they cannot have a login.');
   if (teacher.auth_user_id) redirectWith(path, 'error', 'This teacher already has a login.');
 
+  // An email that already has a login (for example a staff member who also teaches) is linked instead.
   let loginId: string;
-  let existing = false;
+  let existing: boolean;
   try {
-    const { data, error } = await createAdminClient().auth.admin.inviteUserByEmail(email, {
-      data: { role: 'teacher', full_name: `${teacher.first_name} ${teacher.last_name}` }, // used by the invite email template
-      redirectTo: `${await siteUrl()}/auth/accept`,
-    });
-    if (error) {
-      // The email already has a login (for example a staff member who also teaches): link that login instead.
-      if (!/already|registered|exists/i.test(error.message)) throw new Error(error.message);
-      const found = await findUserByEmail(email);
-      if (!found) throw new Error(error.message);
-      loginId = found;
-      existing = true;
-    } else {
-      loginId = data.user.id;
-    }
+    // full_name is used by the invite email template.
+    ({ id: loginId, existing } = await inviteOrFindLogin(email, { role: 'teacher', full_name: `${teacher.first_name} ${teacher.last_name}` }));
   } catch (e) {
     unstable_rethrow(e); // let redirects through
     console.error('giveTeacherLogin failed:', e);
@@ -99,7 +87,7 @@ export async function giveTeacherLogin(form: FormData) {
   const { data, error } = await supabase.from('teachers').update({ auth_user_id: loginId }).eq('id', teacher.id).select('id');
   if (error || data.length === 0) {
     console.error('giveTeacherLogin save failed:', error?.message ?? 'no rows updated');
-    if (!existing) await createAdminClient().auth.admin.deleteUser(loginId); // don't leave a new login linked to nobody
+    if (!existing) await discardNewLogin(loginId); // don't leave a new login linked to nobody
     redirectWith(path, 'error', error?.code === 'P0001' ? error.message
       : error?.code === '23505' ? 'That login already belongs to another teacher.' : 'Could not save the login.');
   }
@@ -119,20 +107,14 @@ export async function giveTeacherLogin(form: FormData) {
 export async function resendTeacherInvite(form: FormData) {
   const { teacher, path } = await teacherForAccess(form);
   if (!teacher.auth_user_id) redirectWith(path, 'error', 'This teacher has no login yet.');
+  let outcome: 'sent' | 'accepted';
   try {
-    const admin = createAdminClient();
-    const { data } = await admin.auth.admin.getUserById(teacher.auth_user_id);
-    if (!data.user?.email) throw new Error('login not found');
-    if (data.user.last_sign_in_at) redirectWith(path, 'error', 'The invite was already accepted.');
-    const { error } = await admin.auth.admin.inviteUserByEmail(data.user.email, {
-      redirectTo: `${await siteUrl()}/auth/accept`,
-    });
-    if (error) throw new Error(error.message);
+    outcome = await resendInvite(teacher.auth_user_id);
   } catch (e) {
-    unstable_rethrow(e); // let redirects through
     console.error('resendTeacherInvite failed:', e);
     redirectWith(path, 'error', 'Could not resend the invite. Try Remove access, then send the invite again.');
   }
+  if (outcome === 'accepted') redirectWith(path, 'error', 'The invite was already accepted.');
   redirectWith(path, 'ok', 'Invite sent again.');
 }
 
@@ -142,9 +124,9 @@ export async function removeTeacherLogin(form: FormData) {
   const loginId = teacher.auth_user_id;
   if (!loginId) redirectWith(path, 'error', 'This teacher has no login.');
 
-  const { error: unlinkError } = await supabase.from('teachers').update({ auth_user_id: null }).eq('id', teacher.id);
-  if (unlinkError) {
-    console.error('removeTeacherLogin unlink failed:', unlinkError.message);
+  const { data: unlinked, error: unlinkError } = await supabase.from('teachers').update({ auth_user_id: null }).eq('id', teacher.id).select('id');
+  if (unlinkError || unlinked.length === 0) {
+    console.error('removeTeacherLogin unlink failed:', unlinkError?.message ?? 'no rows updated');
     redirectWith(path, 'error', 'Could not remove the login.');
   }
   const { data: staff } = await supabase.from('staff').select('id').eq('id', loginId).maybeSingle();
@@ -154,10 +136,8 @@ export async function removeTeacherLogin(form: FormData) {
   }
 
   try {
-    const { error } = await createAdminClient().auth.admin.deleteUser(loginId);
-    if (error) throw new Error(error.message);
+    await deleteLogin(loginId);
   } catch (e) {
-    unstable_rethrow(e);
     console.error('removeTeacherLogin failed:', e);
     redirectWith(path, 'error', 'Unlinked, but the login could not be deleted. They can no longer see anything.');
   }

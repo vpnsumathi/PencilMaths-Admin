@@ -1,16 +1,15 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth';
 
 const ROLES = ['admin', 'operations', 'head_teacher'];
 
-// Shared start for every staff change: must be signed in, and not changing their own account.
+// Shared start for every staff change: must be an admin (the database rules also insist on it), and not
+// changing their own account.
 async function connectFor(targetId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-  if (targetId === user.id) redirect('/settings/staff?error=You cannot change your own account.');
+  const { supabase, viewer } = await requireAdmin();
+  if (targetId === viewer.userId) redirect('/settings/staff?error=You cannot change your own account.');
   return supabase;
 }
 

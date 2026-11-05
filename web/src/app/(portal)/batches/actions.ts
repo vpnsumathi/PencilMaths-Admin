@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireStaff } from '@/lib/auth';
+import { requireStaff, requireStaffOrTeacher } from '@/lib/auth';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { todayInUk, UUID, YEARS } from '@/lib/options';
 import { uploadFile } from '@/lib/google/drive';
@@ -133,7 +133,8 @@ export async function setBatchClosed(form: FormData) {
     .from('batches').update({ closed_on: close ? todayInUk() : null }).eq('id', id).select('id');
   if (error || data.length === 0) {
     console.error('setBatchClosed failed:', error?.message ?? 'no rows updated');
-    redirectWith(path, 'error', 'Could not update the batch.');
+    // Reopening is refused with a message if its class times now clash with the teacher's other classes.
+    redirectWith(path, 'error', error ? dbProblem(error, 'Could not update the batch.') : 'Could not update the batch.');
   }
 
   revalidatePath('/batches');
@@ -174,8 +175,12 @@ export async function createHomework(form: FormData) {
   const fields = readHomework(form, path);
 
   const supabase = await createClient();
-  // Only staff and the batch's own teacher see the batch; checked before anything is uploaded to Drive.
-  const { data: batch } = await supabase.from('batches').select('id').eq('id', batchId).maybeSingle();
+  // Only staff and the batch's own teacher (database rules) see the batch; both checked, at the same time,
+  // before anything is uploaded to Drive.
+  const [, { data: batch }] = await Promise.all([
+    requireStaffOrTeacher(),
+    supabase.from('batches').select('id').eq('id', batchId).maybeSingle(),
+  ]);
   if (!batch) redirectWith('/batches', 'error', 'Batch not found.');
 
   const sheets = await prepareSheetFiles(form);
@@ -205,6 +210,7 @@ export async function setTopicStatus(form: FormData) {
   if (status !== 'not_started' && status !== 'in_progress') redirectWith(`/batches/${batchId}`, 'error', 'Unknown status.');
   const path = `/batches/${batchId}`;
 
+  await requireStaffOrTeacher();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('batch_topics').update({ status, completed_on: null }).eq('id', topicId).eq('batch_id', batchId).select('id');
@@ -226,7 +232,9 @@ export async function completeTopic(form: FormData) {
   const path = `/batches/${batchId}`;
 
   const supabase = await createClient();
-  const [{ data: topic }, { data: sent }] = await Promise.all([
+  // Staff or a teacher only (checked alongside the reads); the database rules limit a teacher to their own batches.
+  const [, { data: topic }, { data: sent }] = await Promise.all([
+    requireStaffOrTeacher(),
     supabase.from('batch_topics').select('id, status').eq('id', topicId).eq('batch_id', batchId).maybeSingle(),
     supabase.from('homework_sheets').select('title').eq('topic_id', topicId).maybeSingle(),
   ]);
@@ -272,7 +280,9 @@ export async function giveHomework(form: FormData) {
   if (!sheetIds.every((v) => UUID.test(v))) redirectWith(path, 'error', 'Homework not found.');
 
   const supabase = await createClient();
-  const [{ data: sheets }, { data: member }] = await Promise.all([
+  // Staff or a teacher only (checked alongside the reads); the database rules limit a teacher to their own batches.
+  const [, { data: sheets }, { data: member }] = await Promise.all([
+    requireStaffOrTeacher(),
     supabase.from('homework_sheets').select('id, title').in('id', sheetIds).eq('batch_id', batchId),
     supabase.from('enrolments').select('students(first_name)').eq('student_id', studentId).eq('batch_id', batchId).is('ended_on', null).maybeSingle(),
   ]);
@@ -308,6 +318,7 @@ export async function setLessonStatus(form: FormData) {
   const path = `/batches/${batchId}`;
   if (status !== 'not_started' && status !== 'in_progress') redirectWith(path, 'error', 'Unknown status.');
 
+  await requireStaffOrTeacher();
   const supabase = await createClient();
   const { error } = await supabase.from('batch_lessons').upsert({
     batch_id: batchId, lesson_id: lessonId, status, completed_on: null,
@@ -339,13 +350,21 @@ export async function completeLesson(form: FormData) {
   const picked = form.getAll('hw').map(String).filter((v) => UUID.test(v));
 
   const fields = readHomeworkDates(form, view);
+  // Each ticked homework's own maximum mark (box "max_mark_<id>"); a blank box means no maximum mark.
+  const maxMarks: Record<string, number | null> = {};
+  for (const id of picked) {
+    const mark = optionalNumber(form, `max_mark_${id}`);
+    if (mark !== null && !(mark > 0)) redirectWith(view, 'error', 'Each maximum mark must be more than 0.');
+    maxMarks[id] = mark;
+  }
 
   // One database function checks the lesson is in this class's plan, sends each ticked sheet that this class
   // hasn't had yet (with its Lesson library worksheet, no copy is made) and marks the lesson completed, together.
   // A ticked sheet with no worksheet yet stops it all, with a message, and nothing is sent.
+  await requireStaffOrTeacher();
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('complete_lesson', {
-    p_batch: batchId, p_lesson: lessonId, p: { ...fields, hw: picked },
+    p_batch: batchId, p_lesson: lessonId, p: { ...fields, hw: picked, max_marks: maxMarks },
   });
   if (error) {
     console.error('completeLesson failed:', error.message);
@@ -394,7 +413,9 @@ export async function markHomework(form: FormData) {
 
   const supabase = await createClient();
   // The maximum mark comes from the database, not the form, so it can't be tampered with.
-  const [{ data: sheet }, { data: result }] = await Promise.all([
+  // Staff or a teacher only (checked alongside the reads); the database rules limit a teacher to their own batches.
+  const [, { data: sheet }, { data: result }] = await Promise.all([
+    requireStaffOrTeacher(),
     supabase.from('homework_sheets').select('id, title, max_mark').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
     supabase.from('homework_results').select('status').eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle(),
   ]);
@@ -439,7 +460,9 @@ export async function sendMarkedDraft(form: FormData) {
   const path = `/batches/${batchId}`;
 
   const supabase = await createClient();
-  const [{ data: sheet }, { data: result }, { data: draft }] = await Promise.all([
+  // Staff or a teacher only (checked alongside the reads); the database rules limit a teacher to their own batches.
+  const [, { data: sheet }, { data: result }, { data: draft }] = await Promise.all([
+    requireStaffOrTeacher(),
     supabase.from('homework_sheets').select('id, max_mark').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
     supabase.from('homework_results').select('status').eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle(),
     supabase.from('homework_markups').select('draft_file_id, draft_name, draft_mark').eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle(),
@@ -470,13 +493,18 @@ export async function deleteHomework(form: FormData) {
   const path = `/batches/${batchId}`;
 
   const supabase = await createClient();
-  // file_links rows point at the sheet without a database link, so remove them by hand.
-  await supabase.from('file_links').delete().in('owner_type', ['homework_submission', 'homework_sheet']).eq('owner_id', sheetId);
+  // The homework first (its results go with it). Only if that worked are its file rows removed: they point at
+  // the homework without a database link. Done the other way round, a refused delete left the homework
+  // without its files.
   const { data, error } = await supabase.from('homework_sheets').delete().eq('id', sheetId).eq('batch_id', batchId).select('id');
   if (error || data.length === 0) {
     console.error('deleteHomework failed:', error?.message ?? 'no rows deleted');
     redirectWith(path, 'error', 'Could not delete the homework.');
   }
+  const { error: filesError } = await supabase.from('file_links').delete()
+    .in('owner_type', ['homework_submission', 'homework_sheet', 'homework_correction']).eq('owner_id', sheetId);
+  // Not a failure for the user: the homework is gone, and leftover rows point at nothing and are never shown.
+  if (filesError) console.error('deleteHomework: file rows left behind (harmless):', filesError.message);
 
   revalidatePath(path);
   revalidatePath('/');
@@ -491,7 +519,11 @@ export async function addHomeworkFile(form: FormData) {
   const path = `/batches/${batchId}`;
 
   const supabase = await createClient();
-  const { data: sheet } = await supabase.from('homework_sheets').select('id').eq('id', sheetId).eq('batch_id', batchId).maybeSingle();
+  // Staff or a teacher only, and the homework must be visible to them: both checked before any upload.
+  const [, { data: sheet }] = await Promise.all([
+    requireStaffOrTeacher(),
+    supabase.from('homework_sheets').select('id').eq('id', sheetId).eq('batch_id', batchId).maybeSingle(),
+  ]);
   if (!sheet) redirectWith(path, 'error', 'Homework not found.');
   const file = form.get('sheet_file');
   if (!(file instanceof File && file.size > 0) && !text(form, 'sheet_url')) redirectWith(path, 'error', 'Choose a file or paste a link.');
@@ -520,10 +552,12 @@ export async function removeHomeworkFile(form: FormData) {
   if (!UUID.test(batchId) || !UUID.test(fileId)) redirectWith('/batches', 'error', 'File not found.');
   const path = `/batches/${batchId}`;
 
+  await requireStaffOrTeacher();
   const supabase = await createClient();
-  const { error } = await supabase.from('file_links').delete().eq('id', fileId).eq('owner_type', 'homework_sheet');
-  if (error) {
-    console.error('removeHomeworkFile failed:', error.message);
+  // .select('id') returns the removed row: none means the database rules said no (or it was already gone).
+  const { data, error } = await supabase.from('file_links').delete().eq('id', fileId).eq('owner_type', 'homework_sheet').select('id');
+  if (error || data.length === 0) {
+    console.error('removeHomeworkFile failed:', error?.message ?? 'no rows deleted');
     redirectWith(path, 'error', 'Could not remove the file.');
   }
   revalidatePath(path);

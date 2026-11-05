@@ -25,7 +25,7 @@ function SendButton({ count }: { count: number }) {
 }
 
 // "Mark completed" for a library lesson: pick which of Hw-1, Hw-2 and Hw-3 to send (Hw-1 ticked),
-// set the dates and mark, then Send. Each ticked sheet becomes one homework for the class, with its worksheet.
+// set the dates and each one's maximum mark, then Send. Each ticked sheet becomes one homework for the class, with its worksheet.
 export function CompleteLesson({ batchId, lesson, sheets, students, today, term, moduleName }: {
   batchId: string; lesson: { id: string; code: string; name: string }; sheets: LessonSheet[];
   students: number; today: string; term: number; moduleName: string;
@@ -59,6 +59,14 @@ export function CompleteLesson({ batchId, lesson, sheets, students, today, term,
                 {s.sent ? <span className={ui.muted}>already sent</span>
                   : s.url ? <a href={s.url} target="_blank" rel="noreferrer" className={ui.link}>View</a>
                   : <span className={ui.muted}>⚠️ no worksheet yet (upload it in the Lesson library)</span>}
+                {/* Each ticked homework has its own maximum mark (leave it blank for no maximum). */}
+                {ticked.includes(s.id) && (
+                  <span style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
+                    <span className={ui.muted}>out of</span>
+                    <input name={`max_mark_${s.id}`} type="number" min={0.5} step="0.5" defaultValue={10}
+                      className={ui.input} style={{ width: '6em' }} aria-label={`Hw-${s.slot} maximum mark`} />
+                  </span>
+                )}
               </label>
             ))}
             {sheets.length === 0 && <p className={ui.muted}>This lesson has no homework sheets.</p>}
@@ -72,9 +80,6 @@ export function CompleteLesson({ batchId, lesson, sheets, students, today, term,
               </Field>
               <Field label="Due on">
                 <input name="due_on" type="date" value={dueOn} min={setOn} className={ui.input} onChange={(e) => setDueOn(e.target.value)} />
-              </Field>
-              <Field label="Maximum mark">
-                <input name="max_mark" type="number" min={1} step="0.5" defaultValue={10} className={ui.input} />
               </Field>
             </>
           )}

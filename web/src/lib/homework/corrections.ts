@@ -40,8 +40,11 @@ export async function recordCorrection(
     external_id: uploaded.id, url: uploaded.webViewLink, label: name,
   }).select('id').single();
   if (error) throw new Error(error.message);
-  await supabase.from('file_links').delete()
+  // Tidy-up only: the new sheet is already saved and shown first. If this fails, the student may also see the
+  // earlier corrected sheet, so it is logged clearly.
+  const { error: oldError } = await supabase.from('file_links').delete()
     .eq('owner_type', 'homework_correction').eq('owner_id', sheetId).eq('student_id', studentId).neq('id', added.id);
+  if (oldError) console.error('recordCorrection: earlier corrected sheet not removed (tidy-up):', oldError.message);
 }
 
 // A marked sheet the browser uploaded: checks it is really in the student's Homework folder.
@@ -81,10 +84,15 @@ export async function sendMarkedSheet(
   const { data: draft } = await supabase.from('homework_markups').select('draft_file_id')
     .eq('sheet_id', sheetId).eq('student_id', studentId).maybeSingle();
   if (draft?.draft_file_id) {
-    await supabase.from('homework_markups')
+    // Tidy-up only: the sheet has been sent. If clearing fails, the unsent copy is kept (not put in the Drive bin),
+    // so the batch page never offers a Send for a file that is gone; it is logged clearly.
+    const { error: clearError } = await supabase.from('homework_markups')
       .update({ draft_file_id: null, draft_name: null, draft_mark: null, draft_saved_at: null })
       .eq('sheet_id', sheetId).eq('student_id', studentId);
-    if (draft.draft_file_id !== file.id) await trashFile(draft.draft_file_id).catch((e) => console.error('trash draft failed:', e));
+    if (clearError) console.error('sendMarkedSheet: unsent copy not cleared (tidy-up):', clearError.message);
+    else if (draft.draft_file_id !== file.id) {
+      await trashFile(draft.draft_file_id).catch((e) => console.error('sendMarkedSheet: old unsent copy not put in the Drive bin (tidy-up):', e));
+    }
   }
   return null;
 }

@@ -2,7 +2,9 @@ import type { EmailOtpType } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-// Invite emails land here (see the Invite user email template in Supabase).
+// Not used yet: today invites and password resets land on /auth/accept (Supabase's built-in email can't link
+// here). Kept for when custom email (SMTP) is set up and the Supabase email templates are changed to link to
+// /auth/confirm?token_hash=…&type=…, which also works when the link is opened on another device.
 // The one-time token_hash is checked, which signs the person in, then they choose a password.
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);

@@ -5,10 +5,9 @@ import { unstable_rethrow } from 'next/navigation';
 import { requireStaff } from '@/lib/auth';
 import { redirectWith, text } from '@/lib/form';
 import { EMAIL, STUDENT_STATUSES, UUID, YEARS } from '@/lib/options';
-import { createAdminClient, findUserByEmail } from '@/lib/supabase/admin';
+import { deleteLogin, discardNewLogin, inviteOrFindLogin, resendInvite } from '@/lib/logins';
 import { createClient } from '@/lib/supabase/server';
 import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
-import { siteUrl } from '@/lib/siteUrl';
 
 // Adds or updates a student. The database function save_student (file 4) saves the student,
 // family, main parent, subjects and folder link together, so a half-saved student is impossible.
@@ -136,24 +135,11 @@ export async function givePortalAccess(form: FormData) {
   if (student.status === 'left') redirectWith(path, 'error', 'This student has left, so they cannot have a login.');
   if (student.auth_user_id) redirectWith(path, 'error', 'This student already has a login.');
 
+  // An email that already has a login (staff, or used before for a brother or sister) is linked instead.
   let invitedId: string;
-  let existing = false;
+  let existing: boolean;
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      data: { role: 'student' },
-      redirectTo: `${await siteUrl()}/auth/accept`,
-    });
-    if (error) {
-      // The email already has a login (staff, or used before): link that login instead.
-      if (!/already|registered|exists/i.test(error.message)) throw new Error(error.message);
-      const found = await findUserByEmail(email);
-      if (!found) throw new Error(error.message);
-      invitedId = found;
-      existing = true;
-    } else {
-      invitedId = data.user.id;
-    }
+    ({ id: invitedId, existing } = await inviteOrFindLogin(email, { role: 'student' }));
   } catch (e) {
     unstable_rethrow(e); // let redirects through
     console.error('givePortalAccess failed:', e);
@@ -168,7 +154,7 @@ export async function givePortalAccess(form: FormData) {
   const { data, error } = await supabase.from('students').update({ auth_user_id: invitedId }).eq('id', student.id).select('id');
   if (error || data.length === 0) {
     console.error('givePortalAccess save failed:', error?.message ?? 'no rows updated');
-    if (!existing) await createAdminClient().auth.admin.deleteUser(invitedId); // don't leave a new login linked to nobody
+    if (!existing) await discardNewLogin(invitedId); // don't leave a new login linked to nobody
     // P0001: refused on purpose, e.g. the email is a teacher's login.
     redirectWith(path, 'error', error?.code === 'P0001' ? error.message : 'Could not save the login.');
   }
@@ -189,20 +175,14 @@ export async function resendPortalInvite(form: FormData) {
   await requireStaff();
   const { student, path } = await studentForAccess(form);
   if (!student.auth_user_id) redirectWith(path, 'error', 'This student has no login yet.');
+  let outcome: 'sent' | 'accepted';
   try {
-    const admin = createAdminClient();
-    const { data } = await admin.auth.admin.getUserById(student.auth_user_id);
-    if (!data.user?.email) throw new Error('login not found');
-    if (data.user.last_sign_in_at) redirectWith(path, 'error', 'The invite was already accepted.');
-    const { error } = await admin.auth.admin.inviteUserByEmail(data.user.email, {
-      redirectTo: `${await siteUrl()}/auth/accept`,
-    });
-    if (error) throw new Error(error.message);
+    outcome = await resendInvite(student.auth_user_id);
   } catch (e) {
-    unstable_rethrow(e); // let redirects through
     console.error('resendPortalInvite failed:', e);
     redirectWith(path, 'error', 'Could not resend the invite. Try Remove access, then give access again.');
   }
+  if (outcome === 'accepted') redirectWith(path, 'error', 'The invite was already accepted.');
   redirectWith(path, 'ok', 'Invite sent again.');
 }
 
@@ -218,7 +198,11 @@ export async function removePortalAccess(form: FormData) {
     supabase.from('students').select('first_name').eq('auth_user_id', student.auth_user_id).neq('id', student.id),
   ]);
   if (staff || siblings?.length) {
-    await supabase.from('students').update({ auth_user_id: null }).eq('id', student.id);
+    const { data: unlinked, error: unlinkError } = await supabase.from('students').update({ auth_user_id: null }).eq('id', student.id).select('id');
+    if (unlinkError || unlinked.length === 0) {
+      console.error('removePortalAccess unlink failed:', unlinkError?.message ?? 'no rows updated');
+      redirectWith(path, 'error', 'Could not remove the login.');
+    }
     revalidatePath(path);
     redirectWith(path, 'ok', staff
       ? 'Unlinked. That login belongs to staff, so it was kept.'
@@ -226,10 +210,8 @@ export async function removePortalAccess(form: FormData) {
   }
 
   try {
-    const { error } = await createAdminClient().auth.admin.deleteUser(student.auth_user_id);
-    if (error) throw new Error(error.message);
+    await deleteLogin(student.auth_user_id);
   } catch (e) {
-    unstable_rethrow(e);
     console.error('removePortalAccess failed:', e);
     redirectWith(path, 'error', 'Could not remove the login.');
   }

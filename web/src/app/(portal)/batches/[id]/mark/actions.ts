@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getViewer } from '@/lib/auth';
 import { startBrowserUpload, trashFile, uploadFile } from '@/lib/google/drive';
 import { checkMarkedFile, correctionName, sendMarkedSheet, studentHomeworkFolder } from '@/lib/homework/corrections';
 import { MAX_BYTES } from '@/lib/homework/handin';
@@ -20,13 +21,17 @@ type Ids = { batchId: string; sheetId: string; studentId: string };
 export type Step<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 // The homework (in this batch) and the student's result. Also checks the mark if one was typed.
+// Only staff and teachers may mark (checked alongside the reads, before any Google Drive work); the database
+// rules limit a teacher to their own batches.
 async function load(ids: Ids, mark: number | null, sending = true) {
   if (![ids.batchId, ids.sheetId, ids.studentId].every((v) => UUID.test(v))) return { error: 'Homework not found.' } as const;
   const supabase = await createClient();
-  const [{ data: sheet }, { data: result }] = await Promise.all([
+  const [viewer, { data: sheet }, { data: result }] = await Promise.all([
+    getViewer(),
     supabase.from('homework_sheets').select('id, title, max_mark').eq('id', ids.sheetId).eq('batch_id', ids.batchId).maybeSingle(),
     supabase.from('homework_results').select('status').eq('sheet_id', ids.sheetId).eq('student_id', ids.studentId).maybeSingle(),
   ]);
+  if (!viewer) return { error: 'Only staff and teachers can mark homework. Sign in again.' } as const;
   if (!sheet || !result) return { error: 'Homework not found.' } as const;
   if (sending && mark === null && result.status !== 'marked') return { error: 'Enter a mark, then Save & send.' } as const;
   if (mark !== null && !(Number.isFinite(mark) && mark >= 0)) return { error: 'The mark must be 0 or more.' } as const;
@@ -76,15 +81,20 @@ export async function finishMarking(ids: Ids, saved: Saved): Promise<Step<{ mess
 
   const problem = await sendMarkedSheet(found.supabase, ids.sheetId, ids.studentId, { id: saved.driveFileId, name: saved.name }, saved.mark);
   if (problem) return { ok: false, error: problem };
-  await keepDrawings(found.supabase, ids, saved, null);
+  // The sheet and mark are already with the student; the drawings are only kept so the sheet can be reopened
+  // and changed later. If that part fails, say so instead of a plain "sent".
+  const drawingsError = await keepDrawings(found.supabase, ids, saved, null);
 
   revalidatePath(`/batches/${ids.batchId}`);
   revalidatePath('/');
+  const sent = saved.mark !== null
+    ? 'Mark and marked sheet sent. The student can see them now.'
+    : 'Marked sheet sent. The student can see it now.';
   return {
     ok: true,
-    message: saved.mark !== null
-      ? 'Mark and marked sheet sent. The student can see them now.'
-      : 'Marked sheet sent. The student can see it now.',
+    message: drawingsError
+      ? `${sent} But your pen marks could not be kept for changing later: to change this sheet, mark it again.`
+      : sent,
   };
 }
 
