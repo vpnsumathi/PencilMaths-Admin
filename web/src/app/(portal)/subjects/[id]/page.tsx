@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronDownIcon, ChevronUpIcon } from '@/components/icons';
 import { requireAdmin } from '@/lib/auth';
+import { yearLabel, YEARS } from '@/lib/options';
 import { addTopic, deleteTopic, moveTopic, renameTopic } from '../actions';
 import styles from '../subjects.module.css';
 
@@ -14,8 +15,6 @@ type Props = {
 };
 
 type Topic = { id: string; name: string; position: number; year_group: number | null };
-
-const YEARS = Array.from({ length: 13 }, (_, i) => i + 1);
 
 export default async function CurriculumPage({ params, searchParams }: Props) {
   const { id } = await params;
@@ -53,7 +52,7 @@ export default async function CurriculumPage({ params, searchParams }: Props) {
         <input name="name" placeholder="New topic name" required className={styles.input} aria-label="New topic name" />
         <select name="year_group" defaultValue="" className={styles.select} aria-label="Year group">
           <option value="">All year groups</option>
-          {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+          {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
         </select>
         <button className={styles.primaryButton}>Add topic</button>
       </form>
@@ -62,7 +61,7 @@ export default async function CurriculumPage({ params, searchParams }: Props) {
 
       {[...groups].map(([year, list]) => (
         <section key={year ?? 'all'} className={styles.group}>
-          <h2>{year === null ? 'All year groups' : `Year ${year}`}</h2>
+          <h2>{year === null ? 'All year groups' : yearLabel(year)}</h2>
           <ol className={styles.topicList}>
             {list.map((t, i) => (
               <li key={t.id} className={styles.topic}>

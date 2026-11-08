@@ -1,4 +1,5 @@
 // Small helpers for showing values on screen.
+import { yearLabel } from './options';
 
 // "2026-10-07" → "7 Oct 2026". Date-only values are read as UTC so they never shift by a day.
 export function formatDate(value: string | null | undefined) {
@@ -22,8 +23,8 @@ export function formatPercent(value: number | null | undefined) {
 }
 
 export function yearRange(min: number | null, max: number | null) {
-  if (min && max) return min === max ? `Year ${min}` : `Years ${min}–${max}`;
-  if (min) return `Year ${min}+`;
-  if (max) return `Up to Year ${max}`;
+  if (min && max) return min === max ? yearLabel(min) : `${yearLabel(min)} to ${yearLabel(max)}`;
+  if (min) return `${yearLabel(min)} and above`;
+  if (max) return `Up to ${yearLabel(max)}`;
   return '—';
 }

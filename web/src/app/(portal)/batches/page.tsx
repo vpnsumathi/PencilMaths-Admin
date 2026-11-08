@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
 import { formatDate } from '@/lib/format';
+import { yearShort } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = { title: 'Batches' };
@@ -46,7 +47,7 @@ export default async function BatchesPage({ searchParams }: Props) {
                 <tr key={b.id}>
                   <td><Link href={`/batches/${b.id}`} className={ui.link}>{b.code}</Link>{b.name && <span className={ui.muted}> · {b.name}</span>}</td>
                   <td>{b.subject}</td>
-                  <td>{b.year_group}</td>
+                  <td>{yearShort(b.year_group)}</td>
                   {!teacher && <td>{b.teacher}</td>}
                   <td>{b.schedule ?? '—'}</td>
                   <td>{b.member_count} / {b.capacity}</td>

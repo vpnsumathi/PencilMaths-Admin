@@ -107,7 +107,7 @@ export async function addTopic(form: FormData) {
   const yearText = String(form.get('year_group') ?? '');
   const yearGroup = yearText ? Number(yearText) : null;
   if (!name) back(path, 'error', 'Enter a topic name.');
-  if (yearGroup !== null && !(Number.isInteger(yearGroup) && yearGroup >= 1 && yearGroup <= 13)) {
+  if (yearGroup !== null && !(Number.isInteger(yearGroup) && yearGroup >= 1 && yearGroup <= 12)) {
     back(path, 'error', 'Choose a valid year group.');
   }
 

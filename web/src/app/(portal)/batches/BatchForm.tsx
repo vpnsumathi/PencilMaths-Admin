@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
 import { formatTime } from '@/lib/format';
-import { todayInUk, WEEKDAYS, YEARS } from '@/lib/options';
+import { todayInUk, WEEKDAYS, yearLabel, YEARS } from '@/lib/options';
 import { createBatch, updateBatch } from './actions';
 
 export type Batch = {
@@ -44,7 +44,7 @@ export function BatchForm({ batch, subjects, teachers }: { batch?: Batch; subjec
               <Field label="Year group">
                 <select name="year_group" required defaultValue="" className={ui.select}>
                   <option value="" disabled>Choose…</option>
-                  {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+                  {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
                 </select>
               </Field>
             </>

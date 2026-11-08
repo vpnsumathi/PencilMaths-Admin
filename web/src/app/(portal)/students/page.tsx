@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
 import { formatPercent } from '@/lib/format';
-import { STUDENT_STATUSES } from '@/lib/options';
+import { STUDENT_STATUSES, yearShort } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = { title: 'Students' };
@@ -64,7 +64,7 @@ export default async function StudentsPage({ searchParams }: Props) {
                 <tr key={s.id}>
                   <td className={ui.muted}>{s.code}</td>
                   <td><Link href={`/students/${s.id}`} className={ui.link}>{s.first_name} {s.last_name}</Link></td>
-                  <td>{s.year_group}</td>
+                  <td>{yearShort(s.year_group)}</td>
                   <td>{s.subjects || '—'}</td>
                   {!teacher && <td>{s.teachers || '—'}</td>}
                   <td>{s.batches || '—'}</td>

@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
 import { formatPercent } from '@/lib/format';
-import { STUDENT_STATUSES, UUID } from '@/lib/options';
+import { STUDENT_STATUSES, UUID, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { createDriveFolder } from '../actions';
 import { HandInLink } from '../HandInLink';
@@ -60,7 +60,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
         <div>
           <h1 className={ui.title}>{student.first_name} {student.last_name}</h1>
           <p className={ui.subtitle}>
-            {student.code} · Year {student.year_group} · Attendance {formatPercent(stats?.attendance_pct)} · Homework{' '}
+            {student.code} · {yearLabel(student.year_group)} · Attendance {formatPercent(stats?.attendance_pct)} · Homework{' '}
             {formatPercent(stats?.homework_pct)} (last 28 days)
           </p>
         </div>
@@ -116,7 +116,7 @@ async function TeacherView({ student }: { student: Basic }) {
         <div>
           <h1 className={ui.title}>{student.first_name} {student.last_name}</h1>
           <p className={ui.subtitle}>
-            {student.code} · Year {student.year_group}{student.school ? ` · ${student.school}` : ''} · Attendance{' '}
+            {student.code} · {yearLabel(student.year_group)}{student.school ? ` · ${student.school}` : ''} · Attendance{' '}
             {formatPercent(stats?.attendance_pct)} · Homework {formatPercent(stats?.homework_pct)} (last 28 days, your classes)
           </p>
         </div>
@@ -128,7 +128,7 @@ async function TeacherView({ student }: { student: Basic }) {
           {((enrolments ?? []) as unknown as Row[]).map((e) => (
             <li key={e.id}>
               <Link href={`/batches/${e.batch_id}`} className={ui.link}>{e.batches?.code ?? 'Batch'}</Link>
-              <span className={ui.muted}>{e.subjects?.name} · Year {e.batches?.year_group}</span>
+              <span className={ui.muted}>{e.subjects?.name} · {yearLabel(e.batches?.year_group)}</span>
             </li>
           ))}
         </ul>

@@ -92,6 +92,8 @@ export function ImportForm() {
           </table>
         </div>
         <ul className={styles.rules}>
+          <li>Year: <code>Year 1</code> to <code>Year 10</code> (or just the number), then <code>GCSE-H</code> and <code>GCSE-F</code>
+            (<code>GCSE - H</code>, <code>GCSE Higher</code> and <code>GCSE Foundation</code> work too). Year 11, 12 and 13 are no longer used.</li>
           <li>Batch time: one day per line (or separated by <code>;</code>). Only the start time is kept.</li>
           <li>Nothing is added twice. Teachers, batches and students already in the portal are matched by name
             (a batch by its year and name, e.g. Year 2 Batch 1), so you can import the same file again after changing it.</li>

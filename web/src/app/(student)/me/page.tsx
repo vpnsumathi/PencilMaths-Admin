@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { yearLabel } from '@/lib/options';
 import styles from '../student.module.css';
 import { type Dashboard, nextClass } from './dashboard';
 import { getMyDashboard } from './myDashboard';
@@ -19,7 +20,7 @@ export default async function MyDashboard() {
     <>
       <h1>Hi {me.first_name}</h1>
       <p className={styles.muted}>
-        {me.first_name} {me.last_name} · {me.code} · Year {me.year_group}
+        {me.first_name} {me.last_name} · {me.code} · {yearLabel(me.year_group)}
         {me.school ? ` · ${me.school}` : ''}
       </p>
 

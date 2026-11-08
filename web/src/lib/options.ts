@@ -1,6 +1,25 @@
 // Fixed lists used by forms and labels. The keys match the database enums (see docs/SUPABASE.md).
 
-export const YEARS = Array.from({ length: 13 }, (_, i) => i + 1);
+// Year groups as stored (1-12): 1-10 are Year 1 to Year 10, 11 is GCSE - H (Higher), 12 is GCSE - F (Foundation).
+// The database's year_label() gives the same words.
+export const YEARS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+// 5 → "Year 5", 11 → "GCSE - H", 12 → "GCSE - F".
+export function yearLabel(year: number | null | undefined) {
+  if (year == null) return '—';
+  return year === 11 ? 'GCSE - H' : year === 12 ? 'GCSE - F' : `Year ${year}`;
+}
+
+// For narrow columns and charts: 5 → "Y5", 11 → "GCSE-H", 12 → "GCSE-F".
+export function yearShort(year: number | null | undefined) {
+  if (year == null) return '—';
+  return year === 11 ? 'GCSE-H' : year === 12 ? 'GCSE-F' : `Y${year}`;
+}
+
+// Lesson library codes start with this: Y5-, and GH- / GF- for GCSE - H / GCSE - F.
+export function lessonCodePrefix(year: number) {
+  return year === 11 ? 'GH-' : year === 12 ? 'GF-' : `Y${year}-`;
+}
 
 export const STUDENT_STATUSES: Record<string, string> = {
   active: 'Active',

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
-import { STUDENT_STATUSES, todayInUk, YEARS } from '@/lib/options';
+import { STUDENT_STATUSES, todayInUk, yearLabel, YEARS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { saveStudent } from './actions';
 import { YearBatchFilter } from './YearBatchFilter';
@@ -65,7 +65,7 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
           <Field label="Year group">
             <select name="year_group" required defaultValue={student?.year_group ?? ''} className={ui.select}>
               <option value="" disabled>Choose…</option>
-              {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+              {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
             </select>
           </Field>
           <Field label="School">
@@ -122,7 +122,7 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
                 <option value="">No batch yet</option>
                 {options.batches.filter((b) => b.subject_id === s.id).map((b) => (
                   <option key={b.id} value={b.id} data-year={b.year_group}>
-                    {b.code}{b.name ? ` ${b.name}` : ''} · Year {b.year_group} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity}{b.member_count >= b.capacity && b.id !== e?.batch_id ? ' · full' : ''})
+                    {b.code}{b.name ? ` ${b.name}` : ''} · {yearLabel(b.year_group)} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity}{b.member_count >= b.capacity && b.id !== e?.batch_id ? ' · full' : ''})
                   </option>
                 ))}
               </select>

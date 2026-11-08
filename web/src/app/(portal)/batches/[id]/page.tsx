@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
 import { formatDate } from '@/lib/format';
-import { STUDENT_STATUSES, todayInUk, UUID, WEEKDAYS } from '@/lib/options';
+import { STUDENT_STATUSES, todayInUk, UUID, WEEKDAYS, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { setBatchClosed, setTopicStatus } from '../actions';
 import { CompleteTopic } from '../CompleteTopic';
@@ -93,7 +93,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
       <div className={ui.header}>
         <div>
           <h1 className={ui.title} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
-            {batch.code}{batch.name ? ` · ${batch.name}` : ''} · {subjectName} · Year {batch.year_group}
+            {batch.code}{batch.name ? ` · ${batch.name}` : ''} · {subjectName} · {yearLabel(batch.year_group)}
             {/* Jumps to the latest active homework, which is open (or to the section if there is none yet). */}
             <a href={hasHomework ? '#latest-homework' : '#homework'} className={`${ui.button} ${ui.highlightButton}`}>📘 Homework</a>
           </h1>
@@ -133,7 +133,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
                 <li key={s.id}>
                   <Link href={`/students/${s.id}`} className={ui.link}>{s.first_name} {s.last_name}</Link>
                   <span className={ui.formActions}>
-                    <span className={ui.muted}>Year {s.year_group} · <StatusBadge status={s.status} label={STUDENT_STATUSES[s.status] ?? s.status} /></span>
+                    <span className={ui.muted}>{yearLabel(s.year_group)} · <StatusBadge status={s.status} label={STUDENT_STATUSES[s.status] ?? s.status} /></span>
                     {notGiven(s.id).length > 0 && (
                       <GivePastHomework batchId={batch.id} student={{ id: s.id, name: `${s.first_name} ${s.last_name}` }} homework={notGiven(s.id)} />
                     )}

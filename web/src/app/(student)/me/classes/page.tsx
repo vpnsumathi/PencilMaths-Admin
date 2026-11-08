@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { formatDate, formatTime } from '@/lib/format';
-import { WEEKDAYS } from '@/lib/options';
+import { WEEKDAYS, yearLabel } from '@/lib/options';
 import styles from '../../student.module.css';
 import { type Dashboard, nextClass } from '../dashboard';
 import { getMyDashboard } from '../myDashboard';
@@ -26,7 +26,7 @@ export default async function MyClasses() {
             <p className={styles.teacherLine}>Teacher: <strong>{c.teacher ?? 'To be confirmed'}</strong></p>
             <dl className={styles.details}>
               <dt>Teacher</dt><dd><strong>{c.teacher ?? 'To be confirmed'}</strong></dd>
-              {c.class_year && <><dt>Class year</dt><dd>Year {c.class_year}</dd></>}
+              {c.class_year && <><dt>Class year</dt><dd>{yearLabel(c.class_year)}</dd></>}
               <dt>Class times</dt>
               <dd>
                 {c.times.length === 0

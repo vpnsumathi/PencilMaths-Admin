@@ -3,7 +3,7 @@ import { Alerts } from '@/components/Alerts';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
 import { requireAdmin } from '@/lib/auth';
-import { YEARS } from '@/lib/options';
+import { yearLabel, YEARS } from '@/lib/options';
 import { importLessonPlan } from './actions';
 import { WorksheetUpload } from './WorksheetUpload';
 
@@ -57,7 +57,8 @@ export default async function LessonLibraryPage({ searchParams }: Props) {
           <h2>1. Import a lesson plan</h2>
           <p className={ui.muted}>
             The &quot;Term Lesson Plan - Year N&quot; spreadsheet: sheets <strong>Term 1</strong>, <strong>Term 2</strong>, <strong>Term 3</strong> with
-            columns Module, Lesson Code, Lesson, Hw - 1, Hw - 2, Hw - 3. Importing again updates it; nothing is deleted.
+            columns Module, Lesson Code, Lesson, Hw - 1, Hw - 2, Hw - 3. Lesson codes start with the year: <code>Y5-</code>,
+            or <code>GH-</code> for GCSE - H and <code>GF-</code> for GCSE - F. Importing again updates it; nothing is deleted.
           </p>
           <form action={importLessonPlan} className={ui.fieldGrid}>
             <Field label="Subject">
@@ -67,7 +68,7 @@ export default async function LessonLibraryPage({ searchParams }: Props) {
             </Field>
             <Field label="Year group">
               <select name="year_group" defaultValue={year} className={ui.input}>
-                {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+                {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
               </select>
             </Field>
             <Field label="Spreadsheet (.xlsx)" full>
@@ -90,19 +91,19 @@ export default async function LessonLibraryPage({ searchParams }: Props) {
       </div>
 
       <section className={ui.card} style={{ marginTop: 16 }}>
-        <h2>{subjectName} · Year {year}</h2>
+        <h2>{subjectName} · {yearLabel(year)}</h2>
         {imported.length > 1 && (
           <p className={ui.formActions}>
             {imported.map((p) => (
               <Link key={`${p.subject_id}${p.year_group}`} className={ui.link}
                 href={`/lesson-library?subject=${p.subject_id}&year=${p.year_group}&term=1`}>
-                {(subjects ?? []).find((s) => s.id === p.subject_id)?.name ?? p.subject_id} Year {p.year_group}
+                {(subjects ?? []).find((s) => s.id === p.subject_id)?.name ?? p.subject_id} {yearLabel(p.year_group)}
               </Link>
             ))}
           </p>
         )}
         {terms.length === 0 ? (
-          <p className={ui.empty}>Nothing imported for {subjectName} Year {year} yet.</p>
+          <p className={ui.empty}>Nothing imported for {subjectName} {yearLabel(year)} yet.</p>
         ) : (
           <>
             <div className={ui.formActions} style={{ marginBottom: 12 }}>

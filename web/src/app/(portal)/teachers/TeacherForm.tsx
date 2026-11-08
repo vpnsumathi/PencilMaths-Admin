@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
-import { TEACHER_STATUSES, YEARS } from '@/lib/options';
+import { TEACHER_STATUSES, yearLabel, YEARS } from '@/lib/options';
 import { saveTeacher } from './actions';
 
 export type Teacher = {
@@ -60,13 +60,13 @@ export function TeacherForm({ teacher, subjects }: { teacher?: Teacher; subjects
           <Field label="Lowest year group">
             <select name="year_min" defaultValue={teacher?.year_min ?? ''} className={ui.select}>
               <option value="">Any</option>
-              {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+              {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
             </select>
           </Field>
           <Field label="Highest year group">
             <select name="year_max" defaultValue={teacher?.year_max ?? ''} className={ui.select}>
               <option value="">Any</option>
-              {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+              {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
             </select>
           </Field>
           <Field label="Joined on">

@@ -1,4 +1,4 @@
-import { todayInUk } from '@/lib/options';
+import { todayInUk, yearLabel, yearShort } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
 // Loads everything the dashboard shows, then turns the raw rows into numbers and chart bars.
@@ -95,7 +95,7 @@ export async function loadDashboard() {
   if (years.length) {
     for (let y = Math.min(...years); y <= Math.max(...years); y++) {
       const n = years.filter((v) => v === y).length;
-      byYear.push({ key: `y${y}`, label: `Y${y}`, value: n, display: String(n), detail: `Year ${y}` });
+      byYear.push({ key: `y${y}`, label: yearShort(y), value: n, display: String(n), detail: yearLabel(y) });
     }
   }
 
@@ -108,7 +108,7 @@ export async function loadDashboard() {
     value: b.member_count,
     max: b.capacity,
     display: `${b.member_count}/${b.capacity}`,
-    detail: `${b.subject} · Year ${b.year_group} · ${b.teacher}`,
+    detail: `${b.subject} · ${yearLabel(b.year_group)} · ${b.teacher}`,
     href: `/batches/${b.id}`,
   }));
   const seats = openBatches.reduce((s, b) => s + b.capacity, 0);
@@ -130,7 +130,7 @@ export async function loadDashboard() {
     attention.push({
       tone: 'warn', kind: 'student',
       title: `${s.first_name} ${s.last_name} needs a ${s.missing_batch ? 'batch' : 'teacher'}`,
-      detail: `Year ${s.year_group}`,
+      detail: yearLabel(s.year_group),
       href: `/students/${s.id}`,
     });
   }
@@ -138,7 +138,7 @@ export async function loadDashboard() {
     attention.push({
       tone: 'warn', kind: 'homework',
       title: `${b.code}: ${b.to_mark} homework to mark`,
-      detail: `${b.subject} Y${b.year_group} · ${b.teacher ?? 'you'}`, // empty in a teacher's own view
+      detail: `${b.subject} ${yearShort(b.year_group)} · ${b.teacher ?? 'you'}`, // empty in a teacher's own view
       href: `/batches/${b.id}`,
     });
   }
