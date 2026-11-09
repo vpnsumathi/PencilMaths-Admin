@@ -152,9 +152,6 @@ export async function loadDashboard() {
       href: `/enquiries/${e.id}`,
     });
   }
-  for (const b of openBatches.filter((b) => b.member_count >= b.capacity)) {
-    attention.push({ tone: 'info', kind: 'full', title: `${b.code} is full`, detail: `${b.member_count}/${b.capacity} places`, href: `/batches/${b.id}` });
-  }
   const order = { danger: 0, warn: 1, info: 2 };
   attention.sort((a, b) => order[a.tone] - order[b.tone]);
 
