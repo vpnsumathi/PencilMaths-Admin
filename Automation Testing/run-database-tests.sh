@@ -29,10 +29,18 @@ red=$'\e[31m'; green=$'\e[32m'; bold=$'\e[1m'; plain=$'\e[0m'
 
 fail_setup() { echo "${red}${bold}Could not build the test database:${plain} $1"; echo "$2" | tail -20; exit 1; }
 
-# Safety: only ever a local or GitHub test server, never a Supabase project.
-case "${PGHOST:-localhost}" in
-  *supabase*) echo "${red}PGHOST points at Supabase (${PGHOST}). These tests must run on an empty test server, never on Staging or Production.${plain}"; exit 1 ;;
-esac
+# Safety: this script deletes and rebuilds the database it is pointed at, so it only runs on this computer's
+# (or GitHub's) own test server, never on Supabase or any other server, and only on a database named like a test.
+# For a test server elsewhere (for example a Docker container called "db"), set ALLOW_TEST_HOST=yes.
+for host in "${PGHOST:-}" "${PGHOSTADDR:-}"; do
+  case "$host" in
+    ''|localhost|127.0.0.1|::1|/*) ;;
+    *) [ "${ALLOW_TEST_HOST:-}" = yes ] && [[ "$host" != *supabase* ]] && continue
+       echo "${red}PGHOST/PGHOSTADDR is \"$host\". These tests delete and rebuild their database, so they only run on this computer's own Postgres.${plain}"; exit 1 ;;
+  esac
+done
+[ -z "${PGSERVICE:-}" ] || { echo "${red}PGSERVICE is set. Unset it and use PGHOST/PGPORT for a local test server.${plain}"; exit 1; }
+[[ "$DB" == *test* ]] || { echo "${red}The test database name must contain \"test\" (got \"$DB\"), so a real database is never deleted.${plain}"; exit 1; }
 
 # 1. A fresh, empty database.
 dropdb --if-exists "$DB" >/dev/null 2>&1

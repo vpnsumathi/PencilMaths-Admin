@@ -31,6 +31,7 @@ Reviews of how fast, safe and simple the app is, with the findings and the fixes
 | 17 | [Architecture review](17-architecture-review.md) | The 3 Nov 2026 review of how the app is built (findings F1–F24), what has been fixed since, and what to do next |
 | 18 | [Database performance review](18-database-performance-review.md) | The 5 Nov 2026 check of all migration scripts (findings D1–D8): slow access rules for staff, missing indexes, the batch list view, the batch page's 1,000-row limit, timings before and after, and good practice for new scripts. D1–D4 built on 6 Nov as `20261106000001_faster_database.sql` |
 | 19 | [Page speed review](19-page-speed-review.md) | The 3 Nov 2026 check of how fast pages feel (findings P1–P9): loading skeletons, fewer login checks, queries side by side, the dashboard, Vercel and Supabase regions, what not to do, and what has been done since |
+| 23 | [Full engineering audit](23-engineering-audit.md) | The 11 Nov 2026 audit of the whole codebase (findings E1–E14): where every earlier finding (F, D, P) stands today, library security updates, the hand-in link and teacher checks the database doesn't make yet, the 1,000-row limit in numbers, backups, the GitHub test run, and a suggested order of work |
 
 ## AI
 

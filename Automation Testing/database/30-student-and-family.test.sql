@@ -27,8 +27,14 @@ select tests.ok(my_homework_file('80000000-0000-0000-0000-000000000003') is null
 select tests.ok(my_handin_target('70000000-0000-0000-0000-000000000002') is null, 'A child can''t hand in another class''s homework');
 
 -- Handing in from the student pages.
-select tests.lives($$select my_handin_record('70000000-0000-0000-0000-000000000001', 'drv-sam-1', 'https://drive.test/sam1', 'page1.jpg')$$,
+-- (The app's server records the upload with handin_record after checking my_handin_target.)
+select tests.ok(my_handin_target('70000000-0000-0000-0000-000000000001') is not null, 'A child can hand in their own homework');
+select tests.eq(current_student_id(), '30000000-0000-0000-0000-000000000001'::uuid, 'The server can tell which child is handing in');
+select tests.as_owner();
+select set_config('role', 'service_role', true);
+select tests.lives($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drive-file-sam1', null, 'page1.jpg')$$,
   'A child can hand in their homework');
+select tests.as('family');
 select tests.eq((my_dashboard()->'homework'->>'handed_in')::int, 1, 'After handing in, it counts as handed in');
 select tests.eq((my_dashboard()->'homework'->>'to_do')::int, 0, 'After handing in, it is no longer to do');
 select tests.eq(jsonb_array_length(my_homework()->0->'handed'), 1, 'My homework lists the file that was handed in');
@@ -62,8 +68,7 @@ select tests.eq((select string_agg(s->>'first_name', ',') from jsonb_array_eleme
 select tests.as('nobody');
 select tests.ok(my_dashboard() is null, 'A login with no student gets no dashboard');
 select tests.eq(jsonb_array_length(my_students()), 0, 'A login with no student lists no children');
-select tests.throws($$select my_handin_record('70000000-0000-0000-0000-000000000001', 'x', 'https://x', 'x')$$, 'Not a student login',
-  'A login with no student can''t hand anything in');
+select tests.ok(my_handin_target('70000000-0000-0000-0000-000000000001') is null, 'A login with no student can''t hand anything in');
 
 -- One email can't be both a teacher login and a student login.
 select tests.as_owner();

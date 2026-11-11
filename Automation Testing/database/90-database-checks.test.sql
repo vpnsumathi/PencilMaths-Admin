@@ -42,6 +42,10 @@ select tests.eq((select string_agg(relname, ', ' order by relname) from pg_class
   'Saved Drive folder ids can only be read by the server');
 
 select tests.eq((select string_agg(p.proname, ', ' order by p.proname) from pg_proc p
-                 where p.pronamespace = 'public'::regnamespace and p.proname in ('handin_page', 'handin_target', 'handin_record')
+                 where p.pronamespace = 'public'::regnamespace and p.proname in ('handin_page', 'handin_target')
                    and not has_function_privilege('anon', p.oid, 'execute')), null,
-  'The WhatsApp hand-in link functions can be used without signing in');
+  'The WhatsApp hand-in link page can be used without signing in');
+select tests.eq((select string_agg(p.proname, ', ' order by p.proname) from pg_proc p
+                 where p.pronamespace = 'public'::regnamespace and p.proname = 'handin_record'
+                   and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'))), null,
+  'Only the server can record a hand-in');

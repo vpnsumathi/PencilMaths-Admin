@@ -880,6 +880,58 @@ You then commit `Help/01-project-guide.md` as usual (section 11).
 
 Newest first.
 
+### 2026-11-11 — Test runner safety check
+**What changed:**
+- The database test runner deletes and rebuilds the database it is pointed at. Before, it only refused a server address containing "supabase". Now it runs only on this computer's own Postgres (or GitHub's), refuses `PGSERVICE`, and only deletes a database whose name contains "test". A test server in Docker needs `ALLOW_TEST_HOST=yes`.
+- Checked: refused for a Supabase address, a pooler address, another server's address, `TEST_DATABASE=postgres` and `PGSERVICE`; all 518 checks still pass locally.
+
+**Files added / changed / removed:**
+- `Automation Testing/run-database-tests.sh` — changed. `Help/20-automation-testing.md` — updated.
+
+### 2026-11-11 — Hand-ins recorded by the server only (guide 23, E2)
+**What changed:**
+- Recording a handed-in file is now done only by the app's server, straight after it has uploaded the file to Drive. Before, anyone with a WhatsApp link (or a student login) could call the database directly and add a link to any website as a "handed-in file".
+- The saved address is always worked out from the Drive file id, so it can only open the Drive file.
+- Two uploads at the same moment can no longer go past the 20-file limit.
+- If saving to the database fails after the upload, the file is moved to the Drive bin, so no stray copies are left in the student's folder.
+- Families and students see no difference.
+
+**Files added / changed / removed:**
+- `supabase/migrations/20261111000003_handin_server_only.sql` — new (run on Staging; Prod at go-live after `20261111000002`). Safe to run twice. It removes `my_handin_record`, so run it together with the app change.
+- `web/src/lib/homework/handin.ts` (`uploadHandIn` is now `saveHandIn`: upload, record, bin on failure), `web/src/app/h/[code]/actions.ts`, `web/src/app/(student)/me/homework/actions.ts` — changed. Needs `SUPABASE_SECRET_KEY`, which is already set for invites.
+- `Automation Testing/database/40-handin-link.test.sql`, `30-student-and-family.test.sql`, `90-database-checks.test.sql` — updated (518 checks, all passing).
+- `Help/23-engineering-audit.md` (E2 status) — updated.
+
+**How to check it works:**
+- Run the SQL on Staging, then hand in a photo through a WhatsApp link and through a student login. Both should show on the batch page as before.
+
+### 2026-11-11 — Security updates: Next.js and the PDF viewer (guide 23, E1)
+**What changed:**
+- **Next.js 15.5.27 → 15.5.29** (patch release, fixes a critical image-optimiser problem and a Server Actions denial of service), with `eslint-config-next` to match.
+- **`pdfjs-dist` 5.7 → 6.5.438**, the PDF viewer on the marking page. The old one could run JavaScript hidden in a crafted PDF, and staff open families' PDFs there. No code change was needed: the marking page works the same.
+- `package.json` has a new `overrides` entry that lifts the copy of PostCSS inside Next.js to 8.5.32 (it had published problems too; it is only used when building).
+- `npm audit --omit=dev`: 0 problems (was 1 critical, 2 high).
+- GitHub run: a new step runs `npm audit` and fails on a high or critical problem; Node.js 22 (the new PDF viewer asks for 22.13 or later).
+- Checked on a copy: type check, lint and build pass; marking page tested in a browser with a 2-page PDF and a photo (pages show, pen marks draw).
+
+**Files added / changed / removed:**
+- `web/package.json`, `web/package-lock.json` — changed. Run `npm install` in `web` afterwards.
+- `Automation Testing/setup/automation-tests.yml` — audit step, Node.js 22. Copy it to `.github/workflows/` again if you already copied it.
+- To delete by hand: `web/public/file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg` (left over from the Next.js starter; nothing uses them).
+- `Help/23-engineering-audit.md` (E1 status), `Help/20-automation-testing.md` — updated.
+
+**How to check it works:**
+- `cd web`, `npm install`, `npm run dev`; open a batch's homework, press 🖊️ Mark on a handed-in PDF and on a photo, draw, and Save & close.
+
+### 2026-11-11 — Full engineering audit (guide 23)
+**What changed:**
+- A read-only audit of the whole codebase, written up as `Help/23-engineering-audit.md` in **Process Improvement / Optimization**. No app code, migration or setting was changed.
+- It checks every finding from guides 17, 18 and 19 against today's code, and adds new findings E1–E14. The top ones: update Next.js to 15.5.29 and the PDF viewer `pdfjs-dist` to 6.x (published security problems); make the hand-in link's "record a file" step server-only (it accepts any web address today); fix the batch page's 1,000-row limit for files (D6), which will bite after about one term; switch on the GitHub test run; decide on backups.
+- Checked on a copy: all 511 database checks, type check, lint and build pass.
+
+**Files added / changed / removed:**
+- `Help/23-engineering-audit.md` — new. `Help/README.md` — row 23.
+
 ### 2026-11-11 — Students list: create missing Drive folders
 **What changed:**
 - A student without a Google Drive folder can't hand in homework ("Your homework folder is not ready yet"). The **Students** list now shows an amber box when any current student has no folder, naming them, with a **Create missing folders** button that makes them all (5 at a time, with progress). Those students also get a **No Drive folder** badge in the list.

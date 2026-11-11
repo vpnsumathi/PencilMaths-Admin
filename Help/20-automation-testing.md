@@ -61,7 +61,7 @@ To run one area only, add part of its name, for example `bash "Automation Testin
 
 You can also ask Claude in this project to run them on the folder.
 
-> ⚠️ Never point the tests at Supabase. They create and delete their own database. The runner refuses if `PGHOST` contains "supabase".
+> ⚠️ Never point the tests at Supabase. They delete and rebuild their own database. The runner refuses unless `PGHOST` is this computer (`localhost`, `127.0.0.1` or a socket folder), refuses if `PGSERVICE` is set, and refuses a database name without "test" in it. For a test server in a Docker container, set `ALLOW_TEST_HOST=yes` (a Supabase address is still refused).
 
 ## 3. Before going live
 
@@ -107,7 +107,7 @@ If a file says **"stopped with an unexpected error"**, a script or a check hit a
 | `database/supabase-stub.sql` | Supabase's basics (the `anon`, `authenticated` and `service_role` roles, `auth.users`, `auth.uid()`), so the migrations run on plain Postgres. **Only for tests.** |
 | `database/helpers.sql` | The check functions (`tests.eq`, `tests.ok`, `tests.throws`, `tests.lives`), and `tests.as('teacher1')` to sign in as a test person. |
 | `database/fixtures.sql` | The test data: 3 staff, 3 teachers, 4 students and 3 batches, a family login, homework, files and Lesson library lessons. The header lists everyone and every id. |
-| `.github/workflows/automation-tests.yml` (copy in `Automation Testing/setup/`) | The GitHub run: **Database tests** on a fresh Postgres 16, and **App checks** with `npm ci`, `tsc`, lint and build (with placeholder settings; this build is never deployed). |
+| `.github/workflows/automation-tests.yml` (copy in `Automation Testing/setup/`) | The GitHub run: **Database tests** on a fresh Postgres 16, and **App checks** with `npm ci`, a security check of the app's libraries (`npm audit`, fails on a high or critical advisory, since 11 Nov), `tsc`, lint and build (with placeholder settings; this build is never deployed). Node.js 22. |
 
 Signing in as a test person works like Supabase: the test sets the signed-in user and the `authenticated` role, so every database rule applies exactly as in the app.
 

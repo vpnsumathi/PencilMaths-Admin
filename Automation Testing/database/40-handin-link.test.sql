@@ -10,30 +10,47 @@ select tests.eq(handin_target('sam-handin-code', '70000000-0000-0000-0000-000000
   'Uploads go into the student''s own Drive folder');
 select tests.ok(handin_target('sam-handin-code', '70000000-0000-0000-0000-000000000002') is null,
   'A link can''t open another class''s homework');
-select tests.throws($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000002', 'x', 'https://x', 'x')$$,
-  'Link or homework not found', 'A link can''t hand in another class''s homework');
-select tests.throws($$select handin_record('not-a-real-code', '70000000-0000-0000-0000-000000000001', 'x', 'https://x', 'x')$$,
-  'Link or homework not found', 'A made-up link can''t hand anything in');
+-- Recording a hand-in is done by the app's server (after it has uploaded the file), never from the browser.
+select tests.throws($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drive-file-0001', 'https://phishing.example', 'x')$$,
+  'permission denied', 'Someone not signed in can''t record a hand-in directly');
+select tests.as('family');
+select tests.throws($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drive-file-0001', 'https://phishing.example', 'x')$$,
+  'permission denied', 'A student login can''t record a hand-in directly');
 
-select tests.lives($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drv-1', 'https://drive.test/p1', 'page1.jpg')$$,
-  'A family can hand in homework through the link');
+select tests.as_owner();
+select set_config('role', 'service_role', true);
+select tests.throws($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000002', 'drive-file-0001', null, 'x')$$,
+  'Link or homework not found', 'A link can''t hand in another class''s homework');
+select tests.throws($$select handin_record('not-a-real-code', '70000000-0000-0000-0000-000000000001', 'drive-file-0001', null, 'x')$$,
+  'Link or homework not found', 'A made-up link can''t hand anything in');
+select tests.throws($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'https://evil/x', null, 'x')$$,
+  'Not a Drive file id', 'Only a Drive file id can be recorded, not a web address');
+
+select tests.lives($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drive-file-0001', 'https://phishing.example', 'page1.jpg')$$,
+  'The server records a hand-in after uploading the file');
+select tests.as_owner();
+select tests.eq((select url from file_links where external_id = 'drive-file-0001'), 'https://drive.google.com/file/d/drive-file-0001/view',
+  'The saved address always points at the Drive file, whatever address is sent');
+select tests.as(null);
 select tests.eq(handin_page('sam-handin-code')->'homework'->0->>'status', 'received', 'Handing in marks the homework as received');
 select tests.eq((handin_page('sam-handin-code')->'homework'->0->>'files')::int, 1, 'The page counts the files handed in');
 select tests.eq(handin_page('kim-handin-code')->'homework'->0->>'status', 'pending', 'Another child''s homework is not affected');
 
 -- At most 20 files per homework.
-select tests.lives($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drv-' || g, null, 'page.jpg')
+select set_config('role', 'service_role', true);
+select tests.lives($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drive-file-' || lpad(g::text, 4, '0'), null, 'page.jpg')
   from generate_series(2, 20) g$$, 'Up to 20 files can be handed in for one homework');
-select tests.throws($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drv-21', null, 'page.jpg')$$,
+select tests.throws($$select handin_record('sam-handin-code', '70000000-0000-0000-0000-000000000001', 'drive-file-0021', null, 'page.jpg')$$,
   'Too many files', 'A 21st file for the same homework is refused');
 
 -- Handing in again after marking keeps the mark.
 select tests.as_owner();
 update homework_results set status = 'marked', mark = 9, marked_on = current_date
 where sheet_id = '70000000-0000-0000-0000-000000000001' and student_id = '30000000-0000-0000-0000-000000000002';
-select tests.as(null);
-select tests.lives($$select handin_record('kim-handin-code', '70000000-0000-0000-0000-000000000001', 'drv-k', null, 'late.jpg')$$,
+select set_config('role', 'service_role', true);
+select tests.lives($$select handin_record('kim-handin-code', '70000000-0000-0000-0000-000000000001', 'drive-file-kim1', null, 'late.jpg')$$,
   'A family can still add a file after the homework was marked');
+select tests.as(null);
 select tests.eq(handin_page('kim-handin-code')->'homework'->0->>'status', 'marked', 'Adding a file after marking keeps it marked');
 select tests.eq((handin_page('kim-handin-code')->'homework'->0->>'mark')::numeric, 9::numeric, 'Adding a file after marking keeps the mark');
 
