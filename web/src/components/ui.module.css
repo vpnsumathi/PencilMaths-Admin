@@ -13,6 +13,8 @@
 /* Messages */
 .alert { margin: 0 0 16px; padding: 12px 16px; border-radius: 14px; font-size: 14px; border: 1px solid; }
 .alertOk { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-border); }
+/* A warning to read before going on (amber), e.g. a possible duplicate student. */
+.alertWarn { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
 .alertError { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
 
 /* Search and filter bar */
@@ -80,6 +82,15 @@
   box-shadow: inset 4px 0 0 var(--brand);
 }
 .fieldGrid { display: grid; gap: 12px; }
+/* A part of a form inside a section that is already a card (e.g. Batch settings on the batch page). */
+.group h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: var(--text); }
+.group + .group { padding-top: 16px; border-top: 1px solid var(--border); }
+/* The "danger zone" at the end of a settings section: closing or deleting something. */
+.dangerZone {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 20px; padding: 14px 16px; border: 1px solid var(--danger-border); border-radius: 14px; background: var(--danger-soft);
+}
+.dangerZone p { margin: 0; font-size: 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field .input, .field .select, .field .textarea { width: 100%; }
 .label { font-size: 13px; font-weight: 500; color: var(--muted); }

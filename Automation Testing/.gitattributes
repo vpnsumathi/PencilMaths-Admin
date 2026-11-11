@@ -1,0 +1,3 @@
+# Keep Unix line endings so the runner works in Git Bash and on GitHub.
+*.sh  text eol=lf
+*.sql text eol=lf

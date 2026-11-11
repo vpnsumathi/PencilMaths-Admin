@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Section } from '@/components/Section';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { formatDate } from '@/lib/format';
@@ -52,11 +53,9 @@ export async function LessonPlanner({ batch, students, today, term: askedTerm, m
   const inTerm = lessons.filter((l) => l.term === term).length;
 
   return (
-    <section className={ui.card} style={{ marginTop: 16 }}>
-      <h2>Lesson plan</h2>
-      <p className={ui.muted} style={{ marginTop: 0 }}>
-        Term {term}: {doneInTerm} of {inTerm} lessons completed. Now on {current.code} {current.name}.
-      </p>
+    // Open by itself after choosing a term or module, or after Start / Undo (those send the term and module back).
+    <Section id="lesson-plan" title="Lesson plan" forceOpen={Boolean(askedTerm || askedModule)}
+      summary={`Term ${term}: ${doneInTerm} of ${inTerm} lessons completed · now on ${current.code} ${current.name}`}>
       <PlannerPicker modules={modules} term={term} moduleName={moduleName} />
 
       <ol className={ui.list}>
@@ -109,6 +108,6 @@ export async function LessonPlanner({ batch, students, today, term: askedTerm, m
         })}
       </ol>
       <p className={ui.muted}>Lessons and worksheets come from the <Link href="/lesson-library" className={ui.link}>Lesson library</Link>.</p>
-    </section>
+    </Section>
   );
 }

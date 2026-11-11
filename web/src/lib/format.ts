@@ -13,6 +13,12 @@ export function formatDay(value: string | null | undefined) {
   return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/London' });
 }
 
+// A moment → the clock time it was in the UK, "17:02".
+export function formatClock(value: string | null | undefined) {
+  if (!value) return '';
+  return new Date(value).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Europe/London' });
+}
+
 // "17:00:00" → "17:00"
 export function formatTime(value: string | null | undefined) {
   return value ? value.slice(0, 5) : '';

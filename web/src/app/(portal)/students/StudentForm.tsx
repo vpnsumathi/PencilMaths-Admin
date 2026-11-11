@@ -4,6 +4,7 @@ import ui from '@/components/ui.module.css';
 import { STUDENT_STATUSES, todayInUk, yearLabel, YEARS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { saveStudent } from './actions';
+import { DuplicateWarning } from './DuplicateWarning';
 import { YearBatchFilter } from './YearBatchFilter';
 
 export type Student = {
@@ -82,6 +83,8 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
           <Field label="Start date">
             <input name="start_date" type="date" defaultValue={student?.start_date ?? todayInUk()} className={ui.input} />
           </Field>
+          {/* New students only: warns when the name and year group match a student already in the app. */}
+          {!student && <DuplicateWarning />}
         </div>
       </section>
 

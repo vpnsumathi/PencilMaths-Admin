@@ -4,6 +4,7 @@ import { CreatedModified } from '@/components/CreatedModified';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
+import { cleanClassLink } from '@/lib/classLink';
 import { formatDate } from '@/lib/format';
 import { yearShort } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
@@ -18,15 +19,19 @@ export default async function BatchesPage({ searchParams }: Props) {
   // Teachers only get their own open batches back (database rules), and can't add batches.
   // batch_list is a database view: each batch with its teacher, members, schedule and progress.
   // Who is looking is worked out at the same time as the list loads, not before it.
-  const [teacher, { data: batches, error }] = await Promise.all([
+  const [teacher, { data: batches, error }, { data: classLinks }] = await Promise.all([
     isTeacher(),
     supabase
       .from('batch_list')
       .select('id, code, name, subject, year_group, teacher, capacity, member_count, schedule, topics_done, topics_total, last_class_on, closed_on, created_at, updated_at')
       .order('closed_on', { ascending: false, nullsFirst: true })
       .order('code'),
+    // Open batches that have a Google Classroom link, for Join class in the list. Asked for separately so the
+    // list still opens before the database script for it (20261111000001_class_link_attendance.sql) has been run.
+    supabase.from('batches').select('id, class_link').not('class_link', 'is', null).is('closed_on', null),
   ]);
   if (error) throw error;
+  const joinLinks = new Map((classLinks ?? []).map((b) => [b.id as string, cleanClassLink(b.class_link as string | null)]));
 
   return (
     <>
@@ -40,7 +45,7 @@ export default async function BatchesPage({ searchParams }: Props) {
         <div className={ui.tableWrap}>
           <table className={ui.table}>
             <thead>
-              <tr><th>Batch</th><th>Subject</th><th>Year</th>{!teacher && <th>Teacher</th>}<th>Times</th><th>Places</th><th>Lesson plan</th><th>Last class</th><th>Status</th><th>Created / modified</th></tr>
+              <tr><th>Batch</th><th>Subject</th><th>Year</th>{!teacher && <th>Teacher</th>}<th>Times</th><th>Class</th><th>Places</th><th>Lesson plan</th><th>Last class</th><th>Status</th><th>Created / modified</th></tr>
             </thead>
             <tbody>
               {batches.map((b) => (
@@ -50,6 +55,11 @@ export default async function BatchesPage({ searchParams }: Props) {
                   <td>{yearShort(b.year_group)}</td>
                   {!teacher && <td>{b.teacher}</td>}
                   <td>{b.schedule ?? '—'}</td>
+                  <td>
+                    {joinLinks.get(b.id)
+                      ? <a href={joinLinks.get(b.id)!} target="_blank" rel="noopener noreferrer" className={ui.link}>Join class</a>
+                      : <span className={ui.muted}>—</span>}
+                  </td>
                   <td>{b.member_count} / {b.capacity}</td>
                   <td>{b.topics_done} of {b.topics_total} done</td>
                   <td>{formatDate(b.last_class_on)}</td>

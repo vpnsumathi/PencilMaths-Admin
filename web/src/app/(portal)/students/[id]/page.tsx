@@ -4,10 +4,12 @@ import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
+import type { AttendanceTotals } from '@/lib/classLink';
 import { formatPercent } from '@/lib/format';
 import { STUDENT_STATUSES, UUID, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { createDriveFolder } from '../actions';
+import { AttendanceCard } from '../AttendanceCard';
 import { HandInLink } from '../HandInLink';
 import { PortalAccess } from '../PortalAccess';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
@@ -38,7 +40,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
   const { data: extra } = await supabase.rpc('student_private', { p_student: id });
   const student = { ...found, date_of_birth: extra?.date_of_birth ?? null, handin_code: extra?.handin_code ?? '' };
 
-  const [{ data: guardian }, { data: enrolments }, { data: folder }, { data: stats }, options] = await Promise.all([
+  const [{ data: guardian }, { data: enrolments }, { data: folder }, { data: stats }, options, { data: attendance }] = await Promise.all([
     student.family_id
       ? supabase
           .from('guardians')
@@ -51,6 +53,8 @@ export default async function StudentPage({ params, searchParams }: Props) {
     supabase.from('file_links').select('url, provider').eq('student_id', id).eq('owner_type', 'student_folder').maybeSingle(),
     supabase.from('student_stats').select('attendance_pct, homework_pct').eq('student_id', id).maybeSingle(),
     loadStudentFormOptions(),
+    // Present / late / absent over the last 12 weeks, all classes. Empty until the class link script has been run.
+    supabase.rpc('attendance_totals', { p_student: id }),
   ]);
 
   return (
@@ -85,6 +89,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
       {(student.status !== 'left' || student.auth_user_id) && (
         <PortalAccess studentId={student.id} authUserId={student.auth_user_id} suggestedEmail={guardian?.email ?? null} />
       )}
+      <AttendanceCard totals={attendance as AttendanceTotals | null} />
       <StudentForm
         student={student as Student}
         guardian={guardian as Guardian | null}
@@ -102,10 +107,12 @@ type Basic = { id: string; code: string; first_name: string; last_name: string; 
 // hand-in link or Drive folder, and nothing to edit.
 async function TeacherView({ student }: { student: Basic }) {
   const supabase = await createClient();
-  const [{ data: enrolments }, { data: stats }] = await Promise.all([
+  const [{ data: enrolments }, { data: stats }, { data: attendance }] = await Promise.all([
     // Only enrolments in the teacher's own batches come back.
     supabase.from('enrolments').select('id, batch_id, subjects(name), batches(code, year_group)').eq('student_id', student.id).is('ended_on', null),
     supabase.from('student_stats').select('attendance_pct, homework_pct').eq('student_id', student.id).maybeSingle(),
+    // Only attendance in the teacher's own classes comes back (database rules).
+    supabase.rpc('attendance_totals', { p_student: student.id }),
   ]);
   type Row = { id: string; batch_id: string; subjects: { name: string } | null; batches: { code: string; year_group: number } | null };
 
@@ -122,6 +129,7 @@ async function TeacherView({ student }: { student: Basic }) {
         </div>
         <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
       </div>
+      <AttendanceCard totals={attendance as AttendanceTotals | null} note="your classes" />
       <section className={ui.card} style={{ maxWidth: 900 }}>
         <h2>Classes with you</h2>
         <ul className={ui.list}>

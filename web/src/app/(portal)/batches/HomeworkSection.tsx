@@ -1,4 +1,5 @@
 import { ConfirmButton } from '@/components/ConfirmButton';
+import { Section } from '@/components/Section';
 import { Field } from '@/components/Field';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
@@ -73,9 +74,14 @@ export async function HomeworkSection({ batchId, members, teacher = false }: { b
     (s.homework_results as unknown as Result[]).some((r) => r.status === 'pending' || r.status === 'received'),
   )?.id ?? sheets?.[0]?.id;
 
+  // For the section header: how much homework, and how much is waiting to be marked.
+  const waiting = (sheets ?? []).reduce((n, s) => n + (s.homework_results as unknown as Result[]).filter((r) => r.status === 'received').length, 0);
+  const count = (sheets ?? []).length;
+  const summary = count === 0 ? 'None set yet'
+    : `${count} homework${waiting ? ` · ${waiting} to mark` : ' · nothing to mark'}`;
+
   return (
-    <section id="homework" className={ui.card} style={{ marginTop: 16, scrollMarginTop: 16 }}>
-      <h2>Upload Homework</h2>
+    <Section id="homework" title="Upload Homework" summary={summary} defaultOpen>
 
       <form action={createHomework} className={ui.fieldGrid} style={{ marginBottom: 16 }}>
         <input type="hidden" name="batch_id" value={batchId} />
@@ -247,6 +253,6 @@ export async function HomeworkSection({ batchId, members, teacher = false }: { b
           </details>
         );
       })}
-    </section>
+    </Section>
   );
 }

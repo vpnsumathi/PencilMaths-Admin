@@ -89,6 +89,10 @@ On the batch page, under **Upload Homework**, each student who handed in a file 
 
 **Test:** hand in a PDF as a test student; on the batch page click **🖊️ Mark**; draw, add a tick and some text, enter a mark, **Save & send**. The student's My homework › Marked shows the marked sheet. Reopen **🖊️ Mark**: the marks are there to change.
 
+### 2.3 Dashboard Homework section (27 Oct 2026)
+
+The dashboard (home page) has a **Homework** section: to mark, overdue, handed in and marked this week, marked but not sent; a **Needs marking** list with **🖊️ Mark** links, oldest first; **Students falling behind** (2+ overdue) with a **WhatsApp nudge** button; and each batch's on-time hand-in rate over the last 4 weeks. Details: guide 03, section 8.1.
+
 ## 3. Why it's built this way
 
 | Choice | Reason |

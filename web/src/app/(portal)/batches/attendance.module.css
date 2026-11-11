@@ -1,0 +1,44 @@
+/* Batch page: the Google Classroom link and the attendance register. */
+.linkRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.linkRow input { flex: 1; min-width: 240px; }
+.linkText { overflow-wrap: anywhere; font-size: 13px; }
+
+.dateRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.recent { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; }
+.recent a {
+  display: inline-block; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text); font-size: 13px; text-decoration: none;
+}
+.recent a:hover { border-color: var(--brand); color: var(--brand); }
+.recent a[aria-current='true'] { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+/* One row per student: name, how it was set, then Present / Late / Absent. */
+.register { margin: 0 0 12px; padding: 0; list-style: none; }
+.register li {
+  display: grid; gap: 6px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border);
+  grid-template-columns: 1fr;
+}
+.register li:first-child { border-top: 0; }
+.how { color: var(--muted); font-size: 13px; }
+.choices { display: inline-flex; flex-wrap: wrap; gap: 6px; border: 0; margin: 0; padding: 0; }
+.choice {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; cursor: pointer;
+  border: 1px solid var(--border-strong); border-radius: 999px; font-size: 14px; background: var(--surface);
+}
+.choice input { accent-color: var(--brand); }
+.choice:has(input:checked) { font-weight: 600; }
+.present:has(input:checked) { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.late:has(input:checked) { background: var(--brand-ring); border-color: var(--brand); color: var(--brand-strong); }
+.absent:has(input:checked) { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.choice:focus-within { box-shadow: 0 0 0 3px var(--brand-ring); }
+
+/* The reason box under the choices, and the list of changes under the row. */
+.markCell { display: grid; gap: 6px; justify-items: start; }
+.reason { width: 100%; max-width: 320px; font-size: 13px; padding: 6px 10px; }
+.history { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+.history summary { cursor: pointer; width: fit-content; }
+.history ul { margin: 4px 0 0; padding-left: 18px; }
+
+@media (min-width: 768px) {
+  .register li { grid-template-columns: minmax(160px, 1fr) minmax(200px, 1.4fr) auto; }
+}

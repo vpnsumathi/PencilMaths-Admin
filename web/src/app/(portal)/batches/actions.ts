@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireStaff, requireStaffOrTeacher } from '@/lib/auth';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
-import { todayInUk, UUID, YEARS } from '@/lib/options';
+import { todayInUk, UUID, WEEKDAYS, YEARS } from '@/lib/options';
 import { uploadFile } from '@/lib/google/drive';
 import { correctionName, recordCorrection, sendMarkedSheet, studentHomeworkFolder } from '@/lib/homework/corrections';
 import { fileKind, MAX_BYTES } from '@/lib/homework/handin';
@@ -32,7 +32,12 @@ function readSlots(form: FormData): Slot[] | string {
     if (!day || !time) return 'Each class time needs both a day and a time.';
     const weekday = Number(day);
     if (!(weekday >= 1 && weekday <= 7) || !/^\d{2}:\d{2}$/.test(time)) return 'Check the class times.';
-    if (!slots.some((s) => s.weekday === weekday && s.start_time === time)) slots.push({ weekday, start_time: time });
+    if (slots.some((s) => s.weekday === weekday && s.start_time === time)) continue;
+    // One register per class day (see 20261111000001_class_link_attendance.sql), so one class time per day.
+    if (slots.some((s) => s.weekday === weekday)) {
+      return `A batch can have only one class time on ${WEEKDAYS[weekday]}. Remove the extra time, or make a second batch.`;
+    }
+    slots.push({ weekday, start_time: time });
   }
   return slots;
 }

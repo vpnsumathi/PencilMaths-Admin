@@ -7,6 +7,7 @@ import { isTeacher } from '@/lib/auth';
 import { formatPercent } from '@/lib/format';
 import { STUDENT_STATUSES, yearShort } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
+import { MissingFolders } from './MissingFolders';
 
 export const metadata = { title: 'Students' };
 
@@ -29,8 +30,22 @@ export default async function StudentsPage({ searchParams }: Props) {
 
   // Teachers only get the students in their own batches back (database rules), and can't add students.
   // Who is looking is worked out at the same time as the list loads, not before it.
-  const [teacher, { data: students, error }] = await Promise.all([isTeacher(), query]);
+  // Current students with no Google Drive folder (they can't hand in homework): students with no matching
+  // file_links row. Teachers can't read student folders, so this is only used for staff.
+  const missingQuery = supabase
+    .from('students')
+    .select('id, first_name, last_name, file_links!left(id)')
+    .neq('status', 'left')
+    .eq('file_links.owner_type', 'student_folder')
+    .eq('file_links.provider', 'google_drive')
+    .is('file_links', null)
+    .order('last_name')
+    .order('first_name');
+  const [teacher, { data: students, error }, { data: missingRows, error: missingError }] = await Promise.all([isTeacher(), query, missingQuery]);
   if (error) throw error;
+  if (missingError) console.error('Students without a Drive folder could not be listed:', missingError.message);
+  const missing = teacher ? [] : (missingRows ?? []).map((s) => ({ id: s.id, name: `${s.first_name} ${s.last_name ?? ''}`.trim() }));
+  const noFolder = new Set(missing.map((s) => s.id));
 
   return (
     <>
@@ -39,6 +54,7 @@ export default async function StudentsPage({ searchParams }: Props) {
         {!teacher && <Link href="/students/new" className={ui.primaryButton}>Add student</Link>}
       </div>
       <Alerts ok={ok} problem={problem} />
+      {missing.length > 0 && <MissingFolders students={missing} />}
 
       {/* A GET form: submitting it puts ?q=…&status=… in the address, which this page reads. */}
       <form className={ui.filters}>
@@ -73,7 +89,8 @@ export default async function StudentsPage({ searchParams }: Props) {
                   <td><StatusBadge status={s.status} label={STUDENT_STATUSES[s.status] ?? s.status} /></td>
                   <td>
                     {s.missing_batch && <StatusBadge status="left" label="Needs batch" />}{' '}
-                    {s.missing_teacher && <StatusBadge status="left" label="Needs teacher" />}
+                    {s.missing_teacher && <StatusBadge status="left" label="Needs teacher" />}{' '}
+                    {noFolder.has(s.id) && <StatusBadge status="left" label="No Drive folder" />}
                   </td>
                   <td><CreatedModified created={s.created_at} updated={s.updated_at} /></td>
                 </tr>

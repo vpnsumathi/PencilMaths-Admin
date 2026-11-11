@@ -8,6 +8,7 @@ import { EMAIL, STUDENT_STATUSES, UUID, YEARS } from '@/lib/options';
 import { deleteLogin, discardNewLogin, inviteOrFindLogin, resendInvite } from '@/lib/logins';
 import { createClient } from '@/lib/supabase/server';
 import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
+import { findStudentMatches } from './duplicates';
 
 // Adds or updates a student. The database function save_student (file 4) saves the student,
 // family, main parent, subjects and folder link together, so a half-saved student is impossible.
@@ -49,6 +50,16 @@ export async function saveStudent(form: FormData) {
     folder_url: text(form, 'folder_url'),
   };
 
+  // A new student with the same first name, last name and year group as one already in the app needs the
+  // "This is a different student" tick (the form shows the match as soon as the name is typed).
+  if (!id && form.get('confirm_duplicate') !== 'yes') {
+    const same = await findStudentMatches(p.first_name, p.last_name, yearGroup);
+    if (same.length > 0) {
+      redirectWith(formPath, 'error', `${same.map((m) => `${m.code} ${m.first_name} ${m.last_name}`).join(', ')} already has this name and year group. `
+        + 'Open that student instead, or add the new one again and tick "This is a different student".');
+    }
+  }
+
   const supabase = await createClient();
   const { data: studentId, error } = await supabase.rpc('save_student', { p });
   if (error) {
@@ -89,6 +100,25 @@ export async function createDriveFolder(form: FormData) {
     driveOk ? 'ok' : 'error',
     driveOk ? 'Drive folder created.' : 'Could not create the Drive folder. Check the connection at /google-drive.',
   );
+}
+// "Create missing folders" on the Students list: makes Google Drive folders for up to 5 students per call
+// (the page calls it again until all are done), so a long list never hits the server's time limit.
+export async function createMissingDriveFolders(ids: string[]): Promise<{ made: number; failed: number }> {
+  await requireStaff();
+  let made = 0;
+  let failed = 0;
+  for (const id of ids.slice(0, 5)) {
+    if (!UUID.test(id)) { failed++; continue; }
+    try {
+      await ensureStudentDriveFolder(id);
+      made++;
+    } catch (e) {
+      console.error('createMissingDriveFolders failed for', id, e);
+      failed++;
+    }
+  }
+  revalidatePath('/students');
+  return { made, failed };
 }
 // Makes a new secret hand-in code; the old WhatsApp link stops working immediately.
 export async function resetHandInLink(form: FormData) {

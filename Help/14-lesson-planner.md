@@ -55,6 +55,7 @@ Student: My homework › Marked › ✅ mark · 📎 their file · ✏️ correc
    - It reads the sheets named **Term 1/2/3**, the row with the **Lesson Code** heading, and every lesson under it.
    - Year 5 gives: 3 terms, 8 modules, 95 lessons, 285 homework codes.
    - Codes are saved without spaces: `Y5 - T1L1` → `Y5-T1L1`.
+   - Lesson codes must start with the year: `Y5-` for Year 5, **`GH-`** for GCSE - H and **`GF-`** for GCSE - F (since 8 Nov 2026; Year 11–13 lessons were removed). GCSE worksheets go to `Homework library/Maths GCSE - H` (or `GCSE - F`).
    - Importing again (after editing the spreadsheet) updates names, modules and order and adds new lessons. Nothing is deleted. If a lesson's Hw code changes, that slot's worksheet is cleared so the right one can be uploaded.
 4. **Upload worksheets:** choose all PDFs in `Year 5 Term 1 worksheets` at once › **Upload**. Each file name is its code (`Y5 - A001.pdf` → `Y5-A001`). They go to Google Drive › `PencilMaths/Homework library/Maths Year 5`. A file uploaded again replaces the old one.
 5. The table below shows each lesson's Hw-1/2/3 as **✅** (worksheet ready, click to open) or **⚠️** (no worksheet yet).
@@ -80,7 +81,8 @@ Any class whose **subject and year** are in the library (e.g. a Maths Year 5 bat
 **Mark completed** pop-up:
 - Hw-1, Hw-2, Hw-3 with **View**. Hw-1 is ticked. Tick any you want to send.
 - A sheet without a worksheet, or already sent to this class, can't be ticked.
-- **Set on** (today), **Due on** (+5 days), **Maximum mark** (10).
+- Each ticked homework has its own **out of** box (the maximum mark, 10 to start with), so Hw-1 can be out of 10 and Hw-2 out of 20. Leave a box empty for no maximum mark.
+- **Set on** (today) and **Due on** (+5 days) are shared by all the ticked homework.
 - **Complete and send** creates one homework per ticked sheet, titled e.g. `Digits and their places · Hw-1 (Y5-A001)`, with the worksheet attached, for every student in the class now. With nothing ticked, the lesson is just marked completed.
 
 ### 3.1 Students who join late: giving past homework
@@ -161,7 +163,7 @@ The student sees the mark on their dashboard under **Recently marked** (for 14 d
 | Change Module to Negative Numbers | Lessons L5–L7 |
 | **Start** Y5-T1L1 | In progress, **Mark completed** appears |
 | **Mark completed** | Pop-up: Hw-1 Y5-A001 ticked, View links work |
-| Tick Hw-2 too › Send | "Homework Y5-A001, Y5-A002 sent to N student(s)"; lesson Completed with today's date; two homework in the Homework section |
+| Tick Hw-2 too, set Hw-1 out of 10 and Hw-2 out of 20 › Send | "Homework Y5-A001, Y5-A002 sent to N student(s)"; lesson Completed with today's date; two homework in the Homework section, "out of 10" and "out of 20" |
 | Student login › My homework | Both under To hand in, each with 📄 Y5-A001.pdf / Y5-A002.pdf that opens |
 | Hand in, then staff enter a mark, choose the corrected sheet and **Save** | "Mark and corrected sheet saved"; ✏️ Corrected in the Files column |
 | Student dashboard | The homework under **Recently marked** with its mark |
@@ -221,3 +223,4 @@ Every section heading is a header bar: soft purple tint, purple stripe on the le
 - Class numbers, dates, revisions, tests and reports from `Copy of Year 5 - LT - Model.xlsx`.
 - Email and WhatsApp messages when homework is sent or marked.
 - Other years and subjects: same spreadsheet layout, imported the same way.
+| 5 Nov 2026 | Mark completed: a separate maximum mark for each ticked homework (`20261105000002_lesson_homework_marks.sql`) |

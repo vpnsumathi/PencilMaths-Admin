@@ -98,12 +98,15 @@ A new file in `supabase/migrations/` changes the database, so it has to be run o
 
 **Production was built with these, in order:** the 4 base scripts `20260928000001`–`04`, then `seed.sql`, `20261007000001`, `20261011000001`, `20261020000001`–`06`.
 
+**Waiting for Production (run in this order at go-live):** `20261023000001`, `20261024000001`, `20261027000001`–`04`, `20261102000001_bulk_import.sql` (Settings and Bulk import, guide 16), `20261103000001_atomic_saves.sql` (batches and homework saved all at once), `20261103000002_created_modified_dates.sql` (Created / modified column on the lists), `20261103000003_drive_folder_ids.sql` (Drive folders remembered by id), `20261105000001_teacher_time_clash.sql` (a teacher can't be given the same class time twice), `20261105000002_lesson_homework_marks.sql` (a maximum mark for each homework in Mark completed), `20261106000001_faster_database.sql` (the same access rules, much faster; dashboard indexes; faster Batches list; guide 18), `20261108000001_gcse_year_groups.sql` (GCSE - H and GCSE - F instead of Year 11–13; guide 02, GCSE section). ⚠️ **This last one deletes every Year 11, 12 and 13 student, batch, enquiry and lesson on Production, and it can't be undone.** Run the "see what will be deleted" query in guide 02 first, and only run it once you are sure the Production Year 11–13 data can go (or has been written down to add again as GCSE-H / GCSE-F).
+
 ---
 
 ## 5. Going live (Staging to Production)
 
 When everything works on Staging:
 
+0. Check the **Automation tests** on GitHub › **Actions** have a **green tick** for your last push to `staging` (guide 20). Don't go live on a red cross.
 1. Run any new database scripts on **Production** (section 4).
 2. Merge and push:
    ```powershell

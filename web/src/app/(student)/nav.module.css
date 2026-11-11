@@ -1,0 +1,6 @@
+/* Student menu: a long tab name has a shorter one on phones, so all tabs fit on one row. */
+.short { display: none; }
+@media (max-width: 600px) {
+  .long { display: none; }
+  .short { display: inline; }
+}
