@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { checkFile, targetProblem, uploadHandIn, type HandInResult } from '@/lib/homework/handin';
+import { checkFile, targetProblem, saveHandIn, type HandInResult } from '@/lib/homework/handin';
 import { UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
@@ -26,9 +26,7 @@ export async function handInFile(form: FormData): Promise<HandInResult> {
   if (problem) return { ok: false, error: problem };
 
   try {
-    const saved = await uploadHandIn(target, checked, part, name, parts);
-    const { error } = await supabase.rpc('handin_record', { p_code: code, p_sheet: sheetId, ...saved });
-    if (error) throw new Error(error.message);
+    await saveHandIn(code, sheetId, target, checked, part, name, parts);
   } catch (e) {
     console.error('handInFile failed:', e);
     return { ok: false, error: 'Sorry, the upload failed. Please try again.' };

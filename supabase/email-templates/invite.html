@@ -1,0 +1,46 @@
+<!-- Supabase › Authentication › Emails › Invite user. Paste everything below into "Message body" (Source view).
+     Subject: Your invitation to Pencil Maths
+     One template serves teachers and students: .Data.role is set when the app sends the invite. -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:8px;border:1px solid #e3e5f0;">
+        <tr>
+          <td style="padding:28px 32px 8px;">
+            <img src="{{ .SiteURL }}/logo.png" alt="Pencil Maths" width="150" style="display:block;border:0;">
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 32px 0;color:#1f2340;font-size:15px;line-height:1.6;">
+            <p style="margin:0 0 16px;">Dear {{ if .Data.full_name }}{{ .Data.full_name }}{{ else }}Sir or Madam{{ end }},</p>
+            {{ if eq .Data.role "teacher" }}
+            <p style="margin:0 0 16px;">You have been invited to join the Pencil Maths teacher portal. Your account gives you access to your classes, lesson plans, and your students' homework and marking.</p>
+            {{ else }}
+            <p style="margin:0 0 16px;">You have been invited to the Pencil Maths student portal, where you can see classes and homework, hand in work and view marked sheets.</p>
+            {{ end }}
+            <p style="margin:0 0 24px;">To activate your account, please select the button below and choose a password.</p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:0 32px 24px;">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#3b3f9f;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:12px 28px;border-radius:6px;">Accept invitation</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 32px 24px;color:#4a4f6a;font-size:13px;line-height:1.6;">
+            <p style="margin:0 0 8px;">If the button does not work, copy this link into your browser:</p>
+            <p style="margin:0 0 16px;word-break:break-all;"><a href="{{ .ConfirmationURL }}" style="color:#3b3f9f;">{{ .ConfirmationURL }}</a></p>
+            <p style="margin:0 0 16px;">For your security, this link can be used only once and expires after a short time. If it has expired, please ask Pencil Maths to send a new invitation.</p>
+            <p style="margin:0;">If you were not expecting this email, you can safely ignore it.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px 28px;border-top:1px solid #e3e5f0;color:#1f2340;font-size:15px;line-height:1.6;">
+            Kind regards,<br>
+            <strong>Pencil Maths</strong>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

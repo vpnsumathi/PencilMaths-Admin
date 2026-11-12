@@ -1,0 +1,12 @@
+/* Settings: one tile per settings page. */
+.grid { display: grid; gap: 12px; max-width: 900px; }
+@media (min-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } }
+.tile {
+  display: flex; gap: 14px; align-items: flex-start; padding: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+  color: var(--text); text-decoration: none;
+}
+.tile:hover { border-color: var(--brand); }
+.tile strong { display: block; margin-bottom: 4px; }
+.icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--brand-ring); color: var(--brand-strong); }
+.text { display: block; font-size: 14px; color: var(--muted); }

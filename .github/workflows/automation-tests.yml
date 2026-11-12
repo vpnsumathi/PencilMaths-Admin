@@ -1,0 +1,67 @@
+# Automation tests (see Help/20-automation-testing.md).
+# Runs by itself on every push to the staging branch and on every pull request into main (going live),
+# and can be started by hand: GitHub › Actions › Automation tests › Run workflow.
+# It uses its own empty test database on GitHub's machine; it never connects to Staging or Production.
+
+name: Automation tests
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  database:
+    name: Database tests
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build a test database from every migration and run the checks
+        run: bash "Automation Testing/run-database-tests.sh"
+
+  app:
+    name: App checks (types, lint, build)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    env:
+      # Placeholders so the build can finish; this build is only checked, never deployed.
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Security check of the app's libraries (fails on a high or critical advisory)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build

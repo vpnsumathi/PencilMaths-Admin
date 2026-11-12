@@ -47,6 +47,7 @@ Family's link: "✅ Marked: 16 / 20"      Dashboard: "to mark" and "handed in %"
 | **Mark** | Type the mark → **Save** |
 | **Excuse** | **Excuse** (clears any mark) |
 | **Delete** | **Delete homework** → confirm. Results go; files stay in Drive |
+| **Give older homework to a new student** | Under the homework's table, **Not given to** lists students who joined after it was set → **Give homework** (added 23 Oct 2026) |
 
 | Status | Badge | Meaning |
 |---|---|---|
@@ -55,7 +56,42 @@ Family's link: "✅ Marked: 16 / 20"      Dashboard: "to mark" and "handed in %"
 | `marked` | Marked (green) | Mark entered |
 | `excused` | Excused (grey) | Doesn't need doing |
 
+### 2.1 New students only get future homework (23 Oct 2026)
+
+A homework is given to a student only when they have a `homework_results` row for it. **Set homework** and **Mark completed** add a row for everyone in the batch **at that moment**. So a student who joins a batch later:
+- does **not** see older homework on their login, WhatsApp link or dashboard;
+- **does** get every homework set after they join;
+- can be given an older homework by hand with **Give homework** (it then shows under **To hand in**).
+
+Database script: `supabase/migrations/20261023000001_homework_for_new_students.sql` (run on **Staging** first). It changes `handin_page`, `handin_target`, `handin_record`, `my_dashboard` and `my_homework_file` to need the result row, and adds missing rows for students who were already in the batch when each homework was set, so nothing disappears for current students.
+
 ---
+
+### 2.2 Marking in the browser (27 Oct 2026)
+
+On the batch page, under **Upload Homework**, each student who handed in a file has a **🖊️ Mark** link. It opens the marking page in a new tab.
+
+- **Tools:** ✏️ pen, 🖍️ highlighter, **T** text (click where it goes, then type), ✓ tick, ✗ cross, ⌫ eraser (click a mark to remove it), ✋ scroll (no drawing, handy on a tablet). Four colours, Thin/Thick, and ↶ Undo / ↷ Redo (Ctrl+Z / Ctrl+Y).
+- **Mark** box and **Save & send**: the marks are written into the PDF, which becomes the student's corrected sheet (it replaces any earlier one). The mark is saved too. If the homework is already marked, the Mark box can be left empty.
+- **Save & close**: keeps the marked sheet (and the mark, if typed) **without sending it**, and closes the tab. On the batch page the student's row then shows *Marked, not sent* with a **📤 Send** button. Send makes it the corrected sheet and saves the mark. Reopening **🖊️ Mark** before sending lets you change it; saving again replaces the unsent copy (the old one goes to the Drive bin).
+- **Download marked PDF** saves it to the computer instead; **Open original** shows the student's file as handed in.
+- With several hand-in files, buttons at the top choose **File 1, File 2…**.
+- **Reopening** the page shows the marks sent before, so they can be changed and sent again.
+- **Nothing is lost:** marks are kept in the browser as you go. If the tab closes or the connection drops before sending, opening the page again brings them back. The browser also warns before closing a tab with unsent marks.
+- Photos handed in (JPG, PNG) are turned into a one-page PDF to mark. Other files (Word, HEIC) show **Open original** instead.
+
+**How it works:**
+- `web/src/app/(portal)/batches/[id]/mark/`: `page.tsx` (loads the homework), `Marker.tsx` (the tools; shows pages with Mozilla's pdf.js, `pdfjs-dist`, "legacy" build for older browsers), `marks.ts` (draws the marks and writes them into the PDF with `pdf-lib`), `actions.ts` (saving), `marker.module.css`.
+- **Saving:** `startMarkedUpload` checks the mark and asks Google Drive for an upload address; the browser sends the PDF straight to Drive (so Vercel's 4.5 MB limit doesn't apply); `finishMarking` checks the file is in the student's Drive Homework folder, records it as the corrected sheet, saves the mark and the drawings. **Save & close** uses `saveMarkingDraft` instead: the file waits in the Homework folder, recorded in `homework_markups.draft_file_id` and `draft_mark`, until **📤 Send** (`sendMarkedDraft` in `batches/actions.ts`). Both send paths share `sendMarkedSheet` in `web/src/lib/homework/corrections.ts`. If the browser can't reach Drive directly, `uploadMarkedViaServer` sends it through the server instead (4 MB max).
+- `web/src/app/(portal)/files/[id]/route.ts`: opens a hand-in from Drive for staff.
+- `web/src/lib/homework/corrections.ts`: shared by this page and the corrected-sheet upload on the batch page.
+- The drawings are kept in table `homework_markups` (script `20261027000003_homework_marking.sql`), one row per student per homework.
+
+**Test:** hand in a PDF as a test student; on the batch page click **🖊️ Mark**; draw, add a tick and some text, enter a mark, **Save & send**. The student's My homework › Marked shows the marked sheet. Reopen **🖊️ Mark**: the marks are there to change.
+
+### 2.3 Dashboard Homework section (27 Oct 2026)
+
+The dashboard (home page) has a **Homework** section: to mark, overdue, handed in and marked this week, marked but not sent; a **Needs marking** list with **🖊️ Mark** links, oldest first; **Students falling behind** (2+ overdue) with a **WhatsApp nudge** button; and each batch's on-time hand-in rate over the last 4 weeks. Details: guide 03, section 8.1.
 
 ## 3. Why it's built this way
 
@@ -104,7 +140,7 @@ Removes the sheet's `file_links` rows (they have no database link to the sheet),
 ### 5.4 `HomeworkSection.tsx`
 - One query: the batch's sheets with each result and the student's name (`homework_results(…, students(first_name, last_name))`), newest first.
 - A second query: all `homework_submission` file records for those sheets.
-- Rows = current batch members + anyone with a result who has left.
+- Rows = students with a result for that homework (the ones it was given to). Current members without one are listed under **Not given to** with a **Give homework** button (`giveHomework` in `actions.ts`: checks the homework is in the batch and the student is in the class, then adds a `pending` result).
 - `<details open={toMark > 0}>` folds each homework away unless it needs marking.
 - `as unknown as Result[]`: Supabase can't tell `students(...)` is one row here, so the type is set by hand.
 
@@ -121,6 +157,9 @@ Removes the sheet's `file_links` rows (they have no database link to the sheet),
 | Enter 25 → Save | "The mark can't be more than 20." |
 | **Excuse** another student | **Excused** |
 | Dashboard | "to mark" and "handed in %" change |
+| Add a new student to a batch that already has homework | Batch page: they are under **Not given to**; their login shows no old homework |
+| **Give homework** for them | They move into the table as **Not handed in**; it appears under **To hand in** on their login |
+| Set a new homework | The new student gets it straight away |
 | **Delete homework** → OK | Gone from the batch and the link; files still in Drive |
 
 ---

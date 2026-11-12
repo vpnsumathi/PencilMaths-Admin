@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { convertWordToPdf } from '@/lib/homework/convert';
 import type { HandInResult } from '@/lib/homework/handin';
 import { buildPdfs, isWord } from '@/lib/homework/makePdf';
+import { FocusMessage } from '@/components/FocusMessage';
 import styles from './handin.module.css';
 
 type Status = { kind: 'idle' | 'busy' | 'done' | 'error'; text: string };
@@ -125,8 +126,8 @@ export function HandInForm({ action, code, sheetId, title, label = 'Hand in' }: 
           </div>
         </form>
       </dialog>
-      {status.kind === 'done' && <p className={styles.ok} role="status">✅ {status.text}</p>}
-      {status.kind === 'error' && <p className={styles.error} role="alert">{status.text}</p>}
+      {status.kind === 'done' && <FocusMessage className={styles.ok} role="status" signal={status}>✅ {status.text}</FocusMessage>}
+      {status.kind === 'error' && <FocusMessage className={styles.error} role="alert" signal={status}>{status.text}</FocusMessage>}
     </div>
   );
 }

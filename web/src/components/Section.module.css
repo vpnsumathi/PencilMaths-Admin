@@ -1,0 +1,33 @@
+/* A card that opens and closes (Section.tsx). The header looks like the app's other card headers
+   (soft tint, brand accent on the left), so open and closed sections sit well with the rest of the app. */
+.section {
+  margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+  overflow: clip; scroll-margin-top: 128px;
+}
+.head {
+  display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 16px 12px 20px;
+  list-style: none; cursor: pointer; user-select: none;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.08), rgba(79, 70, 229, 0.02));
+  box-shadow: inset 4px 0 0 var(--brand);
+}
+.head::-webkit-details-marker { display: none; }
+.head:hover { background: linear-gradient(90deg, rgba(79, 70, 229, 0.13), rgba(79, 70, 229, 0.04)); }
+.head:focus-visible { outline: 3px solid var(--brand-ring); outline-offset: -3px; }
+.section[open] > .head { border-bottom: 1px solid var(--border); }
+
+.text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.title { margin: 0; font-size: 17px; font-weight: 700; color: var(--brand-deep); letter-spacing: -0.01em; }
+.summary { font-size: 13px; color: var(--muted); }
+
+.chevron { flex: none; color: var(--muted); transition: transform 0.2s ease; }
+.head:hover .chevron { color: var(--brand); }
+.section[open] > .head .chevron { transform: rotate(180deg); }
+
+.body { padding: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron { transition: none; }
+}
+@media (min-width: 1024px) {
+  .section { scroll-margin-top: 72px; }
+}

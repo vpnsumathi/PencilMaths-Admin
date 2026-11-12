@@ -73,21 +73,24 @@ cached = { token: body.access_token, expires: Date.now() + body.expires_in * 100
 - On failure throws `Google sign-in failed: <Google's reason>` (e.g. `invalid_grant`).
 - `cache: 'no-store'` stops Next.js from caching the request.
 
-### `drive(path, init)`
-- One helper for **every** Drive request: adds `Authorization: Bearer <access token>`, sends it, parses the JSON.
-- On failure throws `Google Drive error: <Google's message>`, which the test page shows.
+### `send(url, init)` and `drive(path, init)`
+- `send` is used for **every** Google request: adds `Authorization: Bearer <access token>` and sends it.
+- If Google says it is busy (429), or has a brief error (500–504) on a read, change or delete, `send` waits under a second and tries **once** more. Uploads and folder creation are not repeated after a 5xx, in case Google made them anyway.
+- `drive` calls `send`, parses the JSON, and on failure throws `Google Drive error: <Google's message>`, which the test page shows.
 
 ### `findOrCreateFolder(name, parentId = 'root')`
 ```ts
 const q = `name = '${safeName}' and mimeType = '${FOLDER}' and trashed = false and '${parentId}' in parents`;
 ```
-1. **Search** for a folder with that name inside the parent (`'root'` = top of My Drive), not in the bin.
-2. If found → return it. If not → **create** it (`POST /files` with name, folder type and parent).
-3. Returns `{ id, webViewLink }`: the Drive id (stored in the database later) and a link that opens it.
+1. **Saved id?** Looks up `<parentId>/<name>` in the `drive_folders` table (`lib/google/folderIds.ts`, server only, plus an in-memory copy). If found → returns it at once, with no call to Drive.
+2. Otherwise **searches** Drive for a folder with that name inside the parent (`'root'` = top of My Drive), not in the bin. If found → saves its id and returns it.
+3. If not → **creates** it (`POST /files`) and saves its id. If another upload saved one a moment earlier, ours goes to the Drive bin and theirs is used, so there are never two.
+4. Returns `{ id, webViewLink }`: the Drive id and a link that opens it.
 
-- **Safe to run many times**: it finds before it creates, so no duplicates.
 - With `drive.file`, the search only sees folders **this app** made, so a folder you create by hand with the same name is ignored.
 - `safeName` escapes `\` and `'` so a name like `O'Brien` can't break the search.
+- If an upload into a saved folder gets "not found", `forgetFolderId` removes it, so the next try searches again. A folder put **in the bin** is still found by its id, so restore it rather than binning it.
+- Before `20261103000003_drive_folder_ids.sql` is run (or without `SUPABASE_SECRET_KEY`), saving switches itself off and step 2 runs every time, as before.
 
 ### `studentsRootFolder()`
 Makes sure `PencilMaths / Students` exists and returns `Students`. Every student folder will be created inside it.

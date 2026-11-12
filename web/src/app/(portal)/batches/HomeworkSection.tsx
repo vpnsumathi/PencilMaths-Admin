@@ -1,11 +1,16 @@
 import { ConfirmButton } from '@/components/ConfirmButton';
+import { Section } from '@/components/Section';
 import { Field } from '@/components/Field';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { formatDate } from '@/lib/format';
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
-import { addHomeworkFile, createHomework, deleteHomework, markHomework, removeHomeworkFile } from './actions';
+import { CorrectionPicker } from './CorrectionPicker';
+import { MarkButtons } from './MarkButtons';
+import {
+  addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile, sendMarkedDraft,
+} from './actions';
 
 // Label and badge colour for each homework status.
 const STATUS: Record<string, { tone: string; label: string }> = {
@@ -24,7 +29,11 @@ type Result = {
 };
 
 // Homework for one batch: set new homework, see who handed in, open their files, enter marks.
-export async function HomeworkSection({ batchId, members }: { batchId: string; members: Member[] }) {
+// For a teacher: no Delete homework, and Drive files open through the app (/files/…), because teachers
+// don't have access to the Pencil Maths Google Drive.
+export async function HomeworkSection({ batchId, members, teacher = false }: { batchId: string; members: Member[]; teacher?: boolean }) {
+  const open = (f: { id: string; provider: string; url: string | null }) =>
+    teacher && f.provider === 'google_drive' ? `/files/${f.id}` : f.url ?? undefined;
   const supabase = await createClient();
   const { data: sheets } = await supabase
     .from('homework_sheets')
@@ -33,26 +42,46 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
     .order('set_on', { ascending: false })
     .order('created_at', { ascending: false });
   const sheetIds = (sheets ?? []).map((s) => s.id);
-  const { data: files } = sheetIds.length
-    ? await supabase
-        .from('file_links')
-        .select('owner_id, student_id, url, label')
-        .eq('owner_type', 'homework_submission')
-        .in('owner_id', sheetIds)
-        .order('created_at')
-    : { data: [] };
-  const { data: sheetFiles } = sheetIds.length
-    ? await supabase
-        .from('file_links')
-        .select('id, owner_id, url, label')
-        .eq('owner_type', 'homework_sheet')
-        .in('owner_id', sheetIds)
-        .order('created_at')
-    : { data: [] };
+  // The three lookups below only need the homework ids, so they run at the same time.
+  const none = { data: [] };
+  const [{ data: allFiles }, { data: drafts }, { data: sheetFiles }] = sheetIds.length
+    ? await Promise.all([
+        // What students handed in, and the teacher's corrected sheets.
+        supabase
+          .from('file_links')
+          .select('id, provider, owner_type, owner_id, student_id, url, label')
+          .in('owner_type', ['homework_submission', 'homework_correction'])
+          .in('owner_id', sheetIds)
+          .order('created_at'),
+        // Sheets marked in the browser with Save & close: saved, waiting for Send.
+        supabase.from('homework_markups').select('sheet_id, student_id, draft_mark')
+          .in('sheet_id', sheetIds).not('draft_file_id', 'is', null),
+        // The homework sheets themselves (worksheet files and links).
+        supabase
+          .from('file_links')
+          .select('id, provider, owner_id, url, label')
+          .eq('owner_type', 'homework_sheet')
+          .in('owner_id', sheetIds)
+          .order('created_at'),
+      ])
+    : [none, none, none];
+  const files = (allFiles ?? []).filter((f) => f.owner_type === 'homework_submission');
+  const corrections = (allFiles ?? []).filter((f) => f.owner_type === 'homework_correction');
+
+  // The latest active homework (newest one someone still has to hand in or have marked) is open and
+  // highlighted; the rest are folded away. With nothing active, the newest homework is the latest.
+  const latestId = (sheets ?? []).find((s) =>
+    (s.homework_results as unknown as Result[]).some((r) => r.status === 'pending' || r.status === 'received'),
+  )?.id ?? sheets?.[0]?.id;
+
+  // For the section header: how much homework, and how much is waiting to be marked.
+  const waiting = (sheets ?? []).reduce((n, s) => n + (s.homework_results as unknown as Result[]).filter((r) => r.status === 'received').length, 0);
+  const count = (sheets ?? []).length;
+  const summary = count === 0 ? 'None set yet'
+    : `${count} homework${waiting ? ` · ${waiting} to mark` : ' · nothing to mark'}`;
 
   return (
-    <section className={ui.card} style={{ marginTop: 16 }}>
-      <h2>Homework</h2>
+    <Section id="homework" title="Upload Homework" summary={summary} defaultOpen>
 
       <form action={createHomework} className={ui.fieldGrid} style={{ marginBottom: 16 }}>
         <input type="hidden" name="batch_id" value={batchId} />
@@ -85,17 +114,17 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
         // Supabase can't tell students(...) is a single row here, so the type is set by hand.
         const results = sheet.homework_results as unknown as Result[];
         const byStudent = new Map(results.map((r) => [r.student_id, r]));
-        // Everyone in the batch now, plus anyone with a result who has since left it.
-        const rows = members.map((m) => ({ id: m.id, name: `${m.first_name} ${m.last_name}` }));
-        for (const r of results) {
-          if (!rows.some((row) => row.id === r.student_id)) {
-            rows.push({ id: r.student_id, name: `${r.students.first_name} ${r.students.last_name}` });
-          }
-        }
+        // Students the homework was given to (a result row): everyone in the batch when it was set,
+        // plus anyone given it later. Students who joined after it was set are listed under "Not given to".
+        const rows = results
+          .map((r) => ({ id: r.student_id, name: `${r.students.first_name} ${r.students.last_name}` }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        const notGiven = members.filter((m) => !byStudent.has(m.id));
         const toMark = results.filter((r) => r.status === 'received').length;
 
         return (
-          <details key={sheet.id} className={ui.homework} open={toMark > 0}>
+          <details key={sheet.id} id={sheet.id === latestId ? 'latest-homework' : undefined}
+            className={`${ui.homework} ${sheet.id === latestId ? ui.homeworkLatest : ''}`} open={sheet.id === latestId}>
             <summary>
               <strong>{sheet.title}</strong>
               <span className={ui.muted}>
@@ -103,6 +132,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                 {sheet.due_on && ` · due ${formatDate(sheet.due_on)}`}
                 {sheet.max_mark && ` · out of ${sheet.max_mark}`}
               </span>
+              {sheet.id === latestId && <> <StatusBadge status="in_progress" label="Latest" /></>}
               {toMark > 0 && <> <StatusBadge status="trial" label={`${toMark} to mark`} /></>}
             </summary>
 
@@ -113,7 +143,7 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                 <form key={f.id} action={removeHomeworkFile} style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginRight: 12 }}>
                   <input type="hidden" name="batch_id" value={batchId} />
                   <input type="hidden" name="file_id" value={f.id} />
-                  <a href={f.url} target="_blank" rel="noreferrer" className={ui.link}>{f.label}</a>
+                  <a href={open(f)} target="_blank" rel="noreferrer" className={ui.link}>{f.label}</a>
                   <ConfirmButton className={ui.button} message={`Remove "${f.label}" from this homework? An uploaded file stays in Google Drive.`}>
                     Remove
                   </ConfirmButton>
@@ -135,7 +165,9 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                   {rows.map((student) => {
                     const r = byStudent.get(student.id);
                     const status = STATUS[r?.status ?? 'pending'];
-                    const theirFiles = (files ?? []).filter((f) => f.owner_id === sheet.id && f.student_id === student.id);
+                    const theirFiles = files.filter((f) => f.owner_id === sheet.id && f.student_id === student.id);
+                    const corrected = corrections.filter((f) => f.owner_id === sheet.id && f.student_id === student.id);
+                    const draft = (drafts ?? []).find((d) => d.sheet_id === sheet.id && d.student_id === student.id);
                     return (
                       <tr key={student.id}>
                         <td>{student.name}</td>
@@ -144,25 +176,46 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
                           {r?.received_on && <span className={ui.muted}> {formatDate(r.received_on)}</span>}
                         </td>
                         <td>
-                          {theirFiles.length === 0 ? '—' : (
+                          {theirFiles.length === 0 && corrected.length === 0 ? '—' : (
                             <span className={ui.files}>
                               {theirFiles.map((f, i) => (
-                                <a key={f.url} href={f.url} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
-                                  File {i + 1}
+                                <a key={f.id} href={open(f)} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
+                                  View File{theirFiles.length > 1 ? ` ${i + 1}` : ''}
+                                </a>
+                              ))}
+                              {theirFiles.length > 0 && (
+                                <a href={`/batches/${batchId}/mark?sheet=${sheet.id}&student=${student.id}`} target="_blank"
+                                  rel="noreferrer" className={ui.link} title="Mark in the browser, then send it to the student">
+                                  🖊️ Mark
+                                </a>
+                              )}
+                              {corrected.map((f, i) => (
+                                <a key={f.id} href={open(f)} target="_blank" rel="noreferrer" className={ui.link} title={f.label}>
+                                  ✏️ Corrected{corrected.length > 1 ? ` ${i + 1}` : ''}
                                 </a>
                               ))}
                             </span>
                           )}
+                          {draft && (
+                            <form action={sendMarkedDraft} className={ui.formActions} style={{ marginTop: 6 }}>
+                              <input type="hidden" name="batch_id" value={batchId} />
+                              <input type="hidden" name="sheet_id" value={sheet.id} />
+                              <input type="hidden" name="student_id" value={student.id} />
+                              <span className={ui.muted}>Marked, not sent{draft.draft_mark !== null ? ` (mark ${draft.draft_mark})` : ''}</span>
+                              <button className={ui.primaryButton} title="Send the marked sheet (and mark) to the student">📤 Send</button>
+                            </form>
+                          )}
                         </td>
                         <td>
-                          <form action={markHomework} className={ui.formActions}>
+                          {/* One Save: the mark, plus the corrected sheet if one is chosen. */}
+                          <form action={markHomework} className={ui.markForm}>
                             <input type="hidden" name="batch_id" value={batchId} />
                             <input type="hidden" name="sheet_id" value={sheet.id} />
                             <input type="hidden" name="student_id" value={student.id} />
                             <input name="mark" type="number" min={0} max={sheet.max_mark ?? undefined} step="0.5"
                               defaultValue={r?.mark ?? ''} className={ui.input} style={{ width: 80 }} aria-label={`Mark for ${student.name}`} />
-                            <button className={ui.button}>Save</button>
-                            <button name="excuse" value="true" className={ui.button}>Excuse</button>
+                            <CorrectionPicker accept={SHEET_ACCEPT} label={`Corrected sheet for ${student.name} (optional)`} />
+                            <MarkButtons />
                           </form>
                         </td>
                       </tr>
@@ -172,16 +225,34 @@ export async function HomeworkSection({ batchId, members }: { batchId: string; m
               </table>
             </div>
 
-            <form action={deleteHomework} style={{ marginTop: 10 }}>
-              <input type="hidden" name="batch_id" value={batchId} />
-              <input type="hidden" name="sheet_id" value={sheet.id} />
-              <ConfirmButton className={ui.dangerButton} message={`Delete "${sheet.title}" and its marks? Files stay in Google Drive.`}>
-                Delete homework
-              </ConfirmButton>
-            </form>
+            {notGiven.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <strong>Not given to: </strong>
+                <span className={ui.muted}>joined the class after this homework was set</span>
+                {notGiven.map((m) => (
+                  <form key={m.id} action={giveHomework} className={ui.formActions} style={{ marginTop: 6 }}>
+                    <input type="hidden" name="batch_id" value={batchId} />
+                    <input type="hidden" name="sheet_id" value={sheet.id} />
+                    <input type="hidden" name="student_id" value={m.id} />
+                    <span>{m.first_name} {m.last_name}</span>
+                    <button className={ui.button}>Give homework</button>
+                  </form>
+                ))}
+              </div>
+            )}
+
+            {!teacher && (
+              <form action={deleteHomework} style={{ marginTop: 10 }}>
+                <input type="hidden" name="batch_id" value={batchId} />
+                <input type="hidden" name="sheet_id" value={sheet.id} />
+                <ConfirmButton className={ui.dangerButton} message={`Delete "${sheet.title}" and its marks? Files stay in Google Drive.`}>
+                  Delete homework
+                </ConfirmButton>
+              </form>
+            )}
           </details>
         );
       })}
-    </section>
+    </Section>
   );
 }

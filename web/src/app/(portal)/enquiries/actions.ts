@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { requireStaff } from '@/lib/auth';
 import { optional, optionalNumber, redirectWith, text } from '@/lib/form';
 import { EMAIL, ENQUIRY_STAGES, UUID, YEARS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
@@ -8,6 +9,7 @@ import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
 
 // Adds a lead, or updates one when the form includes an id.
 export async function saveEnquiry(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (id && !UUID.test(id)) redirectWith('/enquiries', 'error', 'Enquiry not found.');
   const formPath = id ? `/enquiries/${id}` : '/enquiries/new';
@@ -63,6 +65,7 @@ export async function saveEnquiry(form: FormData) {
 
 // Moves a lead to another stage and records it in the history.
 export async function setStage(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   const stage = text(form, 'stage');
   if (!UUID.test(id)) redirectWith('/enquiries', 'error', 'Enquiry not found.');
@@ -94,6 +97,7 @@ export async function setStage(form: FormData) {
 
 // Turns a lead into a student: copies the child, parent and subjects, then marks the lead enrolled.
 export async function convertToStudent(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (!UUID.test(id)) redirectWith('/enquiries', 'error', 'Enquiry not found.');
   const path = `/enquiries/${id}`;

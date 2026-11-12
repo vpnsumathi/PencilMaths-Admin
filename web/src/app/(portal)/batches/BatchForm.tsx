@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
 import { formatTime } from '@/lib/format';
-import { todayInUk, WEEKDAYS, YEARS } from '@/lib/options';
+import { todayInUk, WEEKDAYS, yearLabel, YEARS } from '@/lib/options';
 import { createBatch, updateBatch } from './actions';
 
 export type Batch = {
@@ -12,6 +12,7 @@ export type Batch = {
   teacher_id: string;
   capacity: number;
   started_on: string;
+  name: string | null;
   slots: { weekday: number; start_time: string }[];
 };
 type Subject = { id: string; name: string };
@@ -19,7 +20,12 @@ type Teacher = { id: string; first_name: string; last_name: string; subject_id: 
 
 // Used by "New batch" (no batch) and the batch page. Subject and year group are fixed once created,
 // because the lesson plan and enrolments depend on them.
-export function BatchForm({ batch, subjects, teachers }: { batch?: Batch; subjects: Subject[]; teachers: Teacher[] }) {
+// embedded: inside the batch page's Batch settings section, so the two parts are plain groups, not cards.
+export function BatchForm({ batch, subjects, teachers, embedded = false }: {
+  batch?: Batch; subjects: Subject[]; teachers: Teacher[]; embedded?: boolean;
+}) {
+  const Heading = embedded ? 'h3' : 'h2';
+  const box = embedded ? ui.group : ui.card;
   // Show the existing times plus blank rows, so there are always at least 3 rows and 1 spare.
   const rows = [...(batch?.slots ?? [])];
   while (rows.length < 3 || rows.length === batch?.slots.length) rows.push({ weekday: 0, start_time: '' });
@@ -29,8 +35,8 @@ export function BatchForm({ batch, subjects, teachers }: { batch?: Batch; subjec
       {batch && <input type="hidden" name="id" value={batch.id} />}
       <input type="hidden" name="slot_count" value={rows.length} />
 
-      <section className={ui.card}>
-        <h2>Batch</h2>
+      <section className={box}>
+        <Heading>{embedded ? 'Details' : 'Batch'}</Heading>
         <div className={ui.fieldGrid}>
           {!batch && (
             <>
@@ -43,11 +49,14 @@ export function BatchForm({ batch, subjects, teachers }: { batch?: Batch; subjec
               <Field label="Year group">
                 <select name="year_group" required defaultValue="" className={ui.select}>
                   <option value="" disabled>Choose…</option>
-                  {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+                  {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
                 </select>
               </Field>
             </>
           )}
+          <Field label="Name (optional)">
+            <input name="name" defaultValue={batch?.name ?? ''} placeholder="e.g. Batch 1" maxLength={40} className={ui.input} />
+          </Field>
           <Field label="Teacher">
             <select name="teacher_id" required defaultValue={batch?.teacher_id ?? ''} className={ui.select}>
               <option value="" disabled>Choose…</option>
@@ -67,8 +76,8 @@ export function BatchForm({ batch, subjects, teachers }: { batch?: Batch; subjec
         </div>
       </section>
 
-      <section className={ui.card}>
-        <h2>Weekly class times (UK time)</h2>
+      <section className={box}>
+        <Heading>Weekly class times (UK time)</Heading>
         <p className={ui.hint}>Leave a row blank to skip it.</p>
         {rows.map((slot, i) => (
           <div key={i} className={ui.slotRow}>
@@ -79,12 +88,12 @@ export function BatchForm({ batch, subjects, teachers }: { batch?: Batch; subjec
             <input name={`slot_time_${i}`} type="time" defaultValue={formatTime(slot.start_time)} className={ui.input} aria-label={`Class ${i + 1} time`} />
           </div>
         ))}
+        {/* Saves the whole form (batch details and class times). */}
+        <div className={ui.formActions} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          <button className={ui.primaryButton}>{batch ? 'Save' : 'Create batch'}</button>
+          {!embedded && <Link href="/batches" className={ui.button}>Cancel</Link>}
+        </div>
       </section>
-
-      <div className={ui.formActions}>
-        <button className={ui.primaryButton}>{batch ? 'Save changes' : 'Create batch'}</button>
-        <Link href="/batches" className={ui.button}>Cancel</Link>
-      </div>
     </form>
   );
 }

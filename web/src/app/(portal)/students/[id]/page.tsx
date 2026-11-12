@@ -3,10 +3,13 @@ import { notFound } from 'next/navigation';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
+import { isTeacher } from '@/lib/auth';
+import type { AttendanceTotals } from '@/lib/classLink';
 import { formatPercent } from '@/lib/format';
-import { STUDENT_STATUSES, UUID } from '@/lib/options';
+import { STUDENT_STATUSES, UUID, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { createDriveFolder } from '../actions';
+import { AttendanceCard } from '../AttendanceCard';
 import { HandInLink } from '../HandInLink';
 import { PortalAccess } from '../PortalAccess';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
@@ -24,14 +27,20 @@ export default async function StudentPage({ params, searchParams }: Props) {
   if (!UUID.test(id)) notFound();
 
   const supabase = await createClient();
-  const { data: student } = await supabase
+  // Teachers only get students in their own batches back (database rules), so anyone else is "not found".
+  const { data: found } = await supabase
     .from('students')
-    .select('id, code, family_id, first_name, last_name, year_group, school, date_of_birth, status, start_date, handin_code, auth_user_id')
+    .select('id, code, family_id, first_name, last_name, year_group, school, status, start_date, auth_user_id')
     .eq('id', id)
     .maybeSingle();
-  if (!student) notFound();
+  if (!found) notFound();
+  if (await isTeacher()) return <TeacherView student={found} />;
 
-  const [{ data: guardian }, { data: enrolments }, { data: folder }, { data: stats }, options] = await Promise.all([
+  // Date of birth and the secret hand-in code are only readable by staff, through student_private.
+  const { data: extra } = await supabase.rpc('student_private', { p_student: id });
+  const student = { ...found, date_of_birth: extra?.date_of_birth ?? null, handin_code: extra?.handin_code ?? '' };
+
+  const [{ data: guardian }, { data: enrolments }, { data: folder }, { data: stats }, options, { data: attendance }] = await Promise.all([
     student.family_id
       ? supabase
           .from('guardians')
@@ -44,6 +53,8 @@ export default async function StudentPage({ params, searchParams }: Props) {
     supabase.from('file_links').select('url, provider').eq('student_id', id).eq('owner_type', 'student_folder').maybeSingle(),
     supabase.from('student_stats').select('attendance_pct, homework_pct').eq('student_id', id).maybeSingle(),
     loadStudentFormOptions(),
+    // Present / late / absent over the last 12 weeks, all classes. Empty until the class link script has been run.
+    supabase.rpc('attendance_totals', { p_student: id }),
   ]);
 
   return (
@@ -53,7 +64,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
         <div>
           <h1 className={ui.title}>{student.first_name} {student.last_name}</h1>
           <p className={ui.subtitle}>
-            {student.code} · Year {student.year_group} · Attendance {formatPercent(stats?.attendance_pct)} · Homework{' '}
+            {student.code} · {yearLabel(student.year_group)} · Attendance {formatPercent(stats?.attendance_pct)} · Homework{' '}
             {formatPercent(stats?.homework_pct)} (last 28 days)
           </p>
         </div>
@@ -78,6 +89,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
       {(student.status !== 'left' || student.auth_user_id) && (
         <PortalAccess studentId={student.id} authUserId={student.auth_user_id} suggestedEmail={guardian?.email ?? null} />
       )}
+      <AttendanceCard totals={attendance as AttendanceTotals | null} />
       <StudentForm
         student={student as Student}
         guardian={guardian as Guardian | null}
@@ -85,6 +97,51 @@ export default async function StudentPage({ params, searchParams }: Props) {
         folder={folder}
         options={options}
       />
+    </>
+  );
+}
+
+type Basic = { id: string; code: string; first_name: string; last_name: string; year_group: number; school: string | null; status: string };
+
+// What a teacher sees: the student and their classes with this teacher. No parent details, logins,
+// hand-in link or Drive folder, and nothing to edit.
+async function TeacherView({ student }: { student: Basic }) {
+  const supabase = await createClient();
+  const [{ data: enrolments }, { data: stats }, { data: attendance }] = await Promise.all([
+    // Only enrolments in the teacher's own batches come back.
+    supabase.from('enrolments').select('id, batch_id, subjects(name), batches(code, year_group)').eq('student_id', student.id).is('ended_on', null),
+    supabase.from('student_stats').select('attendance_pct, homework_pct').eq('student_id', student.id).maybeSingle(),
+    // Only attendance in the teacher's own classes comes back (database rules).
+    supabase.rpc('attendance_totals', { p_student: student.id }),
+  ]);
+  type Row = { id: string; batch_id: string; subjects: { name: string } | null; batches: { code: string; year_group: number } | null };
+
+  return (
+    <>
+      <Link href="/students" className={ui.back}>← My students</Link>
+      <div className={ui.header}>
+        <div>
+          <h1 className={ui.title}>{student.first_name} {student.last_name}</h1>
+          <p className={ui.subtitle}>
+            {student.code} · {yearLabel(student.year_group)}{student.school ? ` · ${student.school}` : ''} · Attendance{' '}
+            {formatPercent(stats?.attendance_pct)} · Homework {formatPercent(stats?.homework_pct)} (last 28 days, your classes)
+          </p>
+        </div>
+        <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
+      </div>
+      <AttendanceCard totals={attendance as AttendanceTotals | null} note="your classes" />
+      <section className={ui.card} style={{ maxWidth: 900 }}>
+        <h2>Classes with you</h2>
+        <ul className={ui.list}>
+          {((enrolments ?? []) as unknown as Row[]).map((e) => (
+            <li key={e.id}>
+              <Link href={`/batches/${e.batch_id}`} className={ui.link}>{e.batches?.code ?? 'Batch'}</Link>
+              <span className={ui.muted}>{e.subjects?.name} · {yearLabel(e.batches?.year_group)}</span>
+            </li>
+          ))}
+        </ul>
+        <p className={ui.hint}>Homework, hand-ins and marking are on the batch page.</p>
+      </section>
     </>
   );
 }

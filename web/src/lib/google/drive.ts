@@ -1,4 +1,5 @@
 import 'server-only';
+import { forgetFolderId, savedFolderId, saveFolderId } from './folderIds';
 
 // Talks to Google Drive with the owner's one-time permission (scope drive.file:
 // the app can only see files and folders it created itself).
@@ -30,32 +31,70 @@ async function accessToken() {
   return cached.token;
 }
 
+// Sends a request to Google with a fresh access token. If Google says it is busy (429), or has a hiccup
+// (5xx) on a request that is safe to repeat (reading, changing, deleting), waits under a second and tries
+// once more. Creating something is not repeated after a 5xx, as Google may have made it anyway.
+// The body must be reusable (string or Blob).
+async function send(url: string, init: RequestInit = {}) {
+  const repeatable = !init.method || ['GET', 'PATCH', 'DELETE'].includes(init.method);
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      ...init,
+      headers: { Authorization: `Bearer ${await accessToken()}`, ...init.headers },
+      cache: 'no-store',
+    });
+    if (attempt === 0 && (res.status === 429 || (repeatable && [500, 502, 503, 504].includes(res.status)))) {
+      await new Promise((r) => setTimeout(r, 600 + Math.random() * 400));
+      continue;
+    }
+    return res;
+  }
+}
+
 // Calls the Drive API and returns its JSON, or throws Google's error message.
 async function drive(path: string, init: RequestInit = {}) {
-  const res = await fetch(`${DRIVE}${path}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${await accessToken()}`, ...init.headers },
-    cache: 'no-store',
-  });
+  const res = await send(`${DRIVE}${path}`, init);
   const body = await res.json();
   if (!res.ok) throw new Error(`Google Drive error: ${body.error?.message ?? res.status}`);
   return body;
 }
 
 export type DriveFolder = { id: string; webViewLink: string };
+const folderLink = (id: string) => `https://drive.google.com/drive/folders/${id}`;
 
 // Finds a folder this app created (by name, inside a parent folder), or creates it.
+// The folder's id is saved the first time (see folderIds.ts), so later calls do not need to ask Drive at all.
 export async function findOrCreateFolder(name: string, parentId = 'root'): Promise<DriveFolder> {
+  const key = `${parentId}/${name}`;
+  const saved = await savedFolderId(key);
+  if (saved) return { id: saved, webViewLink: folderLink(saved) };
+
   const safeName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const q = `name = '${safeName}' and mimeType = '${FOLDER}' and trashed = false and '${parentId}' in parents`;
   const found = await drive(`/files?${new URLSearchParams({ q, fields: 'files(id, webViewLink)', pageSize: '1' })}`);
-  if (found.files.length) return found.files[0];
+  if (found.files.length) {
+    const id = await saveFolderId(key, found.files[0].id);
+    return { id, webViewLink: folderLink(id) };
+  }
 
-  return drive('/files?fields=id,webViewLink', {
+  const made: DriveFolder = await drive('/files?fields=id,webViewLink', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, mimeType: FOLDER, parents: [parentId] }),
   });
+  const id = await saveFolderId(key, made.id);
+  if (id !== made.id) {
+    // Another upload made the same folder a moment earlier: use theirs, bin ours (it is empty).
+    await trashFile(made.id).catch((e) => console.error('Could not bin duplicate folder:', e));
+    return { id, webViewLink: folderLink(id) };
+  }
+  return made;
+}
+
+// A 404 when uploading into a folder means the folder is gone (deleted or in the bin): forget its saved id
+// so the next try finds or makes it again.
+async function folderGone(res: Response, parentId: string) {
+  if (res.status === 404) await forgetFolderId(parentId);
 }
 
 // PencilMaths / Students: every student's folder goes inside this one.
@@ -66,7 +105,8 @@ export async function studentsRootFolder() {
 // PencilMaths / Students / <code> <name> / Homework. Returns the student folder and its Homework folder.
 export async function createStudentFolder(student: { code: string; first_name: string; last_name: string }) {
   const students = await studentsRootFolder();
-  const folder = await findOrCreateFolder(`${student.code} ${student.first_name} ${student.last_name}`, students.id);
+  // Students known by one name have an empty last name: no trailing space in the folder name.
+  const folder = await findOrCreateFolder([student.code, student.first_name, student.last_name].filter(Boolean).join(' '), students.id);
   const homework = await findOrCreateFolder('Homework', folder.id);
   return { folder, homework };
 }
@@ -83,22 +123,53 @@ export async function uploadFile(parentId: string, name: string, mimeType: strin
     data,
     `\r\n--${boundary}--`,
   ]);
-  const res = await fetch(`${UPLOAD}?uploadType=multipart&fields=id,webViewLink`, {
+  const res = await send(`${UPLOAD}?uploadType=multipart&fields=id,webViewLink`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${await accessToken()}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
     body,
-    cache: 'no-store',
   });
   const json = await res.json();
+  if (!res.ok) await folderGone(res, parentId);
   if (!res.ok) throw new Error(`Google Drive upload error: ${json.error?.message ?? res.status}`);
   return json as { id: string; webViewLink: string };
 }
+// Starts an upload the browser finishes itself (big files skip the server's 4.5 MB limit).
+// Returns a one-off upload address; the browser PUTs the file there. The Origin must be the site's
+// address, or the browser is not allowed to use it.
+export async function startBrowserUpload(parentId: string, name: string, mimeType: string, size: number, origin: string) {
+  const res = await send(`${UPLOAD}?uploadType=resumable&fields=id,webViewLink`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': mimeType,
+      'X-Upload-Content-Length': String(size),
+      Origin: origin,
+    },
+    body: JSON.stringify({ name, parents: [parentId] }),
+  });
+  const location = res.headers.get('location');
+  if (!res.ok) await folderGone(res, parentId);
+  if (!res.ok || !location) throw new Error(`Google Drive upload error: ${res.status}`);
+  return location;
+}
+
+// Moves a file this app made to the Drive bin (e.g. a marked sheet that was replaced before it was sent).
+export async function trashFile(fileId: string) {
+  await drive(`/files/${encodeURIComponent(fileId)}?fields=id`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trashed: true }),
+  });
+}
+
+// A file's folder and link, to check a browser upload landed where it should.
+export async function fileInfo(fileId: string): Promise<{ id: string; parents?: string[]; webViewLink: string; trashed: boolean }> {
+  return drive(`/files/${encodeURIComponent(fileId)}?fields=id,parents,webViewLink,trashed`);
+}
+
 // Fetches a file's contents (for files this app uploaded). Returns Google's response to pass on.
 export async function downloadFile(fileId: string) {
-  const res = await fetch(`${DRIVE}/files/${encodeURIComponent(fileId)}?alt=media`, {
-    headers: { Authorization: `Bearer ${await accessToken()}` },
-    cache: 'no-store',
-  });
+  const res = await send(`${DRIVE}/files/${encodeURIComponent(fileId)}?alt=media`);
   if (!res.ok) throw new Error(`Google Drive download error: ${res.status}`);
   return res;
 }

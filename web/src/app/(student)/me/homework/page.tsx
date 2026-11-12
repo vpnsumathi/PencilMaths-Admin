@@ -13,6 +13,7 @@ type Homework = {
   max_mark: number | null; status: string; mark: number | null; files: number;
   sheets?: { id: string; label: string | null }[];
   handed?: { id: string; label: string | null }[];
+  corrected?: { id: string; label: string | null }[];
 };
 
 // Links to the homework sheet(s) staff attached.
@@ -46,6 +47,23 @@ function HandedFiles({ h }: { h: Homework }) {
         {h.handed.map((f) => (
           <a key={f.id} href={`/me/homework/file/${f.id}`} target="_blank" rel="noreferrer" className={styles.sheet}>
             📎 {(f.label ?? 'Handed-in file').replace(/^\d{4}-\d{2}-\d{2} \d{2}\.\d{2} /, '')}
+          </a>
+        ))}
+      </p>
+    </div>
+  );
+}
+
+// The corrected sheet(s) the teacher uploaded after marking.
+function CorrectedFiles({ h }: { h: Homework }) {
+  if (!h.corrected?.length) return null;
+  return (
+    <div className={styles.handed}>
+      <p className={styles.handedTitle}>Corrected by your teacher:</p>
+      <p className={styles.sheets}>
+        {h.corrected.map((f) => (
+          <a key={f.id} href={`/me/homework/file/${f.id}`} target="_blank" rel="noreferrer" className={styles.sheet}>
+            ✏️ {(f.label ?? 'Corrected sheet').replace(/^\d{4}-\d{2}-\d{2} \d{2}\.\d{2} /, '')}
           </a>
         ))}
       </p>
@@ -117,6 +135,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
               : <><strong className={styles.marked}>✓ Handed in</strong> · waiting to be marked · {h.files} file{h.files === 1 ? '' : 's'}</>}
           </p>
           <HandedFiles h={h} />
+          <CorrectedFiles h={h} />
           {h.status === 'received' && <HandInForm action={handInMyFile} sheetId={h.sheet_id} title={h.title} label="Add more pages" />}
         </article>
       ))}
@@ -134,6 +153,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
             ✅ {h.mark !== null ? `${h.mark}${h.max_mark ? ` / ${h.max_mark}` : ''}` : 'Marked'}
           </p>
           <HandedFiles h={h} />
+          <CorrectedFiles h={h} />
         </article>
       ))}
       </>}

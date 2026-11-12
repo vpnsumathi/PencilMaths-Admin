@@ -22,6 +22,7 @@
 7. [Automatic rules (triggers) at a glance](#automatic-rules-triggers-at-a-glance)
 8. [File 5 — `20261007000001_reference_data_admin_only.sql`](#file-5--20261007000001_reference_data_admin_onlysql)
 9. [File 6 — `20261011000001_homework_handin.sql`](#file-6--20261011000001_homework_handinsql)
+10. [GCSE year groups — `20261108000001_gcse_year_groups.sql`](#gcse-year-groups--20261108000001_gcse_year_groupssql)
 
 ---
 
@@ -77,8 +78,8 @@ Creates the structure: enums, tables, indexes and basic automatic rules.
 | | `teachers` | Tutors: name, contact, subject, year range, status. `auth_user_id` reserved for teacher logins later. |
 | | `families` | Groups siblings; holds the WhatsApp group name. |
 | | `guardians` | Parent/guardian contacts for a family. Only one `is_primary` per family. |
-| | `students` | Pupils: name, year group (1–13), school, status, start/left dates, family. |
-| Classes | `batches` | A class group: subject, year group, teacher, capacity, open/closed dates. |
+| | `students` | Pupils: name, year group (1–10, 11 = GCSE - H, 12 = GCSE - F; see the GCSE section), school, status, start/left dates, family. |
+| Classes | `batches` | A class group: subject, year group, teacher, capacity, open/closed dates, optional name ("Batch 1", unique per subject and year among open batches; used by Bulk import, guide 16). |
 | | `batch_slots` | The batch's weekly times (weekday + start time). |
 | | `enrolments` | A student's place in a subject; teacher and batch optional until assigned. Only one active enrolment per student per subject. Ended by setting `ended_on`. |
 | | `batch_topics` | Each batch's own copy of the lesson plan, with progress status. |
@@ -122,6 +123,8 @@ Turns on **row-level security (RLS)** for every table. Without a matching rule, 
 | `staff` table | Active staff can read it; only **admins** can add, change or remove staff. |
 
 Also lets signed-in users run `expected_classes`. **Result:** a user who is signed in but not in `staff` sees nothing, which is why the app shows 0 rows until your `staff` row exists.
+
+> **Since `20261106000001_faster_database.sql` (6 Nov 2026):** these rules read `(select is_staff())` and `(select is_admin())`, so the check runs once per query instead of once per row. Who can do what is unchanged. See `18-database-performance-review.md`.
 
 ---
 
@@ -183,3 +186,39 @@ The WhatsApp hand-in link (`08-homework-handin-link.md`). Families aren't signed
 | `handin_target(code, sheet)` | function | Checks code and homework belong together; returns the Drive folder id and file count |
 | `handin_record(code, sheet, file…)` | function | Adds a `file_links` row (`homework_submission`) and marks the result received (marked stays marked); max 20 files |
 | `grant execute … to anon` | permission | Lets phones that aren't signed in call them |
+
+---
+
+## GCSE year groups — `20261108000001_gcse_year_groups.sql`
+
+Added 8 November 2026. Year 11, Year 12 and Year 13 are replaced by **GCSE - H** (Higher) and **GCSE - F** (Foundation), in that order.
+
+| Stored number | Shown as | Short (lists, charts) | Lesson library codes |
+|---|---|---|---|
+| 1 to 10 | Year 1 … Year 10 | Y1 … Y10 | `Y5-…` |
+| 11 | GCSE - H | GCSE-H | `GH-…` |
+| 12 | GCSE - F | GCSE-F | `GF-…` |
+| 13 | not allowed any more | | |
+
+| Name | Type | What it does |
+|---|---|---|
+| `year_label(n)` | function | 5 → `Year 5`, 11 → `GCSE - H`, 12 → `GCSE - F` (used in Bulk import messages). The app has the same words in `lib/options.ts` (`yearLabel`, `yearShort`). |
+| `import_year(text)` | function | Reads a spreadsheet's Year cell: `Year 5` / `5` → 5, `GCSE-H` / `GCSE - H` / `GCSE Higher` / `Higher` → 11, the same for F / Foundation → 12. `Year 11` comes back as 11, and `bulk_import` then refuses it with "Use GCSE-H or GCSE-F". |
+| year checks | checks | `students`, `batches`, `enquiries`, `lessons`, `curriculum_topics` and teachers' lowest/highest year: 1 to 12. |
+| `bulk_import` | function | Same as guide 16, with the new year reading and the labels in its messages. |
+
+> ⚠️ **The script deletes everything in Year 11, 12 and 13** (asked for on 8 Nov 2026): those students with their subjects, homework results, hand-ins, notes and file rows (and their family and parents when the family has no other student), Year 11–13 batches with their class times, lesson plan and homework, Year 11–13 enquiries, and Year 11–13 Lesson library lessons and curriculum topics. A student of another year placed in a Year 11–13 batch keeps the subject but has no batch. Teachers are kept; a year above 12 becomes GCSE - F. Google Drive files and logins are not deleted. **It can't be undone.**
+
+**See what will be deleted** before running it (Supabase › SQL Editor):
+
+```sql
+select 'students' as what, count(*) from students where year_group >= 11
+union all select 'batches', count(*) from batches where year_group >= 11
+union all select 'enquiries', count(*) from enquiries where year_group >= 11
+union all select 'Lesson library lessons', count(*) from lessons where year_group >= 11
+union all select 'curriculum topics', count(*) from curriculum_topics where year_group >= 11
+union all select 'teachers above 12', count(*) from teachers where year_min > 12 or year_max > 12;
+```
+
+Then run the script. It is safe to run twice. After it, add the GCSE students and batches again (by hand or with Bulk import, writing `GCSE-H` / `GCSE-F` in the Year column) and import the GCSE lesson plans in the Lesson library with `GH-` / `GF-` codes.
+

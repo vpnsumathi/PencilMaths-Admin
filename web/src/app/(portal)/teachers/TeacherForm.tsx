@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
-import { TEACHER_STATUSES, YEARS } from '@/lib/options';
+import { TEACHER_STATUSES, yearLabel, YEARS } from '@/lib/options';
 import { saveTeacher } from './actions';
 
 export type Teacher = {
@@ -31,8 +31,8 @@ export function TeacherForm({ teacher, subjects }: { teacher?: Teacher; subjects
           <Field label="First name">
             <input name="first_name" required defaultValue={teacher?.first_name} className={ui.input} />
           </Field>
-          <Field label="Last name">
-            <input name="last_name" required defaultValue={teacher?.last_name} className={ui.input} />
+          <Field label="Last name (optional)">
+            <input name="last_name" defaultValue={teacher?.last_name} className={ui.input} />
           </Field>
           <Field label="Email">
             <input name="personal_email" type="email" defaultValue={teacher?.personal_email ?? ''} className={ui.input} />
@@ -60,13 +60,13 @@ export function TeacherForm({ teacher, subjects }: { teacher?: Teacher; subjects
           <Field label="Lowest year group">
             <select name="year_min" defaultValue={teacher?.year_min ?? ''} className={ui.select}>
               <option value="">Any</option>
-              {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+              {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
             </select>
           </Field>
           <Field label="Highest year group">
             <select name="year_max" defaultValue={teacher?.year_max ?? ''} className={ui.select}>
               <option value="">Any</option>
-              {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+              {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
             </select>
           </Field>
           <Field label="Joined on">

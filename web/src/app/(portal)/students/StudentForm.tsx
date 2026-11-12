@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
-import { STUDENT_STATUSES, todayInUk, YEARS } from '@/lib/options';
+import { STUDENT_STATUSES, todayInUk, yearLabel, YEARS } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { saveStudent } from './actions';
+import { DuplicateWarning } from './DuplicateWarning';
 import { YearBatchFilter } from './YearBatchFilter';
 
 export type Student = {
@@ -21,19 +22,18 @@ export type Enrolment = { id: string; subject_id: string; teacher_id: string | n
 
 type Options = Awaited<ReturnType<typeof loadStudentFormOptions>>;
 
-// The choices the form needs: subjects, teachers (not left) and open batches.
+// The choices the form needs: subjects and open batches.
 export async function loadStudentFormOptions() {
   const supabase = await createClient();
-  const [{ data: subjects }, { data: teachers }, { data: batches }] = await Promise.all([
+  const [{ data: subjects }, { data: batches }] = await Promise.all([
     supabase.from('subjects').select('id, name, active').order('sort'),
-    supabase.from('teachers').select('id, first_name, last_name, subject_id').neq('status', 'left').order('first_name'),
     supabase
       .from('batch_list')
-      .select('id, code, subject_id, year_group, schedule, member_count, capacity')
+      .select('id, code, name, subject_id, year_group, schedule, member_count, capacity')
       .is('closed_on', null)
       .order('code'),
   ]);
-  return { subjects: subjects ?? [], teachers: teachers ?? [], batches: batches ?? [] };
+  return { subjects: subjects ?? [], batches: batches ?? [] };
 }
 
 type Props = {
@@ -60,13 +60,13 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
           <Field label="First name">
             <input name="first_name" required defaultValue={student?.first_name} className={ui.input} />
           </Field>
-          <Field label="Last name">
-            <input name="last_name" required defaultValue={student?.last_name} className={ui.input} />
+          <Field label="Last name (optional)">
+            <input name="last_name" defaultValue={student?.last_name} className={ui.input} />
           </Field>
           <Field label="Year group">
             <select name="year_group" required defaultValue={student?.year_group ?? ''} className={ui.select}>
               <option value="" disabled>Choose…</option>
-              {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+              {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
             </select>
           </Field>
           <Field label="School">
@@ -83,6 +83,8 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
           <Field label="Start date">
             <input name="start_date" type="date" defaultValue={student?.start_date ?? todayInUk()} className={ui.input} />
           </Field>
+          {/* New students only: warns when the name and year group match a student already in the app. */}
+          {!student && <DuplicateWarning />}
         </div>
       </section>
 
@@ -107,7 +109,7 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
       <section className={ui.card}>
         <h2>Subjects</h2>
         <p className={ui.hint}>
-          Tick each subject the student takes. Choosing a batch also sets the teacher. Unticking a subject ends it.
+          Tick each subject the student takes. The teacher comes from the batch. Unticking a subject ends it.
           Batches are listed for the year group chosen above.
         </p>
         <YearBatchFilter />
@@ -123,16 +125,12 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
                 <option value="">No batch yet</option>
                 {options.batches.filter((b) => b.subject_id === s.id).map((b) => (
                   <option key={b.id} value={b.id} data-year={b.year_group}>
-                    {b.code} · Year {b.year_group} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity})
+                    {b.code}{b.name ? ` ${b.name}` : ''} · {yearLabel(b.year_group)} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity}{b.member_count >= b.capacity && b.id !== e?.batch_id ? ' · full' : ''})
                   </option>
                 ))}
               </select>
-              <select name={`teacher_${s.id}`} defaultValue={e?.teacher_id ?? ''} className={ui.select} aria-label={`${s.name} teacher`}>
-                <option value="">No teacher yet</option>
-                {options.teachers.filter((t) => !t.subject_id || t.subject_id === s.id).map((t) => (
-                  <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
-                ))}
-              </select>
+              {/* The teacher comes from the batch. A teacher set earlier without a batch is kept. */}
+              {e?.teacher_id && <input type="hidden" name={`teacher_${s.id}`} value={e.teacher_id} />}
             </div>
           );
         })}

@@ -2,20 +2,24 @@ import { redirect } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { signOut } from '@/app/actions';
+import { getUserId } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
+import { getMyDashboard } from './me/myDashboard';
 import { StudentNav } from './StudentNav';
+import { StudentSwitcher, type LinkedStudent } from './StudentSwitcher';
 import styles from './student.module.css';
 
 // Every page inside (student) is for a signed-in student only. Staff go back to the staff portal.
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  if (!(await getUserId())) redirect('/login');
 
-  // Returns nothing for staff, unknown logins and students who have left.
-  const { data: me } = await supabase.rpc('my_dashboard');
+  // my_dashboard returns nothing for staff, unknown logins and students who have left (the page reuses it).
+  // A family login can open several children; my_students lists them.
+  const supabase = await createClient();
+  const [me, { data: linked }] = await Promise.all([getMyDashboard(), supabase.rpc('my_students')]);
   if (!me) redirect('/');
   const name = `${me.first_name} ${me.last_name}`;
+  const students = (linked ?? []) as LinkedStudent[];
 
   return (
     <div className={styles.shell}>
@@ -25,7 +29,9 @@ export default async function StudentLayout({ children }: { children: React.Reac
           <Image src="/logo.png" alt="Pencil Maths" width={136} height={45} priority />
         </Link>
         <StudentNav />
-        <span className={styles.who} title={`Signed in as ${name}`}>{name}</span>
+        {students.length > 1
+          ? <StudentSwitcher students={students} />
+          : <span className={styles.who} title={`Signed in as ${name}`}>{name}</span>}
         <Link href="/me/password" className={styles.signOut} title="Change password">🔑 Password</Link>
         <form action={signOut}>
           <button className={styles.signOut}>Sign out</button>

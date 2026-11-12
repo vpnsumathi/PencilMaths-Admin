@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
 import ui from '@/components/ui.module.css';
+import { requireStaff } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { TeacherForm } from '../TeacherForm';
 
@@ -9,6 +10,7 @@ export const metadata = { title: 'Add teacher' };
 type Props = { searchParams: Promise<{ error?: string }> };
 
 export default async function NewTeacherPage({ searchParams }: Props) {
+  await requireStaff();
   const { error: problem } = await searchParams;
   const supabase = await createClient();
   const { data: subjects } = await supabase.from('subjects').select('id, name').eq('active', true).order('sort');

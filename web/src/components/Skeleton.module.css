@@ -1,0 +1,28 @@
+/* Grey placeholder bars, shown while a page or a section loads (loading.tsx files, the dashboard's Homework). */
+
+/* Fades in only if loading takes longer than 0.15 s, so quick pages don't flash a skeleton. */
+.wrap { animation: appear 0.2s ease-out 0.15s both; }
+
+.bone {
+  display: block; flex: none; height: 14px; max-width: 100%; border-radius: 8px;
+  background: linear-gradient(90deg, var(--border) 0%, var(--bg) 50%, var(--border) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; }
+.row { display: flex; align-items: center; gap: 24px; padding: 16px; border-bottom: 1px solid var(--border); }
+.row:last-child { border-bottom: 0; }
+/* On phones, show fewer bars in each row. */
+@media (max-width: 640px) { .row .bone:nth-child(n + 3) { display: none; } }
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+
+/* People who turn off animations in their device settings get still bars. */
+@media (prefers-reduced-motion: reduce) {
+  .wrap, .bone { animation: none; }
+}

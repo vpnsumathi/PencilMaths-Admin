@@ -1,5 +1,6 @@
 import 'server-only';
-import { findOrCreateFolder, uploadFile } from '@/lib/google/drive';
+import { findOrCreateFolder, trashFile, uploadFile } from '@/lib/google/drive';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // Shared by the WhatsApp hand-in link (/h/<code>) and the student login (/me/homework).
 
@@ -40,9 +41,12 @@ export function targetProblem(target: HandInTarget | null, wrongHomework: string
   return null;
 }
 
-// Uploads the file into the student's Drive Homework folder and returns what to record in the database.
-// `chosenName` is the name the student typed when handing in (optional).
-export async function uploadHandIn(target: HandInTarget, { file, type, ext }: CheckedFile, part: number, chosenName?: string, parts = 1) {
+// Uploads the file into the student's Drive Homework folder, then records it in the database.
+// Only the server can record a hand-in (with the full-rights key), and the database builds the link from the Drive id.
+// If recording fails, the uploaded file is binned so no stray copies are left in Drive.
+// `code` is the student's hand-in code; `chosenName` is the name the student typed when handing in (optional).
+export async function saveHandIn(code: string, sheetId: string, target: HandInTarget, { file, type, ext }: CheckedFile,
+  part: number, chosenName?: string, parts = 1) {
   const homework = await findOrCreateFolder('Homework', target.folder_id!);
   // e.g. "2026-10-11 14.05 Maths - Practice sheet 1 (2).jpg", or "2026-10-11 14.05 My fractions answers.pdf"
   const stamp = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/London' }).slice(0, 16).replace(':', '.');
@@ -51,7 +55,15 @@ export async function uploadHandIn(target: HandInTarget, { file, type, ext }: Ch
     ? `${stamp} ${clean}${parts > 1 ? ` (${part})` : ''}.${ext}`
     : `${stamp} ${target.subject} - ${target.title} (${part}).${ext}`;
   const uploaded = await uploadFile(homework.id, name, type, await file.arrayBuffer());
-  return { p_file_id: uploaded.id, p_url: uploaded.webViewLink, p_label: name };
+  try {
+    const { error } = await createAdminClient().rpc('handin_record', {
+      p_code: code, p_sheet: sheetId, p_file_id: uploaded.id, p_url: null, p_label: name,
+    });
+    if (error) throw new Error(error.message);
+  } catch (e) {
+    await trashFile(uploaded.id).catch((t) => console.error('Could not bin the unrecorded hand-in file:', t));
+    throw e;
+  }
 }
 
 // A typed file name made safe: no characters Drive or Windows dislike, at most 80 characters.

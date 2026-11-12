@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { LoginForm } from './LoginForm';
 import styles from './login.module.css';
-import { CalendarIcon, ClipboardCheckIcon, PencilIcon, UsersIcon } from '@/components/icons';
+import { CalendarIcon, ClipboardCheckIcon, UsersIcon } from '@/components/icons';
 
 export const metadata: Metadata = { title: 'Sign in' };
 
@@ -23,11 +24,7 @@ export default function LoginPage() {
         </div>
 
         <div className={styles.brandTop}>
-          <div className={`${styles.logo} ${styles.logoLight}`}><PencilIcon size={20} /></div>
-          <div className={styles.brandName}>
-            <b>Pencil Maths</b>
-            <span>Admin portal</span>
-          </div>
+          <Image className={styles.logo} src="/logo-on-dark.png" alt="Pencil Maths" width={163} height={54} priority />
         </div>
 
         <div className={styles.brandBody}>
@@ -49,11 +46,7 @@ export default function LoginPage() {
       {/* Right: the sign-in form */}
       <main className={styles.formSide}>
         <div className={styles.mobileBrand}>
-          <div className={styles.logo}><PencilIcon size={20} /></div>
-          <div className={styles.brandName}>
-            <b>Pencil Maths</b>
-            <span>Admin portal</span>
-          </div>
+          <Image className={styles.logo} src="/logo-transparent.png" alt="Pencil Maths" width={163} height={54} priority />
         </div>
         <LoginForm />
       </main>

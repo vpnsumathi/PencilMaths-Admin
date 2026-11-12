@@ -23,8 +23,11 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // Also refreshes the session cookie when it is close to expiring.
-  const { data: { user } } = await supabase.auth.getUser();
+  // Is someone signed in? getClaims() checks the login token (see getUserId in lib/auth.ts) and also
+  // refreshes the session cookie when it is close to expiring. Pages still check who it is (getViewer),
+  // and the database rules check every query.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
 

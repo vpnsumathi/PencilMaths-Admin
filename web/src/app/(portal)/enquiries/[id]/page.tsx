@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
-import { ENQUIRY_STAGES, OPEN_STAGES, stageTone, UUID } from '@/lib/options';
+import { requireStaff } from '@/lib/auth';
+import { ENQUIRY_STAGES, OPEN_STAGES, stageTone, UUID, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { convertToStudent, setStage } from '../actions';
 import { EnquiryForm, type Enquiry } from '../EnquiryForm';
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export default async function EnquiryPage({ params, searchParams }: Props) {
+  await requireStaff();
   const { id } = await params;
   const { ok, error: problem } = await searchParams;
   if (!UUID.test(id)) notFound();
@@ -38,7 +40,7 @@ export default async function EnquiryPage({ params, searchParams }: Props) {
       <div className={ui.header}>
         <div>
           <h1 className={ui.title}>{e.child_first_name} {e.child_last_name}</h1>
-          <p className={ui.subtitle}>{e.code} · Year {e.year_group} · enquired {new Date(e.created_at).toLocaleDateString('en-GB')}</p>
+          <p className={ui.subtitle}>{e.code} · {yearLabel(e.year_group)} · enquired {new Date(e.created_at).toLocaleDateString('en-GB')}</p>
         </div>
         <StatusBadge status={stageTone(e.stage)} label={ENQUIRY_STAGES[e.stage]} />
       </div>

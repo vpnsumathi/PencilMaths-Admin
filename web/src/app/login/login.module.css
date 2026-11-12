@@ -98,20 +98,9 @@
 .brandFoot { margin: 0; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 
 /* ---------- Logo ---------- */
-.logo {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--brand), var(--brand-strong));
-  box-shadow: 0 8px 20px -8px var(--brand-shadow);
-}
-.logoLight { color: var(--brand); background: #fff; box-shadow: none; }
-
-.brandName b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
-.brandName span { display: block; font-size: 13px; opacity: 0.75; }
+/* Transparent logo files: logo-on-dark.png (white lettering) for the coloured panel,
+   logo-transparent.png (original colours) for the light form side */
+.logo { display: block; height: 54px; width: auto; }
 
 /* ---------- Right: form side ---------- */
 .formSide {
@@ -123,7 +112,7 @@
   padding: max(32px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
 }
 
-.mobileBrand { display: flex; align-items: center; gap: 12px; color: var(--text); }
+.mobileBrand { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text); }
 @media (min-width: 1024px) { .mobileBrand { display: none; } }
 
 .card {

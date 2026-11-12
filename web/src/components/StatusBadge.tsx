@@ -5,6 +5,7 @@ const TONES: Record<string, string> = {
   active: ui.badgeOk,
   open: ui.badgeOk,
   trial: ui.badgeBrand,
+  in_progress: ui.badgeLive,
   onboarding: ui.badgeBrand,
   paused: ui.badgeMuted,
   leaving: ui.badgeMuted,

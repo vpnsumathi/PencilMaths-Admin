@@ -1,13 +1,24 @@
-// The shape my_dashboard() returns (see supabase/migrations/20261020000003_student_dashboard_tiles.sql).
+import type { AttendanceTotals, ClassWindow } from '@/lib/classLink';
+
+// The shape my_dashboard() returns (see supabase/migrations/20261020000003_student_dashboard_tiles.sql, and
+// 20261111000001_class_link_attendance.sql for batch_id, has_class_link and attendance).
 export type StudentClass = {
   subject: string; batch_code: string | null; teacher: string | null; class_year: number | null;
   started_on: string; times: { weekday: number; start_time: string }[]; to_do: number; marked: number;
   topic?: string | null; topic_started?: boolean;
+  // Missing until the class link script has been run on the database, so everything that uses them copes without.
+  batch_id?: string | null;
+  // true when the class has a Google Classroom link. The link itself is never sent to the page: Join class asks for it.
+  has_class_link?: boolean;
+  // Present / late / absent over the last 12 weeks in this class.
+  attendance?: AttendanceTotals | null;
 };
 
 export type Dashboard = {
   first_name: string; last_name: string; code: string; year_group: number; school: string | null;
   classes: StudentClass[];
+  // The check-in times around each class (missing until the class link script has been run).
+  class_window?: ClassWindow;
   homework: {
     to_do: number; overdue: number; handed_in: number;
     recently_marked: { title: string; subject: string; mark: number | null; max_mark: number | null; marked_on: string }[];

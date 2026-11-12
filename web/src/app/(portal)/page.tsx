@@ -1,19 +1,18 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import {
-  AlertIcon, CalendarIcon, ClipboardCheckIcon, MailIcon, UsersIcon,
+  AlertIcon, ClipboardCheckIcon, MailIcon, UsersIcon,
 } from '@/components/icons';
-import { createClient } from '@/lib/supabase/server';
+import { getViewer } from '@/lib/auth';
 import { BarChart } from './_dashboard/BarChart';
-import { loadDashboard, RANGES, type AttentionItem } from './_dashboard/data';
-import { Sparkline } from './_dashboard/Sparkline';
+import { loadDashboard, NEW_DAYS, type AttentionItem } from './_dashboard/data';
+import { HomeworkPanel, HomeworkPanelLoading } from './_dashboard/HomeworkPanel';
 import styles from './dashboard.module.css';
 
 export const metadata = { title: 'Dashboard' };
 
-type Props = { searchParams: Promise<{ range?: string }> };
-
 const ATTENTION_ICONS: Record<string, typeof AlertIcon> = {
-  class: CalendarIcon, student: UsersIcon, homework: ClipboardCheckIcon, enquiry: MailIcon, full: AlertIcon,
+  student: UsersIcon, homework: ClipboardCheckIcon, enquiry: MailIcon, full: AlertIcon,
 };
 const TONE_LABEL = { danger: 'Overdue', warn: 'To do', info: 'FYI' };
 
@@ -22,18 +21,16 @@ function greeting() {
   return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-export default async function Dashboard({ searchParams }: Props) {
-  const { range } = await searchParams;
-  const days = RANGES.find((r) => String(r.days) === range)?.days ?? 28;
-
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: me }, d] = await Promise.all([
-    supabase.from('staff').select('full_name').eq('id', user!.id).maybeSingle(),
-    loadDashboard(days),
-  ]);
-  const firstName = me?.full_name?.split(' ')[0] ?? '';
-  const rangeLabel = RANGES.find((r) => r.days === days)!.label;
+// Kept to quick queries: attendance, classes logged, the homework hand-in percentages and the range filter
+// were taken off on 3 Nov 2026 because they made the dashboard slow. The Homework section loads on its own
+// and fills in when ready, so the rest of the page shows first.
+export default async function Dashboard() {
+  // A teacher sees the same dashboard, filled only with their own batches and students (database rules),
+  // without enquiries.
+  const [viewer, d] = await Promise.all([getViewer(), loadDashboard()]);
+  const teacher = viewer?.kind === 'teacher';
+  const firstName = viewer?.fullName.split(' ')[0] ?? '';
+  const attention = teacher ? d.attention.filter((a) => a.kind !== 'enquiry') : d.attention;
   const longDate = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/London' });
 
   return (
@@ -43,90 +40,57 @@ export default async function Dashboard({ searchParams }: Props) {
           <p className={styles.date}>{longDate}</p>
           <h1 className={styles.title}>{greeting()}{firstName && `, ${firstName}`}</h1>
         </div>
-        {/* Range filter: scopes attendance, homework, classes and "new students" below. */}
-        <nav className={styles.range} aria-label="Date range">
-          {RANGES.map((r) => (
-            <Link key={r.days} href={`/?range=${r.days}`} className={r.days === days ? styles.rangeOn : ''} aria-current={r.days === days ? 'true' : undefined}>
-              {r.label}
-            </Link>
-          ))}
-        </nav>
       </header>
 
       {/* ---------- Headline tiles ---------- */}
       <section className={styles.kpis}>
         <Link href="/students" className={styles.kpi}>
-          <span className={styles.kpiLabel}>Current students</span>
+          <span className={styles.kpiLabel}>{teacher ? 'My students' : 'Current students'}</span>
           <strong className={styles.kpiValue}>{d.studentCounts.current}</strong>
           <span className={styles.kpiSub}>
             {d.studentCounts.active} active · {d.studentCounts.trial} trial
-            {d.studentCounts.newInRange > 0 && <> · <b className={styles.up}>+{d.studentCounts.newInRange} new</b></>}
+            {d.studentCounts.newInRange > 0 && <> · <b className={styles.up} title={`Started in the last ${NEW_DAYS} days`}>+{d.studentCounts.newInRange} new</b></>}
           </span>
         </Link>
 
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Attendance · {rangeLabel}</span>
-          <div className={styles.kpiRow}>
-            <strong className={styles.kpiValue}>{d.attendanceSummary.rate ?? '–'}{d.attendanceSummary.rate !== null && '%'}</strong>
-            <Sparkline values={d.attendanceTrend.map((b) => b.value)} />
+        <Link href="/batches" className={styles.kpi}>
+          <span className={styles.kpiLabel}>{teacher ? 'My batches' : 'Open batches'}</span>
+          <strong className={styles.kpiValue}>{d.placesSummary.batches}</strong>
+          <span className={styles.kpiSub}>
+            {d.placesSummary.filled} of {d.placesSummary.seats} places used
+            {d.placesSummary.rate !== null && ` (${d.placesSummary.rate}%)`}
+          </span>
+        </Link>
+
+        {!teacher && (
+          <div className={styles.kpi}>
+            <span className={styles.kpiLabel}>Open enquiries</span>
+            <strong className={styles.kpiValue}>{d.enquirySummary.open}</strong>
+            <span className={styles.kpiSub}>
+              {d.enquirySummary.conversion === null ? 'No decisions yet' : `${d.enquirySummary.conversion}% convert to enrolment`}
+            </span>
           </div>
-          <span className={styles.kpiSub}>
-            {d.attendanceSummary.present} present · {d.attendanceSummary.late} late · {d.attendanceSummary.absent} absent
-          </span>
-        </div>
-
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Homework handed in</span>
-          <strong className={styles.kpiValue}>{d.homeworkSummary.rate ?? '–'}{d.homeworkSummary.rate !== null && '%'}</strong>
-          <span className={styles.kpiSub}>{d.homeworkSummary.toMark} waiting to be marked</span>
-        </div>
-
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Classes logged · {rangeLabel}</span>
-          <strong className={styles.kpiValue}>
-            {d.classSummary.logged}<small> / {d.classSummary.expected}</small>
-          </strong>
-          <span className={styles.meter} aria-hidden="true">
-            <span style={{ width: `${d.classSummary.expected ? (100 * d.classSummary.logged) / d.classSummary.expected : 0}%` }} />
-          </span>
-          <span className={styles.kpiSub}>
-            {d.classSummary.missing ? <b className={styles.down}>{d.classSummary.missing} not logged yet</b> : 'All classes logged'}
-          </span>
-        </div>
-
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Open enquiries</span>
-          <strong className={styles.kpiValue}>{d.enquirySummary.open}</strong>
-          <span className={styles.kpiSub}>
-            {d.enquirySummary.conversion === null ? 'No decisions yet' : `${d.enquirySummary.conversion}% convert to enrolment`}
-          </span>
-        </div>
+        )}
       </section>
 
-      {/* ---------- Attendance trend + needs attention ---------- */}
-      <section className={styles.mainGrid}>
-        <article className={styles.card}>
-          <h2>Attendance rate</h2>
-          <p className={styles.cardSub}>
-            Present or late, as a share of all attendance marks · {days === 7 ? 'per day' : 'per week'}
-          </p>
-          <BarChart bars={d.attendanceTrend} orientation="columns" max={100} unit="%" ariaLabel="Attendance rate over time"
-            emptyText="No classes logged in this range yet." />
-        </article>
+      {/* ---------- Needs attention ---------- */}
+      <article className={`${styles.card} ${styles.attentionCard}`}>
+        <h2>Needs attention <span className={styles.count}>{attention.length}</span></h2>
+        <p className={styles.cardSub}>Click an item to sort it out</p>
+        {attention.length === 0 ? (
+          <p className={styles.allClear}>Nothing needs attention. 🎉</p>
+        ) : (
+          <ul className={styles.attention}>
+            {attention.slice(0, 7).map((a, i) => <AttentionRow key={i} item={a} />)}
+          </ul>
+        )}
+        {attention.length > 7 && <p className={styles.more}>+{attention.length - 7} more</p>}
+      </article>
 
-        <article className={styles.card}>
-          <h2>Needs attention <span className={styles.count}>{d.attention.length}</span></h2>
-          <p className={styles.cardSub}>Click an item to sort it out</p>
-          {d.attention.length === 0 ? (
-            <p className={styles.allClear}>Nothing needs attention. 🎉</p>
-          ) : (
-            <ul className={styles.attention}>
-              {d.attention.slice(0, 7).map((a, i) => <AttentionRow key={i} item={a} />)}
-            </ul>
-          )}
-          {d.attention.length > 7 && <p className={styles.more}>+{d.attention.length - 7} more</p>}
-        </article>
-      </section>
+      {/* ---------- Homework: numbers, marking queue, falling behind (fills in when ready) ---------- */}
+      <Suspense fallback={<HomeworkPanelLoading />}>
+        <HomeworkPanel teacher={teacher} />
+      </Suspense>
 
       {/* ---------- Students ---------- */}
       <section className={styles.pair}>
@@ -153,13 +117,13 @@ export default async function Dashboard({ searchParams }: Props) {
           <BarChart bars={d.places} orientation="rows" max={Math.max(...d.places.map((b) => b.max ?? 0), 1)} ariaLabel="Places used per batch"
             emptyText="No open batches." />
         </article>
-        <article className={styles.card}>
+        {!teacher && <article className={styles.card}>
           <h2>Enquiry pipeline</h2>
           <p className={styles.cardSub}>
             Open enquiries at each stage · {d.enquirySummary.enrolled} enrolled, {d.enquirySummary.lost} not proceeding so far
           </p>
           <BarChart bars={d.pipeline} orientation="rows" max={Math.max(...d.pipeline.map((b) => b.value ?? 0), 1)} ariaLabel="Enquiries by stage" />
-        </article>
+        </article>}
       </section>
     </>
   );

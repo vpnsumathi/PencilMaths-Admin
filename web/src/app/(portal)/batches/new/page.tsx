@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
 import ui from '@/components/ui.module.css';
+import { requireStaff } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { BatchForm } from '../BatchForm';
 
@@ -9,6 +10,7 @@ export const metadata = { title: 'New batch' };
 type Props = { searchParams: Promise<{ error?: string }> };
 
 export default async function NewBatchPage({ searchParams }: Props) {
+  await requireStaff();
   const { error: problem } = await searchParams;
   const supabase = await createClient();
   const [{ data: subjects }, { data: teachers }] = await Promise.all([

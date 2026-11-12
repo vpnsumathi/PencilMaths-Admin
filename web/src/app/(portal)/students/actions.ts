@@ -2,15 +2,18 @@
 
 import { revalidatePath } from 'next/cache';
 import { unstable_rethrow } from 'next/navigation';
+import { requireStaff } from '@/lib/auth';
 import { redirectWith, text } from '@/lib/form';
 import { EMAIL, STUDENT_STATUSES, UUID, YEARS } from '@/lib/options';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { deleteLogin, discardNewLogin, inviteOrFindLogin, resendInvite } from '@/lib/logins';
 import { createClient } from '@/lib/supabase/server';
 import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
+import { findStudentMatches } from './duplicates';
 
 // Adds or updates a student. The database function save_student (file 4) saves the student,
 // family, main parent, subjects and folder link together, so a half-saved student is impossible.
 export async function saveStudent(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (id && !UUID.test(id)) redirectWith('/students', 'error', 'Student not found.');
   const formPath = id ? `/students/${id}` : '/students/new';
@@ -47,6 +50,16 @@ export async function saveStudent(form: FormData) {
     folder_url: text(form, 'folder_url'),
   };
 
+  // A new student with the same first name, last name and year group as one already in the app needs the
+  // "This is a different student" tick (the form shows the match as soon as the name is typed).
+  if (!id && form.get('confirm_duplicate') !== 'yes') {
+    const same = await findStudentMatches(p.first_name, p.last_name, yearGroup);
+    if (same.length > 0) {
+      redirectWith(formPath, 'error', `${same.map((m) => `${m.code} ${m.first_name} ${m.last_name}`).join(', ')} already has this name and year group. `
+        + 'Open that student instead, or add the new one again and tick "This is a different student".');
+    }
+  }
+
   const supabase = await createClient();
   const { data: studentId, error } = await supabase.rpc('save_student', { p });
   if (error) {
@@ -72,6 +85,7 @@ redirectWith(`/students/${studentId}`, 'ok', id ? 'Student updated.' : 'Student 
 }
 // "Create Drive folder" button on the student page (existing students, or after a Drive problem).
 export async function createDriveFolder(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (!UUID.test(id)) redirectWith('/students', 'error', 'Student not found.');
   const path = `/students/${id}`;
@@ -87,8 +101,28 @@ export async function createDriveFolder(form: FormData) {
     driveOk ? 'Drive folder created.' : 'Could not create the Drive folder. Check the connection at /google-drive.',
   );
 }
+// "Create missing folders" on the Students list: makes Google Drive folders for up to 5 students per call
+// (the page calls it again until all are done), so a long list never hits the server's time limit.
+export async function createMissingDriveFolders(ids: string[]): Promise<{ made: number; failed: number }> {
+  await requireStaff();
+  let made = 0;
+  let failed = 0;
+  for (const id of ids.slice(0, 5)) {
+    if (!UUID.test(id)) { failed++; continue; }
+    try {
+      await ensureStudentDriveFolder(id);
+      made++;
+    } catch (e) {
+      console.error('createMissingDriveFolders failed for', id, e);
+      failed++;
+    }
+  }
+  revalidatePath('/students');
+  return { made, failed };
+}
 // Makes a new secret hand-in code; the old WhatsApp link stops working immediately.
 export async function resetHandInLink(form: FormData) {
+  await requireStaff();
   const id = text(form, 'id');
   if (!UUID.test(id)) redirectWith('/students', 'error', 'Student not found.');
   const path = `/students/${id}`;
@@ -124,107 +158,90 @@ async function studentForAccess(form: FormData) {
 
 // Sends an invite email. The student clicks it, chooses a password and lands on their dashboard.
 export async function givePortalAccess(form: FormData) {
+  await requireStaff();
   const { supabase, student, path } = await studentForAccess(form);
   const email = text(form, 'email').toLowerCase();
   if (!EMAIL.test(email)) redirectWith(path, 'error', 'Enter a valid email address.');
   if (student.status === 'left') redirectWith(path, 'error', 'This student has left, so they cannot have a login.');
   if (student.auth_user_id) redirectWith(path, 'error', 'This student already has a login.');
 
+  // An email that already has a login (staff, or used before for a brother or sister) is linked instead.
   let invitedId: string;
-  let existing = false;
+  let existing: boolean;
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      data: { role: 'student' },
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/accept`,
-    });
-    if (error) {
-      // The email already has a login (staff, or used before): link that login instead.
-      if (!/already|registered|exists/i.test(error.message)) throw new Error(error.message);
-      const found = await findUserByEmail(email);
-      if (!found) throw new Error(error.message);
-      invitedId = found;
-      existing = true;
-    } else {
-      invitedId = data.user.id;
-    }
+    ({ id: invitedId, existing } = await inviteOrFindLogin(email, { role: 'student' }));
   } catch (e) {
     unstable_rethrow(e); // let redirects through
     console.error('givePortalAccess failed:', e);
     redirectWith(path, 'error', 'Could not send the invite. Check SUPABASE_SECRET_KEY is set.');
   }
 
-  // One login opens one student, so move it here if another student had it.
-  if (existing) await supabase.from('students').update({ auth_user_id: null }).eq('auth_user_id', invitedId);
+  // Family login: an email that already opens a brother or sister now opens this student too.
+  const { data: siblings } = existing
+    ? await supabase.from('students').select('first_name').eq('auth_user_id', invitedId).neq('id', student.id)
+    : { data: [] };
 
   const { data, error } = await supabase.from('students').update({ auth_user_id: invitedId }).eq('id', student.id).select('id');
   if (error || data.length === 0) {
     console.error('givePortalAccess save failed:', error?.message ?? 'no rows updated');
-    if (!existing) await createAdminClient().auth.admin.deleteUser(invitedId); // don't leave a new login linked to nobody
-    redirectWith(path, 'error', 'Could not save the login.');
+    if (!existing) await discardNewLogin(invitedId); // don't leave a new login linked to nobody
+    // P0001: refused on purpose, e.g. the email is a teacher's login.
+    redirectWith(path, 'error', error?.code === 'P0001' ? error.message : 'Could not save the login.');
   }
   revalidatePath(path);
   redirectWith(
     path,
     'ok',
-    existing
-      ? `${email} already had a login, so it is now linked to this student. They sign in with that password (or use Forgot password).`
-      : `Invite sent to ${email}.`,
+    siblings?.length
+      ? `Linked to the existing login for ${email}, which also opens ${siblings.map((x) => x.first_name).join(', ')}. They sign in as before and switch child from the top bar.`
+      : existing
+        ? `${email} already had a login, so it is now linked to this student. They sign in with that password (or use Forgot password).`
+        : `Invite sent to ${email}.`,
   );
-}
-
-// Supabase has no lookup by email, so page through the logins (fine at this size).
-async function findUserByEmail(email: string): Promise<string | null> {
-  const admin = createAdminClient();
-  for (let page = 1; page <= 50; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) throw new Error(error.message);
-    const user = data.users.find((u) => u.email?.toLowerCase() === email);
-    if (user) return user.id;
-    if (data.users.length < 200) return null;
-  }
-  return null;
 }
 
 // Sends the invite email again (only while it has not been accepted).
 export async function resendPortalInvite(form: FormData) {
+  await requireStaff();
   const { student, path } = await studentForAccess(form);
   if (!student.auth_user_id) redirectWith(path, 'error', 'This student has no login yet.');
+  let outcome: 'sent' | 'accepted';
   try {
-    const admin = createAdminClient();
-    const { data } = await admin.auth.admin.getUserById(student.auth_user_id);
-    if (!data.user?.email) throw new Error('login not found');
-    if (data.user.last_sign_in_at) redirectWith(path, 'error', 'The invite was already accepted.');
-    const { error } = await admin.auth.admin.inviteUserByEmail(data.user.email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/accept`,
-    });
-    if (error) throw new Error(error.message);
+    outcome = await resendInvite(student.auth_user_id);
   } catch (e) {
-    unstable_rethrow(e); // let redirects through
     console.error('resendPortalInvite failed:', e);
     redirectWith(path, 'error', 'Could not resend the invite. Try Remove access, then give access again.');
   }
+  if (outcome === 'accepted') redirectWith(path, 'error', 'The invite was already accepted.');
   redirectWith(path, 'ok', 'Invite sent again.');
 }
 
 // Deletes the student's login. Their record, homework and marks are kept.
 export async function removePortalAccess(form: FormData) {
+  await requireStaff();
   const { supabase, student, path } = await studentForAccess(form);
   if (!student.auth_user_id) redirectWith(path, 'error', 'This student has no login.');
 
-  // A staff login is only unlinked, never deleted.
-  const { data: staff } = await supabase.from('staff').select('id').eq('id', student.auth_user_id).maybeSingle();
-  if (staff) {
-    await supabase.from('students').update({ auth_user_id: null }).eq('id', student.id);
+  // A staff login, or a family login a brother or sister still uses, is only unlinked, never deleted.
+  const [{ data: staff }, { data: siblings }] = await Promise.all([
+    supabase.from('staff').select('id').eq('id', student.auth_user_id).maybeSingle(),
+    supabase.from('students').select('first_name').eq('auth_user_id', student.auth_user_id).neq('id', student.id),
+  ]);
+  if (staff || siblings?.length) {
+    const { data: unlinked, error: unlinkError } = await supabase.from('students').update({ auth_user_id: null }).eq('id', student.id).select('id');
+    if (unlinkError || unlinked.length === 0) {
+      console.error('removePortalAccess unlink failed:', unlinkError?.message ?? 'no rows updated');
+      redirectWith(path, 'error', 'Could not remove the login.');
+    }
     revalidatePath(path);
-    redirectWith(path, 'ok', 'Unlinked. That login belongs to staff, so it was kept.');
+    redirectWith(path, 'ok', staff
+      ? 'Unlinked. That login belongs to staff, so it was kept.'
+      : `Unlinked. The login is kept because it also opens ${siblings!.map((x) => x.first_name).join(', ')}.`);
   }
 
   try {
-    const { error } = await createAdminClient().auth.admin.deleteUser(student.auth_user_id);
-    if (error) throw new Error(error.message);
+    await deleteLogin(student.auth_user_id);
   } catch (e) {
-    unstable_rethrow(e);
     console.error('removePortalAccess failed:', e);
     redirectWith(path, 'error', 'Could not remove the login.');
   }

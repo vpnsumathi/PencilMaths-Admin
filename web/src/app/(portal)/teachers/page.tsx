@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
+import { CreatedModified } from '@/components/CreatedModified';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
+import { requireStaff } from '@/lib/auth';
 import { yearRange } from '@/lib/format';
 import { TEACHER_STATUSES } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
@@ -11,13 +13,14 @@ export const metadata = { title: 'Teachers' };
 type Props = { searchParams: Promise<{ ok?: string; error?: string }> };
 
 export default async function TeachersPage({ searchParams }: Props) {
+  await requireStaff();
   const { ok, error: problem } = await searchParams;
   const supabase = await createClient();
 
   // teacher_list is a database view: each teacher plus their open batch and student counts.
   const { data: teachers, error } = await supabase
     .from('teacher_list')
-    .select('id, code, first_name, last_name, subject, year_min, year_max, status, phone, batch_count, student_count')
+    .select('id, code, first_name, last_name, subject, year_min, year_max, status, phone, batch_count, student_count, created_at, updated_at')
     .order('last_name')
     .order('first_name');
   if (error) throw error;
@@ -34,7 +37,7 @@ export default async function TeachersPage({ searchParams }: Props) {
         <div className={ui.tableWrap}>
           <table className={ui.table}>
             <thead>
-              <tr><th>Code</th><th>Name</th><th>Subject</th><th>Years</th><th>Status</th><th>Batches</th><th>Students</th><th>Phone</th></tr>
+              <tr><th>Code</th><th>Name</th><th>Subject</th><th>Years</th><th>Status</th><th>Batches</th><th>Students</th><th>Phone</th><th>Created / modified</th></tr>
             </thead>
             <tbody>
               {teachers.map((t) => (
@@ -47,6 +50,7 @@ export default async function TeachersPage({ searchParams }: Props) {
                   <td>{t.batch_count}</td>
                   <td>{t.student_count}</td>
                   <td>{t.phone ?? '—'}</td>
+                  <td><CreatedModified created={t.created_at} updated={t.updated_at} /></td>
                 </tr>
               ))}
             </tbody>

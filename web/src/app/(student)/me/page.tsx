@@ -1,26 +1,29 @@
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { yearLabel } from '@/lib/options';
 import styles from '../student.module.css';
 import { type Dashboard, nextClass } from './dashboard';
+import { currentClass } from '@/lib/classLink';
+import { JoinClassButton } from './classes/JoinClassButton';
+import { getMyDashboard } from './myDashboard';
 
 export const metadata = { title: 'My dashboard' };
 
 // The student's home page: tiles for their classes and homework, then their class schedule.
 export default async function MyDashboard() {
-  const supabase = await createClient();
-  const { data } = await supabase.rpc('my_dashboard');
-  const me = data as Dashboard; // the layout has already checked this is a student
+  // The same answer the layout already asked for (cached), so no second call.
+  const me = (await getMyDashboard()) as Dashboard; // the layout has already checked this is a student
   const hw = me.homework;
-  // Soonest class first; classes with no times yet go last.
   const schedule = me.classes
-    .map((c) => ({ c, next: nextClass(c.times) }))
-    .sort((a, b) => (a.next ? `${a.next.date} ${a.next.time}` : 'z').localeCompare(b.next ? `${b.next.date} ${b.next.time}` : 'z'));
+    .map((c) => ({ c, next: nextClass(c.times), now: currentClass(c.times, me.class_window) }))
+    // A class happening now comes first; then the soonest; classes with no times yet go last.
+    .sort((a, b) => Number(b.now !== null) - Number(a.now !== null)
+      || (a.next ? `${a.next.date} ${a.next.time}` : 'z').localeCompare(b.next ? `${b.next.date} ${b.next.time}` : 'z'));
 
   return (
     <>
       <h1>Hi {me.first_name}</h1>
       <p className={styles.muted}>
-        {me.first_name} {me.last_name} · {me.code} · Year {me.year_group}
+        {me.first_name} {me.last_name} · {me.code} · {yearLabel(me.year_group)}
         {me.school ? ` · ${me.school}` : ''}
       </p>
 
@@ -77,15 +80,17 @@ export default async function MyDashboard() {
         <p className={styles.subject}>Class schedule</p>
         {schedule.length === 0 && <p className={styles.muted}>You are not in any classes yet.</p>}
         <div className={styles.scheduleList}>
-          {schedule.map(({ c, next }) => (
-            <div key={c.subject} className={styles.block}>
-              <span className={styles.mid}>🗓️</span>
+          {schedule.map(({ c, next, now }) => (
+            <div key={c.subject} className={`${styles.block} ${now ? styles.blockNow : ''}`}>
+              <span className={styles.mid}>{now ? '🟢' : '🗓️'}</span>
               <div>
                 <strong>{c.subject}{c.batch_code ? ` · ${c.batch_code}` : ''}</strong>
-                <p className={styles.nextClass}>{next ? `Next class: ${next.label}` : 'Class times to be confirmed'}</p>
+                {now && <p className={styles.nowLabel}>{now.label}</p>}
+                <p className={now ? styles.muted : styles.nextClass}>{next ? `Next class: ${next.label}` : 'Class times to be confirmed'}</p>
                 <p className={styles.muted}>
                   {c.topic ? <>{c.topic_started ? 'Topic now: ' : 'First topic: '}<strong>{c.topic}</strong></> : 'Topic to be confirmed'}
                 </p>
+                {c.batch_id && c.has_class_link && <JoinClassButton batchId={c.batch_id} checkIn={now !== null} />}
               </div>
             </div>
           ))}

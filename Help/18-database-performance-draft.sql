@@ -1,0 +1,2 @@
+-- This draft became supabase/migrations/20261106000001_faster_database.sql on 6 Nov 2026.
+-- Use that file. This one can be deleted.

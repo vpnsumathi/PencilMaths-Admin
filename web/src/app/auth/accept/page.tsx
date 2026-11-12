@@ -2,7 +2,9 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import styles from '@/components/AuthCard.module.css';
 
 // Invite emails and "Forgot password" emails land here with the session in the
 // address hash (#access_token=…&refresh_token=…), or with #error=… when the
@@ -50,19 +52,26 @@ export default function AcceptInvite() {
   }, [router]);
 
   return (
-    <main style={{ padding: 24, maxWidth: 420 }}>
-      {problem ? (
-        <>
-          <h1>This link has expired</h1>
-          <p>
-            Email links work once and only for a limited time. For a password reset, use Forgot
-            password on the <a href="/login">sign-in page</a> again. For an invite, ask Pencil Maths to send a new one.
-          </p>
-          <p style={{ color: '#666', fontSize: 14 }}>Reason: {problem}</p>
-        </>
-      ) : (
-        <p>Signing you in…</p>
-      )}
+    <main className={styles.page}>
+      <section className={styles.card}>
+        <Image src="/logo.png" alt="Pencil Maths" width={181} height={60} priority className={styles.logo} />
+        {problem ? (
+          <>
+            <h1 className={styles.title}>This link has expired</h1>
+            <p className={styles.subtitle}>Email links work once and only for a limited time.</p>
+            <p className={styles.text}>
+              For a password reset, use Forgot password on the <a href="/login">sign-in page</a> again.
+              For an invite, ask Pencil Maths to send a new one.
+            </p>
+            <p className={styles.reason}>Reason: {problem}</p>
+          </>
+        ) : (
+          <>
+            <h1 className={styles.title}>Signing you in…</h1>
+            <p className={styles.subtitle}>This takes a moment.</p>
+          </>
+        )}
+      </section>
     </main>
   );
 }

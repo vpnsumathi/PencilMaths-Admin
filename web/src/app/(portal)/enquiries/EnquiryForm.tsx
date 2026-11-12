@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
-import { YEARS } from '@/lib/options';
+import { yearLabel, YEARS } from '@/lib/options';
 import { saveEnquiry } from './actions';
 
 export type Enquiry = {
@@ -39,7 +39,7 @@ export function EnquiryForm({ enquiry, subjects }: { enquiry?: Enquiry; subjects
           <Field label="Year group">
             <select name="year_group" required defaultValue={enquiry?.year_group ?? ''} className={ui.select}>
               <option value="" disabled>Choose…</option>
-              {YEARS.map((y) => <option key={y} value={y}>Year {y}</option>)}
+              {YEARS.map((y) => <option key={y} value={y}>{yearLabel(y)}</option>)}
             </select>
           </Field>
           <Field label="School">

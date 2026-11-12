@@ -2,6 +2,7 @@
 
 > How to test everything built so far: sign-in, staff, subjects, teachers, batches, students, the dashboard, enquiries and the WhatsApp homework feature (Phases 1–5).
 > Each section has a table. Do what the left column says, check that the right column matches, then tick the box. The detailed guides are linked in each heading.
+> **Automated tests (since 6 Nov 2026):** the database rules, saves and logins are also checked automatically on GitHub before every go-live. See `20-automation-testing.md`. This manual guide is still the way to check screens, Google Drive and emails.
 
 | | |
 |---|---|
@@ -151,7 +152,9 @@ Run this after any change, before the full test.
 | ☐ | Open **Teachers** | 5 teachers with code, subject, years, status, and batch and student counts. Sara Ahmed is **On leave** |
 | ☐ | **Add teacher** with a name, email, subject and years 7 to 11 | Saved, with a new code (T006 and so on) |
 | ☐ | Add another teacher with the **same email** | "Another teacher already uses that email." |
-| ☐ | Enter years 11 to 7 (lowest above highest) | "The lowest year group cannot be above the highest." |
+| ☐ | Enter GCSE - H to Year 7 (lowest above highest) | "The lowest year group cannot be above the highest." |
+| ☐ | Year group pickers (student, batch, enquiry, teacher, curriculum, Lesson library) | Year 1 to Year 10, then GCSE - H, then GCSE - F. No Year 11, 12 or 13 |
+| ☐ | A GCSE - H student and batch | Lists show `GCSE-H`; the student and batch pages show `GCSE - H` |
 | ☐ | Leave the email as `abc` | "Enter a valid email address." |
 | ☐ | Click a teacher, change the phone number and save | Saved |
 
@@ -203,7 +206,7 @@ Run this after any change, before the full test.
 | ☐ | Switch the range: 7 days, 4 weeks, 90 days | Numbers change; the address shows `?range=…` |
 | ☐ | Hover over a bar, or use Tab to reach it | A tooltip with the value |
 | ☐ | Press **Table** on a chart | The same data as a table |
-| ☐ | **Needs attention** | Lists the unlogged classes from the latest week (from the dummy data), homework to mark, students without a batch and enquiries waiting 7 or more days |
+| ☐ | **Needs attention** | Lists the unlogged classes from the latest week (from the dummy data), homework to mark, students without a batch and enquiries waiting 7 or more days. A full batch is **not** listed |
 | ☐ | Click an enquiry in Needs attention | Opens that lead |
 
 ---

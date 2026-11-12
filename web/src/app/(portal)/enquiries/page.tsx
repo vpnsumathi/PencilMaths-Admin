@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
-import { ENQUIRY_STAGES, stageTone } from '@/lib/options';
+import { requireStaff } from '@/lib/auth';
+import { ENQUIRY_STAGES, stageTone, yearShort } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = { title: 'Enquiries' };
@@ -10,6 +11,7 @@ export const metadata = { title: 'Enquiries' };
 type Props = { searchParams: Promise<{ ok?: string; error?: string; stage?: string }> };
 
 export default async function EnquiriesPage({ searchParams }: Props) {
+  await requireStaff();
   const { ok, error: problem, stage = 'open' } = await searchParams;
   const supabase = await createClient();
 
@@ -52,7 +54,7 @@ export default async function EnquiriesPage({ searchParams }: Props) {
                   <tr key={e.id}>
                     <td className={ui.muted}>{e.code}</td>
                     <td><Link href={`/enquiries/${e.id}`} className={ui.link}>{e.child_first_name} {e.child_last_name}</Link></td>
-                    <td>{e.year_group}</td>
+                    <td>{yearShort(e.year_group)}</td>
                     <td>{subjects.join(', ') || '—'}</td>
                     <td>{e.parent_name}</td>
                     <td>{e.parent_phone ?? '—'}</td>
