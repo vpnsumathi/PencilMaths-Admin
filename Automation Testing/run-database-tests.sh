@@ -11,6 +11,7 @@
 #   Run:    bash "Automation Testing/run-database-tests.sh"
 #   Needs:  psql, createdb and dropdb (PostgreSQL 15 or later), and a Postgres server it may create a database on.
 #           Point it at the server with the usual PGHOST, PGPORT, PGUSER and PGPASSWORD settings.
+#   PROD_SQL=yes bash "Automation Testing/run-database-tests.sh" builds from the "Prod Sql" folder instead.
 #   Result: one line per check; the last line says how many passed. Exit code 0 = all passed, 1 = something failed.
 #
 # GitHub runs this automatically (.github/workflows/automation-tests.yml). See Help/20-automation-testing.md.
@@ -48,29 +49,41 @@ createdb "$DB" || { echo "${red}Could not create the test database \"$DB\". Is P
 
 # 2. Supabase's basics, every migration in order, the starting data, then the test helpers.
 out=$("${PSQL[@]}" < "$HERE/database/supabase-stub.sql" 2>&1) || fail_setup "supabase-stub.sql" "$out"
-# Migrations in supabase/migrations and its AI/ folder, together in date order (by file name).
-migrations=()
-while IFS=$'\t' read -r _ path; do migrations+=("$path"); done < <(
-  for f in "$ROOT"/supabase/migrations/*.sql "$ROOT"/supabase/migrations/AI/*.sql; do
-    [ -e "$f" ] && printf '%s\t%s\n' "$(basename "$f")" "$f"
-  done | sort)
-count=0
-for f in "${migrations[@]}"; do
-  out=$("${PSQL[@]}" < "$f" 2>&1) || fail_setup "$(basename "$f")" "$out"
-  count=$((count + 1))
-done
-out=$("${PSQL[@]}" < "$ROOT/supabase/seed.sql" 2>&1) || fail_setup "seed.sql" "$out"
+if [ "${PROD_SQL:-}" = yes ]; then
+  # PROD_SQL=yes: build from the "Prod Sql" folder instead (the one-off scripts for a new Production
+  # database), to check they give the same database as the migrations. See "Prod Sql/README.md".
+  for f in "$ROOT/Prod Sql/01_schema.sql" "$ROOT/Prod Sql/02_seed.sql"; do
+    out=$("${PSQL[@]}" < "$f" 2>&1) || fail_setup "$(basename "$f")" "$out"
+  done
+  built="the Prod Sql scripts (01_schema.sql + 02_seed.sql)"
+else
+  # Migrations in supabase/migrations and its AI/ folder, together in date order (by file name).
+  migrations=()
+  while IFS=$'\t' read -r _ path; do migrations+=("$path"); done < <(
+    for f in "$ROOT"/supabase/migrations/*.sql "$ROOT"/supabase/migrations/AI/*.sql; do
+      [ -e "$f" ] && printf '%s\t%s\n' "$(basename "$f")" "$f"
+    done | sort)
+  count=0
+  for f in "${migrations[@]}"; do
+    out=$("${PSQL[@]}" < "$f" 2>&1) || fail_setup "$(basename "$f")" "$out"
+    count=$((count + 1))
+  done
+  out=$("${PSQL[@]}" < "$ROOT/supabase/seed.sql" 2>&1) || fail_setup "seed.sql" "$out"
+  built="$count migration scripts"
+fi
 out=$("${PSQL[@]}" < "$HERE/database/helpers.sql" 2>&1) || fail_setup "helpers.sql" "$out"
-echo "${bold}Test database built from $count migration scripts.${plain}"
+echo "${bold}Test database built from $built.${plain}"
 echo
 
-{ echo "## Database tests"; echo; echo "Built from $count migration scripts."; echo; echo "| Test file | Passed | Failed |"; echo "|---|---|---|"; } >> "$SUMMARY"
+{ echo "## Database tests"; echo; echo "Built from $built."; echo; echo "| Test file | Passed | Failed |"; echo "|---|---|---|"; } >> "$SUMMARY"
 
 # 3. Each test file, in its own transaction that is rolled back at the end.
 total_pass=0; total_fail=0; failed_files=()
 for f in "$HERE"/database/*.test.sql; do
   name="$(basename "$f" .test.sql)"
   [ -n "$ONLY" ] && [[ "$name" != *"$ONLY"* ]] && continue
+  # The AI question bank is not part of Prod Sql (it stays on its own branch), so its tests are skipped there.
+  if [ "${PROD_SQL:-}" = yes ] && [[ "$name" == *question-bank* ]]; then echo "${bold}$name${plain}: skipped (AI, not in Prod Sql)"; echo; continue; fi
   out=$( { echo "begin;"; cat "$HERE/database/fixtures.sql"; cat "$f"; echo; echo "select tests.as_owner();"; \
            echo "select line from tests.report() as line;"; echo "rollback;"; } \
          | psql -X -q -At -v ON_ERROR_STOP=1 -d "$DB" 2>&1 )

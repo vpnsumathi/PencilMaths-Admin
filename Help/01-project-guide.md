@@ -880,6 +880,18 @@ You then commit `Help/01-project-guide.md` as usual (section 11).
 
 Newest first.
 
+### 2026-11-12 — Prod Sql: a new Production database in 4 files
+**What changed:**
+- New folder `Prod Sql` builds a new, empty Production database in one go, instead of running the 29 migration files one by one: `01_schema.sql` (every table, function, view and rule written once in its final form; all-or-nothing), `02_seed.sql` (4 subjects, 54 topics; safe to run twice), `03_first_admin.sql` and `04_check.sql` (read-only; every row must say yes).
+- Checked: a database built from these files is identical to one built from the 29 migrations up to `20261111000003`, and all 455 database checks pass on it. Also tried as a non-superuser owner (like Supabase) and with no default table rights: same permissions.
+- Not included: the AI question bank (`supabase/migrations/AI`).
+- Found on the way: `supabase/seed.sql` says it is safe to re-run, but running it twice doubles the curriculum topics (there is no unique rule on them). `Prod Sql/02_seed.sql` skips a subject that already has topics.
+
+**Files added / changed / removed:**
+- `Prod Sql/README.md`, `01_schema.sql`, `02_seed.sql`, `03_first_admin.sql`, `04_check.sql` — new.
+- `Automation Testing/run-database-tests.sh` — `PROD_SQL=yes` builds from `Prod Sql` instead of the migrations (AI tests skipped).
+- `Help/13-staging-and-production.md` (section 4), `Help/20-automation-testing.md` (section 2) — updated.
+
 ### 2026-11-11 — Test runner safety check
 **What changed:**
 - The database test runner deletes and rebuilds the database it is pointed at. Before, it only refused a server address containing "supabase". Now it runs only on this computer's own Postgres (or GitHub's), refuses `PGSERVICE`, and only deletes a database whose name contains "test". A test server in Docker needs `ALLOW_TEST_HOST=yes`.

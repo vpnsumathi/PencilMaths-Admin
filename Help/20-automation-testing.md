@@ -59,6 +59,8 @@ bash "Automation Testing/run-database-tests.sh"
 ```
 To run one area only, add part of its name, for example `bash "Automation Testing/run-database-tests.sh" teacher`.
 
+To check the `Prod Sql` scripts (guide 13, section 4) instead of the migrations: `PROD_SQL=yes bash "Automation Testing/run-database-tests.sh"`. The AI question bank tests are skipped then, because Prod Sql doesn't include it.
+
 You can also ask Claude in this project to run them on the folder.
 
 > ⚠️ Never point the tests at Supabase. They delete and rebuild their own database. The runner refuses unless `PGHOST` is this computer (`localhost`, `127.0.0.1` or a socket folder), refuses if `PGSERVICE` is set, and refuses a database name without "test" in it. For a test server in a Docker container, set `ALLOW_TEST_HOST=yes` (a Supabase address is still refused).

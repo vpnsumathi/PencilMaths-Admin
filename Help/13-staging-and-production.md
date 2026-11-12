@@ -92,13 +92,13 @@ A new file in `supabase/migrations/` changes the database, so it has to be run o
 | While building | **Staging** Supabase only (SQL Editor › paste › Run) |
 | When going live | **Production** Supabase, just **before** merging into `main` |
 
-- Keep a note of which scripts Production has had. The last one run on Production when it was set up was `20261020000006_student_handed_in_files.sql`.
-- ⚠️ **Never** run `dummy_data.sql` or `clear_dummy_data.sql` on Production.
+- Keep a note of which scripts Production has had. A new Production database gets the `Prod Sql` scripts first, which hold everything up to `20261111000003_handin_server_only.sql`.
+- ⚠️ **Never** run `dummy_data.sql`, `clear_dummy_data.sql` or `clear_all_people_data.sql` on Production.
 - Always check the project name at the top left of Supabase before pressing Run.
 
-**Production was built with these, in order:** the 4 base scripts `20260928000001`–`04`, then `seed.sql`, `20261007000001`, `20261011000001`, `20261020000001`–`06`.
+**Setting up a new Production database:** don't run the migration files one by one. Run the 4 files in the `Prod Sql` folder instead, in order (its `README.md` has the steps): `01_schema.sql` (everything the app needs, all-or-nothing), `02_seed.sql` (subjects and topics), `03_first_admin.sql` (your admin login) and `04_check.sql` (a read-only check; every row must say yes). They give exactly the same database as the 29 migration files up to `20261111000003`, without the Staging-only steps such as the GCSE delete. The AI question bank (`supabase/migrations/AI`) is not included.
 
-**Waiting for Production (run in this order at go-live):** `20261023000001`, `20261024000001`, `20261027000001`–`04`, `20261102000001_bulk_import.sql` (Settings and Bulk import, guide 16), `20261103000001_atomic_saves.sql` (batches and homework saved all at once), `20261103000002_created_modified_dates.sql` (Created / modified column on the lists), `20261103000003_drive_folder_ids.sql` (Drive folders remembered by id), `20261105000001_teacher_time_clash.sql` (a teacher can't be given the same class time twice), `20261105000002_lesson_homework_marks.sql` (a maximum mark for each homework in Mark completed), `20261106000001_faster_database.sql` (the same access rules, much faster; dashboard indexes; faster Batches list; guide 18), `20261108000001_gcse_year_groups.sql` (GCSE - H and GCSE - F instead of Year 11–13; guide 02, GCSE section). ⚠️ **This last one deletes every Year 11, 12 and 13 student, batch, enquiry and lesson on Production, and it can't be undone.** Run the "see what will be deleted" query in guide 02 first, and only run it once you are sure the Production Year 11–13 data can go (or has been written down to add again as GCSE-H / GCSE-F).
+**After that:** run only migration files dated **after** `20261111000003` on Production, one at a time, just before merging into `main`.
 
 ---
 
