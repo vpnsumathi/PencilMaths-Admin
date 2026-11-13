@@ -68,6 +68,7 @@ export async function AttendanceSection({ batchId, classDate }: { batchId: strin
             <input id="class_date" name="class_date" type="date" required max={today} defaultValue={date} className={ui.input} />
             <button className={ui.button}>Show</button>
             {date !== today && <Link href={`/batches/${batchId}#attendance`} className={ui.link}>Today</Link>}
+            <Link href={`/attendance?batch=${batchId}`} className={ui.link} style={{ marginLeft: 'auto' }}>Attendance List for this batch →</Link>
           </form>
 
           {register.recent.length > 0 && (

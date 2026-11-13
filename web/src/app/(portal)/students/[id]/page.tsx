@@ -4,12 +4,12 @@ import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
-import type { AttendanceTotals } from '@/lib/classLink';
+import { rangeDates, type StudentAttendance } from '@/lib/attendanceReport';
 import { formatPercent } from '@/lib/format';
 import { STUDENT_STATUSES, UUID, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { createDriveFolder } from '../actions';
-import { AttendanceCard } from '../AttendanceCard';
+import { AttendanceCard, cardPeriod, type CardPeriod } from '../AttendanceCard';
 import { HandInLink } from '../HandInLink';
 import { PortalAccess } from '../PortalAccess';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
@@ -18,12 +18,13 @@ export const metadata = { title: 'Student' };
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ ok?: string; error?: string; att?: string }>;
 };
 
 export default async function StudentPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { ok, error: problem } = await searchParams;
+  const { ok, error: problem, att } = await searchParams;
+  const period = cardPeriod(att);
   if (!UUID.test(id)) notFound();
 
   const supabase = await createClient();
@@ -34,13 +35,13 @@ export default async function StudentPage({ params, searchParams }: Props) {
     .eq('id', id)
     .maybeSingle();
   if (!found) notFound();
-  if (await isTeacher()) return <TeacherView student={found} />;
+  if (await isTeacher()) return <TeacherView student={found} period={period} />;
 
   // Date of birth and the secret hand-in code are only readable by staff, through student_private.
   const { data: extra } = await supabase.rpc('student_private', { p_student: id });
   const student = { ...found, date_of_birth: extra?.date_of_birth ?? null, handin_code: extra?.handin_code ?? '' };
 
-  const [{ data: guardian }, { data: enrolments }, { data: folder }, { data: stats }, options, { data: attendance }] = await Promise.all([
+  const [{ data: guardian }, { data: enrolments }, { data: folder }, { data: stats }, options, attendance] = await Promise.all([
     student.family_id
       ? supabase
           .from('guardians')
@@ -53,8 +54,8 @@ export default async function StudentPage({ params, searchParams }: Props) {
     supabase.from('file_links').select('url, provider').eq('student_id', id).eq('owner_type', 'student_folder').maybeSingle(),
     supabase.from('student_stats').select('attendance_pct, homework_pct').eq('student_id', id).maybeSingle(),
     loadStudentFormOptions(),
-    // Present / late / absent over the last 12 weeks, all classes. Empty until the class link script has been run.
-    supabase.rpc('attendance_totals', { p_student: id }),
+    // The Attendance card, over the chosen period (12 weeks unless the card's buttons chose another).
+    loadAttendance(id, period),
   ]);
 
   return (
@@ -89,7 +90,7 @@ export default async function StudentPage({ params, searchParams }: Props) {
       {(student.status !== 'left' || student.auth_user_id) && (
         <PortalAccess studentId={student.id} authUserId={student.auth_user_id} suggestedEmail={guardian?.email ?? null} />
       )}
-      <AttendanceCard totals={attendance as AttendanceTotals | null} />
+      <AttendanceCard studentId={student.id} period={period} {...attendance} />
       <StudentForm
         student={student as Student}
         guardian={guardian as Guardian | null}
@@ -101,18 +102,27 @@ export default async function StudentPage({ params, searchParams }: Props) {
   );
 }
 
+// The Attendance card's numbers (student_attendance). notReady until 20261113000001_attendance_report.sql has run.
+async function loadAttendance(studentId: string, period: CardPeriod) {
+  const supabase = await createClient();
+  const p_from = period === 'all' ? null : rangeDates(period).from;
+  const { data, error } = await supabase.rpc('student_attendance', { p_student: studentId, p_from });
+  if (error) console.error('student_attendance:', error.message);
+  return { data: (data as StudentAttendance | null) ?? null, notReady: error?.code === 'PGRST202' };
+}
+
 type Basic = { id: string; code: string; first_name: string; last_name: string; year_group: number; school: string | null; status: string };
 
 // What a teacher sees: the student and their classes with this teacher. No parent details, logins,
 // hand-in link or Drive folder, and nothing to edit.
-async function TeacherView({ student }: { student: Basic }) {
+async function TeacherView({ student, period }: { student: Basic; period: CardPeriod }) {
   const supabase = await createClient();
-  const [{ data: enrolments }, { data: stats }, { data: attendance }] = await Promise.all([
+  const [{ data: enrolments }, { data: stats }, attendance] = await Promise.all([
     // Only enrolments in the teacher's own batches come back.
     supabase.from('enrolments').select('id, batch_id, subjects(name), batches(code, year_group)').eq('student_id', student.id).is('ended_on', null),
     supabase.from('student_stats').select('attendance_pct, homework_pct').eq('student_id', student.id).maybeSingle(),
-    // Only attendance in the teacher's own classes comes back (database rules).
-    supabase.rpc('attendance_totals', { p_student: student.id }),
+    // Only attendance in the teacher's own classes comes back (the database decides).
+    loadAttendance(student.id, period),
   ]);
   type Row = { id: string; batch_id: string; subjects: { name: string } | null; batches: { code: string; year_group: number } | null };
 
@@ -129,7 +139,7 @@ async function TeacherView({ student }: { student: Basic }) {
         </div>
         <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
       </div>
-      <AttendanceCard totals={attendance as AttendanceTotals | null} note="your classes" />
+      <AttendanceCard studentId={student.id} period={period} {...attendance} note="your classes" />
       <section className={ui.card} style={{ maxWidth: 900 }}>
         <h2>Classes with you</h2>
         <ul className={ui.list}>

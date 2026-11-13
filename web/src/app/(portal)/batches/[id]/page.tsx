@@ -144,9 +144,12 @@ export default async function BatchPage({ params, searchParams }: Props) {
             {times && <> · {times}</>}
           </p>
         </div>
-        {joinLink && !batch.closed_on && (
-          <a href={joinLink} target="_blank" rel="noopener noreferrer" className={ui.primaryButton}>Join class</a>
-        )}
+        <div className={ui.formActions}>
+          <Link href={`/attendance?batch=${batch.id}`} className={ui.button}>Attendance List</Link>
+          {joinLink && !batch.closed_on && (
+            <a href={joinLink} target="_blank" rel="noopener noreferrer" className={ui.primaryButton}>Join class</a>
+          )}
+        </div>
       </div>
       <Alerts ok={ok} problem={problem} />
 

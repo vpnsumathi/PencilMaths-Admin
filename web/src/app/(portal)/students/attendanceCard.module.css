@@ -1,0 +1,79 @@
+/* The student page Attendance card: a fixed layout, one line per class. */
+.card { --late: #d97706; margin-bottom: 16px; max-width: 900px; scroll-margin-top: 16px; }
+/* The same header bar as other cards (ui.card's first h2), with the period buttons on the right. */
+.head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  margin: -16px -16px 0; padding: 10px 16px 10px 20px; border-bottom: 1px solid var(--border); border-radius: 18px 18px 0 0;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.08), rgba(79, 70, 229, 0.02)); box-shadow: inset 4px 0 0 var(--brand);
+}
+.card .head h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--brand-deep); letter-spacing: -0.01em; }
+.note { color: var(--muted); font-weight: 400; font-size: 14px; }
+.periods { display: flex; flex-wrap: wrap; gap: 6px; }
+.period {
+  padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+  color: var(--muted); font-size: 12px; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.period:hover { border-color: var(--brand); color: var(--brand); }
+.periodOn, .periodOn:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+.summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 16px 0 12px; }
+.big b { display: block; font-size: 40px; font-weight: 800; line-height: 1; }
+.big small { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.counts { display: flex; flex-wrap: wrap; gap: 8px; }
+.count {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--border);
+  border-radius: 999px; font-size: 13px; font-weight: 600;
+}
+.count i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.dotP { background: var(--ok); }
+.dotL { background: var(--late); }
+.dotA { background: var(--danger); }
+.dotC { background: var(--brand); }
+
+.flags { display: grid; gap: 6px; margin: 0 0 12px; }
+.flagWarn, .flagInfo { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+.flagWarn { background: #fef3c7; color: #92400e; }
+.flagInfo { display: block; background: var(--brand-ring); color: var(--brand-strong); text-decoration: none; }
+.flagInfo:hover { text-decoration: underline; }
+
+.classes { margin: 0; padding: 0; list-style: none; }
+.cls {
+  display: grid; grid-template-columns: minmax(150px, 190px) 1fr auto; gap: 8px 16px; align-items: center;
+  padding: 12px 0; border-top: 1px solid var(--border);
+}
+.name { display: grid; gap: 2px; min-width: 0; }
+.name span { color: var(--muted); font-size: 12px; }
+.stripWrap { min-width: 0; }
+/* The dates under the squares line up with the first and last square. */
+.track { display: inline-grid; max-width: 100%; }
+.strip { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.axis { display: flex; justify-content: space-between; margin-top: 4px; color: var(--subtle); font-size: 11px; }
+.none { color: var(--subtle); font-size: 13px; }
+.earlier { margin-right: 4px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.rate { font-weight: 700; text-align: right; white-space: nowrap; }
+.ok { color: var(--ok); }
+.bad { color: var(--danger); }
+
+/* One class day */
+.sq { display: inline-block; flex: none; width: 16px; height: 16px; border-radius: 4px; vertical-align: middle; }
+a.sq:hover, a.sq:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.sqP { background: var(--ok); }
+.sqL { background: var(--late); }
+.sqA { background: var(--danger); }
+.sqC { background: var(--surface); outline: 2px dashed var(--brand); outline-offset: -2px; }
+.fixed { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--text); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+.legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.foot {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--border); font-size: 13px;
+}
+.more { color: var(--brand-strong); font-weight: 700; text-decoration: none; }
+.more:hover { text-decoration: underline; }
+
+@media (max-width: 600px) {
+  .cls { grid-template-columns: 1fr auto; }
+  .stripWrap { grid-column: 1 / -1; grid-row: 2; }
+  .big b { font-size: 32px; }
+}

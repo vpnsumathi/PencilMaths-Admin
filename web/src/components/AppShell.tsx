@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { signOut } from '@/app/actions';
 import styles from './AppShell.module.css';
 import {
-  BookIcon, CalendarIcon, HomeIcon, LogOutIcon, MailIcon, MenuIcon, PencilIcon, SettingsIcon, ShieldCheckIcon, UploadIcon, UsersIcon, XIcon,
+  BookIcon, CalendarIcon, ClipboardCheckIcon, HomeIcon, LogOutIcon, MailIcon, MenuIcon, PencilIcon, SettingsIcon, ShieldCheckIcon, UploadIcon, UsersIcon, XIcon,
 } from './icons';
 
 type Staff = { full_name: string; role: string };
@@ -18,6 +18,7 @@ const NAV: NavLink[] = [
   { href: '/students', label: 'Students', icon: UsersIcon, ready: true },
   { href: '/teachers', label: 'Teachers', icon: PencilIcon, ready: true },
   { href: '/batches', label: 'Batches', icon: CalendarIcon, ready: true },
+  { href: '/attendance', label: 'Attendance', icon: ClipboardCheckIcon, ready: true },
   { href: '/enquiries', label: 'Enquiries', icon: MailIcon, ready: true },
 ];
 const ADMIN_NAV: NavLink[] = [
@@ -36,6 +37,7 @@ const TEACHER_NAV: NavLink[] = [
   { href: '/', label: 'Dashboard', icon: HomeIcon, ready: true },
   { href: '/batches', label: 'My batches', icon: CalendarIcon, ready: true },
   { href: '/students', label: 'My students', icon: UsersIcon, ready: true },
+  { href: '/attendance', label: 'Attendance', icon: ClipboardCheckIcon, ready: true },
 ];
 
 export function AppShell({ staff, children }: { staff: Staff; children: React.ReactNode }) {
@@ -104,4 +106,4 @@ export function AppShell({ staff, children }: { staff: Staff; children: React.Re
       <main className={styles.main}>{children}</main>
     </div>
   );
-}
+}
