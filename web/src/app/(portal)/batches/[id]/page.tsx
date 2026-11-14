@@ -9,13 +9,15 @@ import { Bone, Skeleton } from '@/components/Skeleton';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
-import { cleanClassLink } from '@/lib/classLink';
+import { CLASS_WINDOW, cleanClassLink, currentClass } from '@/lib/classLink';
 import { formatDate } from '@/lib/format';
 import { STUDENT_STATUSES, todayInUk, UUID, WEEKDAYS, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { setBatchClosed, setTopicStatus } from '../actions';
 import { AttendanceSection } from '../AttendanceSection';
 import { BatchForm } from '../BatchForm';
+import type { ClassroomRow } from '@/lib/classroomSetup';
+import type { MeetRoom } from '@/lib/meetRoom';
 import { ClassLinkSection, type ClassLink } from '../ClassLinkSection';
 import { ClassNotesSection } from '../ClassNotesSection';
 import { CompleteTopic } from '../CompleteTopic';
@@ -48,7 +50,8 @@ export default async function BatchPage({ params, searchParams }: Props) {
     .maybeSingle())();
   const [
     teacher, { data: batch }, libraryLessons, { data: slots }, { data: members }, { data: topics }, { data: subjects },
-    teachers, { data: allHomework }, { data: classLinkRow },
+    teachers, { data: allHomework }, { data: classLinkRow }, { data: classroomRow, error: classroomError },
+    { data: meetRow, error: meetError },
   ] =
     await Promise.all([
       teacherCheck,
@@ -87,11 +90,26 @@ export default async function BatchPage({ params, searchParams }: Props) {
         .select('class_link, class_link_updated_at, changed_by:staff!batches_class_link_updated_by_fkey(full_name)')
         .eq('id', id)
         .maybeSingle(),
+      // The class the app created with Create Google Classroom, if any (20261113000002_classroom_setup.sql).
+      supabase.from('batch_classrooms').select('*').eq('batch_id', id).maybeSingle(),
+      // The batch's Google Meet room, if any (20261114000001_meet_rooms.sql).
+      supabase.from('batch_meet_rooms').select('*').eq('batch_id', id).maybeSingle(),
     ]);
   if (!batch) notFound();
   const classLink = classLinkRow as unknown as ClassLink | null;
+  // A class the app created: staff open it with its own address, and the teacher only once Google says they have
+  // joined (until then the class's invite link would make them a student). Otherwise the pasted link.
   // Checked again here, so only a Google Classroom or Google Meet address can ever be a link on this page.
-  const joinLink = cleanClassLink(classLink?.class_link);
+  const classroom = classroomRow as ClassroomRow | null;
+  const joinLink = classroom
+    ? (classroom.course_state === 'ACTIVE' && (!teacher || (classroom.teacher_status === 'joined' && classroom.teacher_id === batch.teacher_id))
+        ? cleanClassLink(classroom.teacher_link) : null)
+    : cleanClassLink(classLink?.class_link);
+  // At class time, Join class opens the batch's Meet room (through /batches/<id>/meet, which asks Google for the
+  // room's current link). At other times it opens Google Classroom as before.
+  const meetRoom = meetRow as MeetRoom | null;
+  const meetNow = Boolean(meetRoom) && currentClass(slots ?? [], CLASS_WINDOW) !== null;
+  const joinHref = meetNow ? `/batches/${batch.id}/meet` : joinLink;
   const usesLibrary = libraryLessons > 0;
   const hasHomework = (allHomework ?? []).length > 0;
   const notGiven = (studentId: string): PastHomework[] => (allHomework ?? [])
@@ -146,8 +164,10 @@ export default async function BatchPage({ params, searchParams }: Props) {
         </div>
         <div className={ui.formActions}>
           <Link href={`/attendance?batch=${batch.id}`} className={ui.button}>Attendance List</Link>
-          {joinLink && !batch.closed_on && (
-            <a href={joinLink} target="_blank" rel="noopener noreferrer" className={ui.primaryButton}>Join class</a>
+          {joinHref && !batch.closed_on && (
+            <a href={joinHref} target="_blank" rel="noopener noreferrer" className={ui.primaryButton}>
+              {meetNow ? 'Join class (Meet)' : 'Join class'}
+            </a>
           )}
         </div>
       </div>
@@ -242,7 +262,9 @@ export default async function BatchPage({ params, searchParams }: Props) {
       <ClassNotesSection batch={batch} usesLibrary={usesLibrary} />
 
       <ClassLinkSection batchId={batch.id} info={classLink ? { ...classLink, class_link: joinLink } : null}
-        teacher={teacher} closed={Boolean(batch.closed_on)} />
+        teacher={teacher} closed={Boolean(batch.closed_on)} classroom={classroom} classroomReady={!classroomError}
+        batchTeacher={teacherName && batch.teacher_id ? { id: batch.teacher_id, name: teacherName } : null}
+        meetRoom={meetRoom} meetReady={!meetError} />
 
       {!teacher && (
         <Section id="batch-settings" title="Batch settings" summary="Name, teacher, places, start date, class times, close batch">

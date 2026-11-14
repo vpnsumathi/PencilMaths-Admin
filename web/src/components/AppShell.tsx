@@ -19,6 +19,7 @@ const NAV: NavLink[] = [
   { href: '/teachers', label: 'Teachers', icon: PencilIcon, ready: true },
   { href: '/batches', label: 'Batches', icon: CalendarIcon, ready: true },
   { href: '/attendance', label: 'Attendance', icon: ClipboardCheckIcon, ready: true },
+  { href: '/class-schedule', label: 'Class Schedule', icon: CalendarIcon, ready: true },
   { href: '/enquiries', label: 'Enquiries', icon: MailIcon, ready: true },
 ];
 const ADMIN_NAV: NavLink[] = [
@@ -106,4 +107,4 @@ export function AppShell({ staff, children }: { staff: Staff; children: React.Re
       <main className={styles.main}>{children}</main>
     </div>
   );
-}
+}

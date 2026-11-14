@@ -1,55 +1,12 @@
 import 'server-only';
+import { accessToken, send } from './auth';
 import { forgetFolderId, savedFolderId, saveFolderId } from './folderIds';
 
 // Talks to Google Drive with the owner's one-time permission (scope drive.file:
 // the app can only see files and folders it created itself).
 
-const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const DRIVE = 'https://www.googleapis.com/drive/v3';
 const FOLDER = 'application/vnd.google-apps.folder';
-
-let cached: { token: string; expires: number } | null = null;
-
-// Swaps the long-lived refresh token for a short-lived access token (about 1 hour),
-// and reuses it until it is close to expiring.
-async function accessToken() {
-  if (cached && cached.expires > Date.now() + 60_000) return cached.token;
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN!,
-      grant_type: 'refresh_token',
-    }),
-    cache: 'no-store',
-  });
-  const body = await res.json();
-  if (!res.ok) throw new Error(`Google sign-in failed: ${body.error_description ?? body.error ?? res.status}`);
-  cached = { token: body.access_token, expires: Date.now() + body.expires_in * 1000 };
-  return cached.token;
-}
-
-// Sends a request to Google with a fresh access token. If Google says it is busy (429), or has a hiccup
-// (5xx) on a request that is safe to repeat (reading, changing, deleting), waits under a second and tries
-// once more. Creating something is not repeated after a 5xx, as Google may have made it anyway.
-// The body must be reusable (string or Blob).
-async function send(url: string, init: RequestInit = {}) {
-  const repeatable = !init.method || ['GET', 'PATCH', 'DELETE'].includes(init.method);
-  for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, {
-      ...init,
-      headers: { Authorization: `Bearer ${await accessToken()}`, ...init.headers },
-      cache: 'no-store',
-    });
-    if (attempt === 0 && (res.status === 429 || (repeatable && [500, 502, 503, 504].includes(res.status)))) {
-      await new Promise((r) => setTimeout(r, 600 + Math.random() * 400));
-      continue;
-    }
-    return res;
-  }
-}
 
 // Calls the Drive API and returns its JSON, or throws Google's error message.
 async function drive(path: string, init: RequestInit = {}) {

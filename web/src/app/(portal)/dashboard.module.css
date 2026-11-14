@@ -22,6 +22,15 @@ a.kpi:hover { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring
 .meter { display: block; height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
 .meter span { display: block; height: 100%; border-radius: 999px; background: #2a78d6; }
 
+/* ---------- A teacher's next class ---------- */
+.nextClassCard { margin-bottom: 16px; border-color: var(--brand); }
+.nextClassMain { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.nextClassWhen { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.nextClassWhat { margin: 2px 0 0; font-size: 14px; }
+.nextClassLater { margin: 14px 0 0; padding: 10px 0 0; list-style: none; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.nextClassLater li { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.nextClassLater li > span { color: var(--muted); min-width: 150px; }
+
 /* ---------- Cards ---------- */
 .card { min-width: 0; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
 .card h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; }

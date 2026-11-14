@@ -17,7 +17,7 @@ function daysBetween(from: string, to: string) {
 }
 
 // UK mobile "07700 900123" → "447700900123", the form wa.me links need. null if it doesn't look like a number.
-function whatsappNumber(phone: string | null) {
+export function whatsappNumber(phone: string | null) {
   const digits = (phone ?? '').replace(/[^\d+]/g, '');
   if (digits.startsWith('+')) return digits.slice(1) || null;
   if (digits.startsWith('00')) return digits.slice(2) || null;

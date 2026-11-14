@@ -42,3 +42,21 @@
 @media (min-width: 768px) {
   .register li { grid-template-columns: minmax(160px, 1fr) minmax(200px, 1.4fr) auto; }
 }
+
+/* Google Classroom set up by the app: one line per step. */
+.steps { margin: 0 0 12px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.steps li { display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+.steps li > span:first-child {
+  flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+  font-size: 12px; font-weight: 700; border: 1px solid var(--border-strong); color: var(--muted);
+}
+.stepDone > span:first-child { background: var(--ok-soft); border-color: var(--ok-border) !important; color: var(--ok) !important; }
+.stepWarn > span:first-child { background: var(--danger-soft); border-color: var(--danger-border) !important; color: var(--danger) !important; }
+.stepTodo { color: var(--text); }
+.createBox { margin: 0 0 16px; padding: 12px 14px; border: 1px dashed var(--border-strong); border-radius: 12px; }
+.createBox p { margin: 0 0 10px; font-size: 14px; }
+
+/* The batch's Google Meet room (Google Classroom section) */
+.meetBox { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.meetBox h3 { margin: 0 0 6px; font-size: 14px; }
+.meetBox p { margin: 0 0 10px; font-size: 13px; color: var(--muted); }

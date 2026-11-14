@@ -34,7 +34,7 @@ export function TeacherForm({ teacher, subjects }: { teacher?: Teacher; subjects
           <Field label="Last name (optional)">
             <input name="last_name" defaultValue={teacher?.last_name} className={ui.input} />
           </Field>
-          <Field label="Email">
+          <Field label="Email (their Google account, for Classroom invites)">
             <input name="personal_email" type="email" defaultValue={teacher?.personal_email ?? ''} className={ui.input} />
           </Field>
           <Field label="Phone">

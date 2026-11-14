@@ -34,6 +34,9 @@ export async function saveClassLink(form: FormData) {
   if (pasted && !link) redirectWith(path, 'error', `That link can't be used. ${CLASS_LINK_HELP}`);
 
   const supabase = await createClient();
+  // A class the app created (Create Google Classroom) keeps its own link: disconnect it first.
+  const { data: created } = await supabase.from('batch_classrooms').select('batch_id').eq('batch_id', id).maybeSingle();
+  if (created) redirectWith(path, 'error', 'This batch\'s class was created by the app, which keeps its link up to date. Press Disconnect first to paste a different link.');
   // Who changed it and when is filled in by the database (batch_class_link_stamp).
   const { data, error } = await supabase.from('batches').update({ class_link: link }).eq('id', id).select('id');
   if (error || data.length === 0) {

@@ -1,10 +1,17 @@
+import { Suspense } from 'react';
 import { ConfirmButton } from '@/components/ConfirmButton';
 import { Section } from '@/components/Section';
 import ui from '@/components/ui.module.css';
 import { CLASS_LINK_HELP } from '@/lib/classLink';
+import type { ClassroomRow } from '@/lib/classroomSetup';
+import type { MeetRoom } from '@/lib/meetRoom';
 import { formatDay } from '@/lib/format';
 import styles from './attendance.module.css';
 import { saveClassLink } from './classActions';
+import { ClassroomButton } from './ClassroomButton';
+import { setUpClassroom } from './classroomActions';
+import { ClassroomSteps, classroomSummary, FreshClassroomStatus } from './ClassroomStatus';
+import { MeetRoomBlock } from './MeetRoomBlock';
 
 export type ClassLink = {
   class_link: string | null;
@@ -18,12 +25,33 @@ type Props = {
   info: ClassLink | null;
   teacher: boolean;
   closed: boolean;
+  // The class the app created for this batch (Create Google Classroom), if any. Then the steps are shown
+  // instead of the paste box. classroomReady: false until 20261113000002_classroom_setup.sql has run.
+  classroom: ClassroomRow | null;
+  classroomReady: boolean;
+  batchTeacher: { id: string; name: string } | null;
+  // The batch's Google Meet room (guide 21, section 12). meetReady: false until 20261114000001_meet_rooms.sql has run.
+  meetRoom: MeetRoom | null;
+  meetReady: boolean;
 };
 
 // The batch's Google Classroom link. Staff paste, replace or remove it; the batch's teacher sees it and joins
 // with it. Students never see the link itself: they press Join class in their login (see /me/classes).
-export function ClassLinkSection({ batchId, info, teacher, closed }: Props) {
+export function ClassLinkSection({ batchId, info, teacher, closed, classroom, classroomReady, batchTeacher, meetRoom, meetReady }: Props) {
   const link = info?.class_link ?? null;
+  const meet = !teacher && !closed && meetReady && <MeetRoomBlock batchId={batchId} room={meetRoom} />;
+
+  if (classroom) {
+    const steps = { row: classroom, teacher, batchTeacher };
+    return (
+      <Section id="google-classroom" title="Google Classroom" summary={classroomSummary(classroom)}>
+        <Suspense fallback={<ClassroomSteps {...steps} />}>
+          <FreshClassroomStatus {...steps} />
+        </Suspense>
+        {meet}
+      </Section>
+    );
+  }
 
   return (
     <Section id="google-classroom" title="Google Classroom"
@@ -44,6 +72,19 @@ export function ClassLinkSection({ batchId, info, teacher, closed }: Props) {
             {teacher ? 'No class link yet. Ask the office to add it.' : 'No class link yet.'}
           </p>
         )
+      )}
+
+      {info && !teacher && !link && !closed && classroomReady && (
+        <div className={styles.createBox}>
+          <p>
+            <b>Create the class in Google Classroom.</b> The app makes the class with the Pencil Maths Google account, invites
+            this batch&apos;s teacher, and gives students Join class. Or paste a link below if the class already exists.
+          </p>
+          <form action={setUpClassroom}>
+            <input type="hidden" name="id" value={batchId} />
+            <ClassroomButton label="Create Google Classroom" busy="Creating the class…" className={ui.primaryButton} />
+          </form>
+        </div>
       )}
 
       {info && !teacher && (
@@ -77,6 +118,7 @@ export function ClassLinkSection({ batchId, info, teacher, closed }: Props) {
           )}
         </>
       )}
+      {link && meet}
     </Section>
   );
 }

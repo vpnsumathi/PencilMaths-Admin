@@ -7,6 +7,7 @@ import { getViewer } from '@/lib/auth';
 import { BarChart } from './_dashboard/BarChart';
 import { loadDashboard, NEW_DAYS, type AttentionItem } from './_dashboard/data';
 import { HomeworkPanel, HomeworkPanelLoading } from './_dashboard/HomeworkPanel';
+import { NextClass } from './_dashboard/NextClass';
 import styles from './dashboard.module.css';
 
 export const metadata = { title: 'Dashboard' };
@@ -41,6 +42,13 @@ export default async function Dashboard() {
           <h1 className={styles.title}>{greeting()}{firstName && `, ${firstName}`}</h1>
         </div>
       </header>
+
+      {/* ---------- A teacher's next class with Join class (fills in when ready, never holds up the page) ---------- */}
+      {teacher && (
+        <Suspense fallback={null}>
+          <NextClass />
+        </Suspense>
+      )}
 
       {/* ---------- Headline tiles ---------- */}
       <section className={styles.kpis}>

@@ -23,6 +23,9 @@ export function cleanClassLink(value: string | null | undefined): string | null 
 
 // The numbers behind "during class", as the database gives them (class_window in the attendance script).
 export type ClassWindow = { before_minutes: number; after_minutes: number; late_minutes: number };
+// The same numbers as the database's class_window(): check-ins from 15 minutes before the start to 60 after,
+// late after 10. For pages that don't ask the database (the Class Schedule page, Join class going to Meet).
+export const CLASS_WINDOW: ClassWindow = { before_minutes: 15, after_minutes: 60, late_minutes: 10 };
 
 // "16:00:00" plus or minus some minutes → "15:45". Class times never run across midnight.
 export function shiftTime(time: string, minutes: number) {

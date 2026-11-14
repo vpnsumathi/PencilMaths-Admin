@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { cleanClassLink } from '@/lib/classLink';
 import { redirectWith, text } from '@/lib/form';
+import { meetLink } from '@/lib/meetRoom';
 import { UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
@@ -30,6 +31,13 @@ export async function joinClass(form: FormData) {
   // The student still gets into the class if marking the attendance failed; staff can set it on the register.
   if (result?.attendance === 'error') console.error('joinClass: attendance was not recorded:', result.problem);
 
+  // At class time (the press counted), a class with a Meet room opens the room itself, so the student lands in the
+  // call and the Class Schedule page can see them (guide 21, section 12). Otherwise, or if that fails, Classroom.
+  let meet: string | null = null;
+  if (['present', 'late', 'already'].includes(result?.attendance ?? '')) {
+    try { meet = await meetLink(batchId); } catch (e) { console.error('joinClass: Meet room:', e); }
+  }
+
   revalidatePath('/me', 'layout');
-  redirect(link);
+  redirect(meet ?? link!);
 }
