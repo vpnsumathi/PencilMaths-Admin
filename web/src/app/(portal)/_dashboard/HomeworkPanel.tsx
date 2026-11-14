@@ -23,25 +23,25 @@ export async function HomeworkPanel({ teacher = false }: { teacher?: boolean }) 
         <a href="#to-mark" className={styles.kpi}>
           <span className={styles.kpiLabel}>To mark</span>
           <strong className={`${styles.kpiValue} ${s.toMark ? styles.down : ''}`}>{s.toMark}</strong>
-          <span className={styles.kpiSub}>Handed in, not marked</span>
+          <span className={styles.kpiSub}>Submitted, not corrected</span>
         </a>
         <a href="#falling-behind" className={styles.kpi}>
           <span className={styles.kpiLabel}>Overdue</span>
           <strong className={`${styles.kpiValue} ${s.overdue ? styles.down : ''}`}>{s.overdue}</strong>
-          <span className={styles.kpiSub}>Not handed in after the due date</span>
+          <span className={styles.kpiSub}>Not submitted by the due date</span>
         </a>
         <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Handed in this week</span>
+          <span className={styles.kpiLabel}>Submitted this week</span>
           <strong className={styles.kpiValue}>{s.handedThisWeek}</strong>
           <span className={styles.kpiSub}>Since Monday {formatDate(h.weekStart)}</span>
         </div>
         <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Marked this week</span>
+          <span className={styles.kpiLabel}>Corrected this week</span>
           <strong className={styles.kpiValue}>{s.markedThisWeek}</strong>
           <span className={styles.kpiSub}>Sent back to students</span>
         </div>
         <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>Marked, not sent</span>
+          <span className={styles.kpiLabel}>Corrected, not sent</span>
           <strong className={styles.kpiValue}>{s.notSent}</strong>
           <span className={styles.kpiSub}>Saved with Save &amp; close; press Send on the batch page</span>
         </div>
@@ -50,9 +50,9 @@ export async function HomeworkPanel({ teacher = false }: { teacher?: boolean }) 
       <div className={styles.pair}>
         <article id="to-mark" className={styles.card}>
           <h2>Needs marking <span className={styles.count}>{h.toMark.length}</span></h2>
-          <p className={styles.cardSub}>Oldest first · 🖊️ Mark opens the hand-in in a new tab</p>
+          <p className={styles.cardSub}>Oldest first · 🖊️ Mark opens the submitted homework in a new tab</p>
           {h.toMark.length === 0 ? (
-            <p className={styles.allClear}>Everything handed in is marked. 🎉</p>
+            <p className={styles.allClear}>Everything submitted is corrected. 🎉</p>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.hwTable}>

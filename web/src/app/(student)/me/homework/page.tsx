@@ -31,9 +31,9 @@ function Sheets({ h }: { h: Homework }) {
 }
 
 const TABS = [
-  { key: 'todo', label: 'To hand in' },
-  { key: 'handed', label: 'Handed in' },
-  { key: 'marked', label: 'Marked' },
+  { key: 'todo', label: 'Assigned' },
+  { key: 'handed', label: 'Submitted' },
+  { key: 'marked', label: 'Corrected' },
 ] as const;
 
 // The files the student handed in, newest last. The date and time at the start of the Drive name is
@@ -42,11 +42,11 @@ function HandedFiles({ h }: { h: Homework }) {
   if (!h.handed?.length) return null;
   return (
     <div className={styles.handed}>
-      <p className={styles.handedTitle}>Your handed-in file{h.handed.length === 1 ? '' : 's'}:</p>
+      <p className={styles.handedTitle}>Your submitted file{h.handed.length === 1 ? '' : 's'}:</p>
       <p className={styles.sheets}>
         {h.handed.map((f) => (
           <a key={f.id} href={`/me/homework/file/${f.id}`} target="_blank" rel="noreferrer" className={styles.sheet}>
-            📎 {(f.label ?? 'Handed-in file').replace(/^\d{4}-\d{2}-\d{2} \d{2}\.\d{2} /, '')}
+            📎 {(f.label ?? 'Submitted file').replace(/^\d{4}-\d{2}-\d{2} \d{2}\.\d{2} /, '')}
           </a>
         ))}
       </p>
@@ -71,7 +71,7 @@ function CorrectedFiles({ h }: { h: Homework }) {
   );
 }
 
-// The student's homework from the last 90 days, in three tabs: to hand in (the default), handed in, and marked.
+// The student's homework from the last 90 days, in three tabs: Assigned (the default), Submitted and Corrected.
 // ?tab=handed or ?tab=marked opens the other tabs (the dashboard links use these).
 export default async function MyHomework({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab: asked } = await searchParams;
@@ -88,7 +88,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
   return (
     <>
       <h1>My homework</h1>
-      <p className={styles.muted}>Take a photo of each page, or choose a PDF or Word file, then press Hand in.</p>
+      <p className={styles.muted}>Take a photo of each page, or choose a PDF or Word file, then press Submit.</p>
 
       <nav className={styles.tabs} aria-label="Homework">
         {TABS.map((t) => {
@@ -103,7 +103,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
       </nav>
 
       {tab === 'todo' && <>
-      {toDo.length === 0 && <p className={styles.muted}>Nothing to hand in right now. 🎉</p>}
+      {toDo.length === 0 && <p className={styles.muted}>Nothing to submit right now. 🎉</p>}
       {toDo.map((h) => (
         <article key={h.sheet_id} className={styles.card} style={{ marginBottom: 12 }}>
           <p className={styles.subject}>{h.subject}</p>
@@ -123,7 +123,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
       </>}
 
       {tab === 'handed' && <>
-      {handedIn.length === 0 && <p className={styles.muted}>Nothing waiting to be marked.</p>}
+      {handedIn.length === 0 && <p className={styles.muted}>Nothing waiting to be corrected.</p>}
       {handedIn.map((h) => (
         <article key={h.sheet_id} className={`${styles.card} ${h.status === 'received' ? styles.done : ''}`} style={{ marginBottom: 12 }}>
           <p className={styles.subject}>{h.subject}</p>
@@ -132,7 +132,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
           <p className={styles.muted}>
             {h.status === 'excused'
               ? 'Excused'
-              : <><strong className={styles.marked}>✓ Handed in</strong> · waiting to be marked · {h.files} file{h.files === 1 ? '' : 's'}</>}
+              : <><strong className={styles.marked}>✓ Submitted</strong> · waiting to be corrected · {h.files} file{h.files === 1 ? '' : 's'}</>}
           </p>
           <HandedFiles h={h} />
           <CorrectedFiles h={h} />
@@ -143,14 +143,14 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
       </>}
 
       {tab === 'marked' && <>
-      {marked.length === 0 && <p className={styles.muted}>Nothing marked yet.</p>}
+      {marked.length === 0 && <p className={styles.muted}>Nothing corrected yet.</p>}
       {marked.map((h) => (
         <article key={h.sheet_id} className={`${styles.card} ${styles.done}`} style={{ marginBottom: 12 }}>
           <p className={styles.subject}>{h.subject}</p>
           <h3>{h.title}</h3>
           <Sheets h={h} />
           <p className={styles.marked}>
-            ✅ {h.mark !== null ? `${h.mark}${h.max_mark ? ` / ${h.max_mark}` : ''}` : 'Marked'}
+            ✅ {h.mark !== null ? `${h.mark}${h.max_mark ? ` / ${h.max_mark}` : ''}` : 'Corrected'}
           </p>
           <HandedFiles h={h} />
           <CorrectedFiles h={h} />

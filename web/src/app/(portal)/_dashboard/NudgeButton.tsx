@@ -11,8 +11,8 @@ export function NudgeButton({ student }: { student: Behind }) {
   const [sent, setSent] = useState(0);
   const list = student.titles.map((t) => `• ${t}`).join('\n');
   const message = `Hi${student.parent ? ` ${student.parent}` : ''}, a quick reminder from Pencil Maths: `
-    + `${student.firstName} has ${student.overdue} homework${student.overdue === 1 ? '' : 's'} not handed in yet:\n${list}\n`
-    + `Please hand ${student.overdue === 1 ? 'it' : 'them'} in with the hand-in link when you can. Thank you!`;
+    + `${student.firstName} has ${student.overdue} homework${student.overdue === 1 ? '' : 's'} not submitted yet:\n${list}\n`
+    + `Please submit ${student.overdue === 1 ? 'it' : 'them'} with the homework link when you can. Thank you!`;
   const href = `https://wa.me/${student.phone ?? ''}?text=${encodeURIComponent(message)}`;
 
   return (

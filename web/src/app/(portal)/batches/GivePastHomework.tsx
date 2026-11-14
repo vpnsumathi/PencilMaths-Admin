@@ -31,7 +31,7 @@ export function GivePastHomework({ batchId, student, homework }: {
           <h2 style={{ margin: '0 0 8px' }}>Give past homework to {student.name}</h2>
           <p className={ui.muted} style={{ marginTop: 0 }}>
             This homework was set before {student.name} joined the class. Tick the ones they should do.
-            They appear under To hand in straight away.
+            They appear under Assigned straight away.
           </p>
           {homework.map((h) => (
             <label key={h.id} className={ui.check} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0' }}>

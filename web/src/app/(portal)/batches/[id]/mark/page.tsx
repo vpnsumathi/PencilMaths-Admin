@@ -47,7 +47,7 @@ export default async function MarkPage({ params, searchParams }: Props) {
 
       {handedIn.length > 1 && (
         <p className={ui.formActions} style={{ margin: '0 0 12px' }}>
-          <strong>Handed-in files:</strong>
+          <strong>Submitted files:</strong>
           {handedIn.map((f, i) => (
             <Link key={f.id} className={f.id === file?.id ? ui.primaryButton : ui.button}
               href={`/batches/${batchId}/mark?sheet=${sheetId}&student=${studentId}&file=${f.id}`}>
@@ -71,7 +71,7 @@ export default async function MarkPage({ params, searchParams }: Props) {
           unsent={!!markup?.draft_file_id && markup.source_file_id === file.id}
         />
       ) : (
-        <p className={ui.card}>{student.first_name} hasn&apos;t handed in a file for this homework yet.</p>
+        <p className={ui.card}>{student.first_name} hasn&apos;t submitted a file for this homework yet.</p>
       )}
     </div>
   );

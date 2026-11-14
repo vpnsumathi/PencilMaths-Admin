@@ -138,7 +138,7 @@ export async function resetHandInLink(form: FormData) {
     redirectWith(path, 'error', 'Could not reset the link.');
   }
   revalidatePath(path);
-  redirectWith(path, 'ok', 'New hand-in link created. The old link no longer works.');
+  redirectWith(path, 'ok', 'New homework link created. The old link no longer works.');
 }
 // ---- Student login (portal access) -------------------------------------------------------------
 

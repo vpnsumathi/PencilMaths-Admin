@@ -34,7 +34,7 @@ export async function PortalAccess({ studentId, authUserId, suggestedEmail }: {
       {login === null ? (
         <form action={givePortalAccess}>
           <p className={ui.hint}>
-            The student signs in to see their classes and homework, and can hand in homework. Use an email the family checks.
+            The student signs in to see their classes and homework, and can submit homework. Use an email the family checks.
             For brothers and sisters, use the same email: one login opens all of them.
           </p>
           <input type="hidden" name="id" value={studentId} />

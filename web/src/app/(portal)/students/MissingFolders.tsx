@@ -34,7 +34,7 @@ export function MissingFolders({ students }: { students: MissingFolder[] }) {
     const made = `${p.done} Drive folder${p.done === 1 ? '' : 's'} created.`;
     const query: Record<string, string> = p.failed
       ? { error: `${made} ${p.failed} could not be made: check the Google Drive connection and try again.` }
-      : { ok: `${made} These students can hand in homework now.` };
+      : { ok: `${made} These students can submit homework now.` };
     router.replace(`/students?${new URLSearchParams(query)}`);
   }
 
@@ -42,7 +42,7 @@ export function MissingFolders({ students }: { students: MissingFolder[] }) {
   return (
     <div className={`${ui.alert} ${ui.alertWarn}`} style={{ marginBottom: 16 }}>
       <p style={{ margin: '0 0 8px' }}>
-        <strong>{total} student{total === 1 ? ' has' : 's have'} no Google Drive folder</strong>, so they can&apos;t hand in homework yet:{' '}
+        <strong>{total} student{total === 1 ? ' has' : 's have'} no Google Drive folder</strong>, so they can&apos;t submit homework yet:{' '}
         {shown.map((s, i) => (
           <span key={s.id}>{i > 0 && ', '}<Link href={`/students/${s.id}`} className={ui.link}>{s.name}</Link></span>
         ))}

@@ -12,11 +12,11 @@ import {
   addHomeworkFile, createHomework, deleteHomework, giveHomework, markHomework, removeHomeworkFile, sendMarkedDraft,
 } from './actions';
 
-// Label and badge colour for each homework status.
+// Label and badge colour for each homework status (the database values stay pending/received/marked/excused).
 const STATUS: Record<string, { tone: string; label: string }> = {
-  pending: { tone: 'closed', label: 'Not handed in' },
-  received: { tone: 'trial', label: 'To mark' },
-  marked: { tone: 'active', label: 'Marked' },
+  pending: { tone: 'closed', label: 'Assigned' },
+  received: { tone: 'trial', label: 'Submitted' },
+  marked: { tone: 'active', label: 'Corrected' },
   excused: { tone: 'paused', label: 'Excused' },
 };
 
@@ -201,7 +201,7 @@ export async function HomeworkSection({ batchId, members, teacher = false }: { b
                               <input type="hidden" name="batch_id" value={batchId} />
                               <input type="hidden" name="sheet_id" value={sheet.id} />
                               <input type="hidden" name="student_id" value={student.id} />
-                              <span className={ui.muted}>Marked, not sent{draft.draft_mark !== null ? ` (mark ${draft.draft_mark})` : ''}</span>
+                              <span className={ui.muted}>Corrected, not sent{draft.draft_mark !== null ? ` (mark ${draft.draft_mark})` : ''}</span>
                               <button className={ui.primaryButton} title="Send the marked sheet (and mark) to the student">📤 Send</button>
                             </form>
                           )}

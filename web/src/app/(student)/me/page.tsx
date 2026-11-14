@@ -48,18 +48,18 @@ export default async function MyDashboard() {
           <Link href="/me/homework" className={`${styles.block} ${hw.to_do > 0 ? styles.blockDue : styles.blockOk}`}>
             <span className={styles.mid}>{hw.to_do}</span>
             <span>
-              <strong>To hand in</strong>
+              <strong>Assigned</strong>
               <span className={styles.muted}>{hw.to_do === 0 ? ' · all done 🎉' : hw.overdue > 0 ? ` · ${hw.overdue} overdue` : ''}</span>
             </span>
           </Link>
           <Link href="/me/homework?tab=handed" className={styles.block}>
             <span className={styles.mid}>{hw.handed_in}</span>
-            <span><strong>Handed in</strong><span className={styles.muted}> · waiting to be marked</span></span>
+            <span><strong>Submitted</strong><span className={styles.muted}> · waiting to be corrected</span></span>
           </Link>
           <Link href="/me/homework?tab=marked" className={`${styles.block} ${styles.blockOk}`}>
             <span className={styles.mid}>✅</span>
             <div>
-              <strong>Recently marked</strong>
+              <strong>Recently corrected</strong>
               {hw.recently_marked.length === 0 ? (
                 <p className={styles.muted}>Nothing in the last 2 weeks.</p>
               ) : (

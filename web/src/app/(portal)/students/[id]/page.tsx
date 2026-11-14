@@ -150,7 +150,7 @@ async function TeacherView({ student, period }: { student: Basic; period: CardPe
             </li>
           ))}
         </ul>
-        <p className={ui.hint}>Homework, hand-ins and marking are on the batch page.</p>
+        <p className={ui.hint}>Homework, submissions and corrections are on the batch page.</p>
       </section>
     </>
   );

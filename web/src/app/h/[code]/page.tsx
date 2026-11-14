@@ -5,7 +5,7 @@ import { handInFile } from './actions';
 import { HandInForm } from './HandInForm';
 import styles from './handin.module.css';
 
-export const metadata = { title: 'Hand in homework' };
+export const metadata = { title: 'Submit homework' };
 
 type Homework = {
   sheet_id: string; title: string; subject: string; set_on: string; due_on: string | null;
@@ -30,11 +30,11 @@ export default async function HandInPage({ params }: { params: Promise<{ code: s
       <header className={styles.head}>
         <p className={styles.brand}>Pencil Maths</p>
         <h1>Hi {data.first_name} 👋</h1>
-        <p className={styles.muted}>Hand in your homework here: take a photo of each page, or choose a PDF or Word file.</p>
+        <p className={styles.muted}>Submit your homework here: take a photo of each page, or choose a PDF or Word file.</p>
       </header>
 
-      <h2>To hand in</h2>
-      {toDo.length === 0 && <p className={styles.muted}>Nothing to hand in right now. 🎉</p>}
+      <h2>Assigned</h2>
+      {toDo.length === 0 && <p className={styles.muted}>Nothing to submit right now. 🎉</p>}
       {toDo.map((h) => (
         <article key={h.sheet_id} className={styles.card}>
           <p className={styles.subject}>{h.subject}</p>
@@ -46,17 +46,17 @@ export default async function HandInPage({ params }: { params: Promise<{ code: s
 
       {done.length > 0 && (
         <>
-          <h2>Handed in</h2>
+          <h2>Submitted</h2>
           {done.map((h) => (
             <article key={h.sheet_id} className={styles.card}>
               <p className={styles.subject}>{h.subject}</p>
               <h3>{h.title}</h3>
               <p className={styles.muted}>
                 {h.status === 'marked' && h.mark !== null
-                  ? `✅ Marked: ${h.mark}${h.max_mark ? ` / ${h.max_mark}` : ''}`
+                  ? `✅ Corrected: ${h.mark}${h.max_mark ? ` / ${h.max_mark}` : ''}`
                   : h.status === 'excused'
                     ? 'Excused'
-                    : `📥 Received · ${h.files} file${h.files === 1 ? '' : 's'}`}
+                    : `📥 Submitted · ${h.files} file${h.files === 1 ? '' : 's'}`}
               </p>
               {h.status === 'received' && <HandInForm action={handInFile} code={code} sheetId={h.sheet_id} title={h.title} label="Add more pages" />}
             </article>

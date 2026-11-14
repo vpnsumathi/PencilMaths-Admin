@@ -9,13 +9,13 @@ export function HandInLink({ studentId, firstName, url, hasFolder }: {
   studentId: string; firstName: string; url: string; hasFolder: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const message = `Hi! Use this link to hand in ${firstName}'s Pencil Maths homework: take a photo of each page and tap Hand in. ${url}`;
+  const message = `Hi! Use this link to submit ${firstName}'s Pencil Maths homework: take a photo of each page and tap Submit. ${url}`;
 
   return (
     <section className={ui.card} style={{ marginBottom: 16, maxWidth: 900 }}>
-      <h2>WhatsApp hand-in link</h2>
+      <h2>WhatsApp homework link</h2>
       {!hasFolder && <p className={ui.hint}>⚠️ Create the Drive folder first, otherwise uploads will fail.</p>}
-      <input readOnly value={url} className={ui.input} style={{ width: '100%', marginBottom: 10 }} aria-label="Hand-in link"
+      <input readOnly value={url} className={ui.input} style={{ width: '100%', marginBottom: 10 }} aria-label="Homework link"
         onFocus={(e) => e.currentTarget.select()} />
       <div className={ui.formActions}>
         <button type="button" className={ui.button}

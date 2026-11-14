@@ -22,7 +22,7 @@ export type CheckedFile = { file: File; type: string; ext: string };
 export function checkFile(file: FormDataEntryValue | null): CheckedFile | { error: string } {
   if (!(file instanceof File) || file.size === 0) return { error: 'Choose a photo, PDF or Word file.' };
   const kind = fileKind(file);
-  if (!kind) return { error: 'Only photos (JPG, PNG, HEIC), PDF and Word files can be handed in.' };
+  if (!kind) return { error: 'Only photos (JPG, PNG, HEIC), PDF and Word files can be submitted.' };
   if (file.size > MAX_BYTES) return { error: `${file.name} is too big (4 MB max).` };
   return { file, ...kind };
 }

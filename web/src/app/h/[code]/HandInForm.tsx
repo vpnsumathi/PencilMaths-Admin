@@ -11,8 +11,8 @@ import styles from './handin.module.css';
 type Status = { kind: 'idle' | 'busy' | 'done' | 'error'; text: string };
 
 // Used by the WhatsApp link (with the family's code) and by the student login (no code: the login says who it is).
-// The student adds photos and files one after another, then one Hand in sends them all as a single PDF.
-export function HandInForm({ action, code, sheetId, title, label = 'Hand in' }: {
+// The student adds photos and files one after another, then one Submit sends them all as a single PDF.
+export function HandInForm({ action, code, sheetId, title, label = 'Submit' }: {
   action: (form: FormData) => Promise<HandInResult>; code?: string; sheetId: string; title?: string; label?: string;
 }) {
   const router = useRouter();
@@ -65,8 +65,8 @@ export function HandInForm({ action, code, sheetId, title, label = 'Hand in' }: 
       }
     }
     setFiles([]);
-    setStatus({ kind: 'done', text: 'Received. Thank you!' });
-    router.refresh(); // reload the list so this homework moves to "Handed in"
+    setStatus({ kind: 'done', text: 'Submitted. Thank you!' });
+    router.refresh(); // reload the list so this homework moves to "Submitted"
   }
 
   const busy = status.kind === 'busy';
@@ -111,7 +111,7 @@ export function HandInForm({ action, code, sheetId, title, label = 'Hand in' }: 
         onClick={() => (files.length === 0 ? picker.current?.click() : naming.current?.showModal())}>
         {busy ? status.text : files.length > 0 ? `${label} (${files.length} page${files.length === 1 ? '' : 's'})` : label}
       </button>
-      {/* Asked when Hand in is pressed: the name the PDF is saved under. */}
+      {/* Asked when Submit is pressed: the name the PDF is saved under. */}
       <dialog ref={naming} className={styles.naming} aria-label="Name your file">
         <form method="dialog" onSubmit={(e) => { e.preventDefault(); naming.current?.close(); send(); }}>
           <label className={styles.nameLabel}>

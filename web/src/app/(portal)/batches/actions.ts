@@ -200,7 +200,7 @@ export async function createHomework(form: FormData) {
   revalidatePath(path);
   revalidatePath('/');
   if (sheets.problem) redirectWith(path, 'error', `Homework set for ${students} student(s), but: ${sheets.problem}`);
-  redirectWith(path, 'ok', `Homework set for ${students} student(s). It is now on their hand-in links.`);
+  redirectWith(path, 'ok', `Homework set for ${students} student(s). It is now on their homework links.`);
 }
 
 /* ---------- Lesson plan ---------- */
@@ -308,7 +308,7 @@ export async function giveHomework(form: FormData) {
   revalidatePath('/');
   redirectWith(path, 'ok', sheets.length === 1
     ? `"${sheets[0].title}" given. ${name} can now see it and hand it in.`
-    : `${sheets.length} homework given. ${name} can now see them under To hand in.`);
+    : `${sheets.length} homework given. ${name} can now see them under Assigned.`);
 }
 
 /* ---------- Lesson planner (lessons from the Lesson library) ---------- */
@@ -449,7 +449,7 @@ export async function markHomework(form: FormData) {
   revalidatePath(path);
   revalidatePath('/');
   if (fileProblem) redirectWith(path, 'error', onlyFile ? fileProblem : `Mark saved, but: ${fileProblem}`);
-  redirectWith(path, 'ok', excuse ? 'Marked as excused.'
+  redirectWith(path, 'ok', excuse ? 'Set to Excused.'
     : onlyFile ? 'Corrected sheet uploaded. The student can see it now.'
     : file ? 'Mark and corrected sheet saved. The student can see them now.'
     : 'Mark saved.');
@@ -513,7 +513,7 @@ export async function deleteHomework(form: FormData) {
 
   revalidatePath(path);
   revalidatePath('/');
-  redirectWith(path, 'ok', 'Homework deleted. Any handed-in files are still in Google Drive.');
+  redirectWith(path, 'ok', 'Homework deleted. Any submitted files are still in Google Drive.');
 }
 
 // Adds a homework file (upload or link) to homework that is already set.
