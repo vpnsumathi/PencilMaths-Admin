@@ -138,7 +138,7 @@ export function AttendanceCard({ studentId, period, data, notReady, note }: Prop
         <span><i className={`${styles.sq} ${styles.sqA}`} />Absent</span>
         <span><i className={`${styles.sq} ${styles.sqC}`} />Checked in, not confirmed</span>
         <span><i className={`${styles.sq} ${styles.sqP} ${styles.fixed}`} />Corrected</span>
-        <span>Point at a square for the details, click it to open that day&apos;s register</span>
+        <span>Point at a square for the details, click it to open that day&apos;s attendance</span>
       </p>
 
       <div className={styles.foot}>

@@ -8,6 +8,7 @@ import { BarChart } from './_dashboard/BarChart';
 import { loadDashboard, NEW_DAYS, type AttentionItem } from './_dashboard/data';
 import { HomeworkPanel, HomeworkPanelLoading } from './_dashboard/HomeworkPanel';
 import { NextClass } from './_dashboard/NextClass';
+import { TeacherExtras } from './_dashboard/TeacherExtras';
 import styles from './dashboard.module.css';
 
 export const metadata = { title: 'Dashboard' };
@@ -47,6 +48,12 @@ export default async function Dashboard() {
       {teacher && (
         <Suspense fallback={null}>
           <NextClass />
+        </Suspense>
+      )}
+      {/* ---------- A teacher's extra classes to mark, and what the office changed (guide 24) ---------- */}
+      {teacher && (
+        <Suspense fallback={null}>
+          <TeacherExtras />
         </Suspense>
       )}
 

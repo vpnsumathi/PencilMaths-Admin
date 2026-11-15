@@ -21,7 +21,7 @@ export function MeetRoomBlock({ batchId, room }: { batchId: string; room: MeetRo
           <form action={recreateMeetRoomAction}>
             <input type="hidden" name="id" value={batchId} />
             <ConfirmButton className={ui.button}
-              message="Make a new Meet room for this batch? The old room's link stops being used. Use this if the room no longer works.">
+              message="Make a new Meet room for this batch? Join class gets a new link, and the old room is closed (a call going on in it ends). Use this if the room no longer works or its link was passed around.">
               Recreate room
             </ConfirmButton>
           </form>

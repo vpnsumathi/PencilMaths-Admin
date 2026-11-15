@@ -50,7 +50,7 @@ export async function AttendanceSection({ batchId, classDate }: { batchId: strin
   const last = register?.recent[0];
   const summary = !register ? 'Not available yet'
     : last ? `Last class ${formatDate(last.class_date)}: ${last.present + last.late} of ${last.present + last.late + last.absent} attended`
-    : 'No registers yet';
+    : 'No attendance taken yet';
 
   return (
     // Open by itself when a class date was chosen (and after saving that day's register).
@@ -59,7 +59,7 @@ export async function AttendanceSection({ batchId, classDate }: { batchId: strin
         <p className={ui.empty}>
           {error?.code === 'PGRST202'
             ? 'The database is not ready for this yet: run 20261111000001_class_link_attendance.sql in Supabase first.'
-            : 'The register could not be loaded.'}
+            : 'The attendance could not be loaded.'}
         </p>
       ) : (
         <>
@@ -91,8 +91,8 @@ export async function AttendanceSection({ batchId, classDate }: { batchId: strin
                   {shiftTime(register.start_time, -register.window.before_minutes)} and{' '}
                   {shiftTime(register.start_time, register.window.after_minutes)} is marked Present, or Late after{' '}
                   {shiftTime(register.start_time, register.window.late_minutes)}.</>
-              : <> · no class is planned on this day. You can still take a register by hand.</>}
-            {!register.session_id && register.class_day && <> No register yet for this day.</>}
+              : <> · no class is planned on this day. You can still take attendance by hand.</>}
+            {!register.session_id && register.class_day && <> No attendance yet for this day.</>}
           </p>
 
           {register.students.length === 0 ? (

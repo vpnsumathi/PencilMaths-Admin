@@ -1,0 +1,106 @@
+/* Extra classes (guide 24): status words, results, the booking form, the class page. The filters, tiles, tabs and
+   tables reuse the Attendance page's styles (attendance.module.css), so the two pages look and work alike. */
+.page { --late: #b45309; --late-soft: #fffbeb; --late-border: #fcd34d; }
+
+/* Status: always a word, with a colour as a second clue. */
+.status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+.s_upcoming { background: var(--brand-ring); color: var(--brand-strong); }
+.s_live { background: var(--ok); color: #fff; }
+.s_to_mark { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
+.s_done { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-border); }
+.s_no_show { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
+.s_cancelled { background: var(--bg); color: var(--muted); border-color: var(--border); text-decoration: line-through; }
+.extraBadge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #ede9fe; color: #5b21b6; letter-spacing: 0.02em; }
+
+/* One student's result */
+.result { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.result::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--subtle); flex: none; }
+.rOk::before { background: var(--ok); }
+.rLate::before { background: #d97706; }
+.rBad::before { background: var(--danger); }
+.rChecked::before { background: var(--brand); }
+.rMuted { color: var(--muted); }
+
+.who { display: grid; gap: 2px; }
+.when { display: grid; gap: 1px; }
+.when small { color: var(--muted); font-size: 12px; }
+.sub { color: var(--muted); font-size: 12px; }
+
+/* The booking form */
+.form { display: grid; gap: 16px; max-width: 900px; }
+.picked { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.picked li {
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+}
+.picked li > b { flex: 1 1 160px; }
+.picked select { max-width: 280px; }
+.addRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.addRow input { flex: 1 1 160px; min-width: 0; }
+.addRow select { flex: 2 1 220px; min-width: 0; }
+.checks { display: grid; gap: 8px; margin-top: 4px; }
+.checkList { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+.checkList li + li { margin-top: 4px; }
+.okLine { margin: 0; color: var(--ok); font-size: 14px; font-weight: 500; }
+.checking { margin: 0; color: var(--muted); font-size: 14px; }
+.anyway { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-weight: 600; color: #92400e; }
+.anyway input { width: 18px; height: 18px; accent-color: #b45309; }
+.locked { margin: 0 0 12px; font-size: 14px; color: var(--muted); }
+
+/* The class page */
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; font-size: 14px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.note { white-space: pre-wrap; }
+.cancelBox { max-width: 900px; margin-bottom: 16px; }
+.cancelBox summary { cursor: pointer; font-weight: 600; color: var(--danger); }
+.cancelForm { display: grid; gap: 12px; margin-top: 12px; }
+.radios { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.radios label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.cancelled { max-width: 900px; }
+
+/* Register: a Present / Late / Absent choice per student */
+.register { width: 100%; border-collapse: collapse; font-size: 14px; }
+.register th { padding: 8px 10px; text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); }
+.register td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.register tr:last-child td { border-bottom: 0; }
+.choice { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; }
+.choice label { position: relative; }
+.choice input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.choice span { display: inline-block; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--muted); border-left: 1px solid var(--border); }
+.choice label:first-child span { border-left: 0; }
+.choice input:focus-visible + span { outline: 2px solid var(--brand); outline-offset: -2px; }
+.choice input:checked + span.p { background: var(--ok); color: #fff; }
+.choice input:checked + span.l { background: #d97706; color: #fff; }
+.choice input:checked + span.a { background: var(--danger); color: #fff; }
+.reason { width: 100%; min-width: 160px; }
+.scroll { overflow-x: auto; }
+
+/* History timeline */
+.timeline { margin: 0; padding: 0; list-style: none; }
+.timeline li { display: grid; grid-template-columns: 130px 1fr; gap: 4px 16px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.timeline li:first-child { border-top: 0; }
+.timeline time { color: var(--muted); font-size: 13px; }
+.timeline b { margin-right: 6px; }
+.timeline .reasonText { color: var(--muted); }
+
+/* Live Meet panel */
+.livePeople { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.livePeople li { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: space-between; font-size: 14px; }
+.inMeet { color: var(--ok); font-weight: 600; }
+.leftCall { color: #92400e; }
+.notSeen { color: var(--muted); }
+
+/* Student page card and dashboards */
+.mini { margin: 0; padding: 0; list-style: none; }
+.mini li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.mini li:first-child { border-top: 0; }
+.miniTitle { margin: 12px 0 4px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.foot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 14px; }
+
+@media (max-width: 640px) {
+  .timeline li { grid-template-columns: 1fr; }
+  .facts { grid-template-columns: 1fr; gap: 2px; }
+  .facts dd { margin-bottom: 8px; }
+}

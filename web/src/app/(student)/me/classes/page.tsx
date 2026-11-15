@@ -6,6 +6,8 @@ import { WEEKDAYS, yearLabel } from '@/lib/options';
 import styles from '../../student.module.css';
 import { type Dashboard, nextClass } from '../dashboard';
 import { getMyDashboard } from '../myDashboard';
+import { getMyExtras } from '../myExtras';
+import { ExtraClasses } from './ExtraClasses';
 import { JoinClassButton } from './JoinClassButton';
 
 export const metadata = { title: 'My classes' };
@@ -18,7 +20,10 @@ const shortDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 
 export default async function MyClasses({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
   // The same answer the layout already asked for (cached), so no second call.
-  const me = (await getMyDashboard()) as Dashboard; // the layout has already checked this is a student
+  const [me, extras] = await Promise.all([
+    getMyDashboard() as Promise<Dashboard>, // the layout has already checked this is a student
+    getMyExtras(),
+  ]);
 
   return (
     <>
@@ -115,6 +120,9 @@ export default async function MyClasses({ searchParams }: { searchParams: Promis
           );
         })}
       </div>
+
+      {/* One-off classes such as catch-ups (guide 24), with their own attendance line. */}
+      {extras && <ExtraClasses data={extras} />}
     </>
   );
 }

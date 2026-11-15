@@ -61,7 +61,8 @@ export default async function AttendancePage({ searchParams }: Props) {
           <h1 className={ui.title}>Attendance</h1>
           <p className={ui.subtitle}>
             Check, compare and correct attendance{teacher ? ' in your batches' : ' across batches'}.
-            To change a mark, open that day&apos;s register from any row.
+            To change a mark, open that day&apos;s attendance from any row.
+            Extra classes have their own attendance and aren&apos;t counted here: see <Link href="/extra-classes" className={ui.link}>Extra classes</Link>.
           </p>
         </div>
       </div>
@@ -169,7 +170,7 @@ function Tiles({ f, s, attentionCount }: { f: Filters; s: Summary; attentionCoun
         <span>Check-ins not confirmed</span><b>{s.checked_in}</b>
       </Link>
       <Link href={attendanceHref(f, { tab: 'attention', page: 1 })} className={`${styles.tile} ${s.missing_registers > 0 ? styles.tileBad : ''}`}>
-        <span>Classes with no register</span><b>{s.missing_registers}</b>
+        <span>Classes with no attendance</span><b>{s.missing_registers}</b>
         {attentionCount > 0 && <small>See Needs attention</small>}
       </Link>
       <Link href={attendanceHref(f, { tab: 'corrections', page: 1 })} className={styles.tile}>
@@ -211,7 +212,7 @@ function GridView({ f, grid }: { f: Filters; grid: Grid | null }) {
               <th scope="col" className={styles.stickyCol}>Student</th>
               {grid.dates.map((d) => (
                 <th key={d.class_date} scope="col" className={d.missing ? styles.missingCol : undefined}>
-                  <Link href={register(d.class_date)} title={d.missing ? 'No register yet: open it to take one' : 'Open this day’s register'}>
+                  <Link href={register(d.class_date)} title={d.missing ? 'No attendance yet: open it to take it' : 'Open this day’s attendance'}>
                     <span className={styles.wd}>{weekdayShort(d.class_date)}</span>{short(d.class_date)}
                   </Link>
                 </th>
@@ -236,7 +237,7 @@ function GridView({ f, grid }: { f: Filters; grid: Grid | null }) {
                     if (!m) {
                       return (
                         <td key={d.class_date}>
-                          <span className={`${styles.cell} ${styles.cellEmpty}`} title={outside ? 'Not in the batch on this day' : d.missing ? 'No register' : 'Not marked'}>
+                          <span className={`${styles.cell} ${styles.cellEmpty}`} title={outside ? 'Not in the batch on this day' : d.missing ? 'No attendance' : 'Not marked'}>
                             {outside ? '–' : d.missing ? '?' : ''}
                           </span>
                         </td>
@@ -287,9 +288,9 @@ function Legend() {
       <span><span className={`${styles.cell} ${styles.cellA}`}>A</span> Absent</span>
       <span><span className={`${styles.cell} ${styles.cellC}`}>C</span> Checked in, not confirmed</span>
       <span><span className={`${styles.cell} ${styles.cellP} ${styles.corrected}`}>P</span> Corrected</span>
-      <span><span className={`${styles.cell} ${styles.cellEmpty}`}>?</span> No register</span>
+      <span><span className={`${styles.cell} ${styles.cellEmpty}`}>?</span> No attendance</span>
       <span><span className={`${styles.cell} ${styles.cellEmpty}`}>–</span> Not in the batch then</span>
-      <span>Point at a box for the details · click a date to open that day&apos;s register</span>
+      <span>Point at a box for the details · click a date to open that day&apos;s attendance</span>
     </p>
   );
 }
@@ -380,29 +381,29 @@ function AttentionView({ a }: { a: Attention }) {
   return (
     <div className={styles.attention}>
       <section>
-        <h3>Registers to confirm <span className={styles.count}>{a.unconfirmed.length}</span></h3>
-        <p className={ui.hint}>The class is over, but some marks are still portal check-ins or &quot;has not checked in&quot;. Open the register and save it.</p>
+        <h3>Attendance to confirm <span className={styles.count}>{a.unconfirmed.length}</span></h3>
+        <p className={ui.hint}>The class is over, but some marks are still portal check-ins or &quot;has not checked in&quot;. Open the attendance and save it.</p>
         {a.unconfirmed.length === 0 ? <p className={ui.empty}>None.</p> : (
           <ul className={styles.items}>
             {a.unconfirmed.map((u) => (
               <li key={`${u.batch_id}-${u.class_date}`}>
                 <span><b>{u.batch_code}</b> · {weekdayShort(u.class_date)} {formatDate(u.class_date)}</span>
                 <span className={ui.muted}>{u.checked_in} checked in · {u.not_checked_in} not checked in</span>
-                <Link href={`/batches/${u.batch_id}?class_date=${u.class_date}#attendance`} className={ui.button}>Open register</Link>
+                <Link href={`/batches/${u.batch_id}?class_date=${u.class_date}#attendance`} className={ui.button}>Open attendance</Link>
               </li>
             ))}
           </ul>
         )}
       </section>
       <section>
-        <h3>Classes with no register <span className={styles.count}>{a.missing.length}</span></h3>
-        <p className={ui.hint}>A class was planned (from the batch&apos;s class times) but nobody checked in and no register was taken. Ignore holidays.</p>
+        <h3>Classes with no attendance <span className={styles.count}>{a.missing.length}</span></h3>
+        <p className={ui.hint}>A class was planned (from the batch&apos;s class times) but nobody checked in and no attendance was taken. Ignore holidays.</p>
         {a.missing.length === 0 ? <p className={ui.empty}>None.</p> : (
           <ul className={styles.items}>
             {a.missing.map((m) => (
               <li key={`${m.batch_id}-${m.class_date}`}>
                 <span><b>{m.batch_code}</b> · {weekdayShort(m.class_date)} {formatDate(m.class_date)} {m.start_time.slice(0, 5)}</span>
-                <Link href={`/batches/${m.batch_id}?class_date=${m.class_date}#attendance`} className={ui.button}>Take register</Link>
+                <Link href={`/batches/${m.batch_id}?class_date=${m.class_date}#attendance`} className={ui.button}>Take attendance</Link>
               </li>
             ))}
           </ul>

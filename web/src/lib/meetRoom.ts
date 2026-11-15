@@ -1,5 +1,5 @@
 import 'server-only';
-import { createSpace, getSpace, MEET_ACCESS } from '@/lib/google/meet';
+import { createSpace, getSpace, MEET_ACCESS, retireSpace } from '@/lib/google/meet';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // Each batch's Google Meet room (guide 21, section 12), made with the app's Google account so the app can see who
@@ -34,8 +34,13 @@ export async function ensureMeetRoom(batchId: string, staffId: string | null) {
   if (!(await getMeetRoom(batchId))) await saveRoom(batchId, staffId, false);
 }
 
-// A new room in place of the old one (the old link stops being used).
-export const recreateMeetRoom = (batchId: string, staffId: string | null) => saveRoom(batchId, staffId, true);
+// A new room in place of the old one. Join class uses the new link straight away; the old room is then closed
+// (retireSpace). Returns false if Google wouldn't close the old room, so its old link may still let people in.
+export async function recreateMeetRoom(batchId: string, staffId: string | null): Promise<boolean> {
+  const old = await getMeetRoom(batchId);
+  await saveRoom(batchId, staffId, true);
+  return old && old.space_name ? retireSpace(old.space_name) : true;
+}
 
 // The room's link to send someone to, or null if the batch has no room. Asks Google again after a few hours; if
 // Google can't be reached, the link saved before is used.

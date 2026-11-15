@@ -5,13 +5,22 @@ import { type Dashboard, nextClass } from './dashboard';
 import { currentClass } from '@/lib/classLink';
 import { JoinClassButton } from './classes/JoinClassButton';
 import { getMyDashboard } from './myDashboard';
+import { getMyExtras } from './myExtras';
+import { UpcomingCard } from './classes/ExtraClasses';
+import { FocusMessage } from '@/components/FocusMessage';
 
 export const metadata = { title: 'My dashboard' };
 
 // The student's home page: tiles for their classes and homework, then their class schedule.
-export default async function MyDashboard() {
+export default async function MyDashboard({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
   // The same answer the layout already asked for (cached), so no second call.
-  const me = (await getMyDashboard()) as Dashboard; // the layout has already checked this is a student
+  const [me, extras] = await Promise.all([
+    getMyDashboard() as Promise<Dashboard>, // the layout has already checked this is a student
+    getMyExtras(),
+  ]);
+  // An extra class within the next 7 days goes at the top (guide 24).
+  const soon = (extras?.upcoming ?? []).filter((c) => !c.cancelled && new Date(c.starts_at).getTime() < Date.now() + 7 * 86400_000);
   const hw = me.homework;
   const schedule = me.classes
     .map((c) => ({ c, next: nextClass(c.times), now: currentClass(c.times, me.class_window) }))
@@ -26,6 +35,17 @@ export default async function MyDashboard() {
         {me.first_name} {me.last_name} · {me.code} · {yearLabel(me.year_group)}
         {me.school ? ` · ${me.school}` : ''}
       </p>
+      {error && <FocusMessage key={`error${Date.now()}`} className={styles.errorMsg} role="alert">{error}</FocusMessage>}
+
+      {extras && soon.length > 0 && (
+        <section style={{ marginTop: 20 }} aria-label="Extra classes this week">
+          <p className={styles.subject} style={{ marginBottom: 8 }}>{soon.length === 1 ? 'Extra class' : 'Extra classes'} this week</p>
+          <div className={styles.classList} style={{ marginTop: 0 }}>
+            {soon.slice(0, 2).map((c) => <UpcomingCard key={c.id} c={c} window={extras.window} back="/me" />)}
+          </div>
+          {soon.length > 2 && <p className={styles.muted} style={{ marginTop: 8 }}><Link href="/me/classes">+{soon.length - 2} more in My classes →</Link></p>}
+        </section>
+      )}
 
       <div className={styles.tiles}>
         <Link href="/me/classes" className={`${styles.tile} ${styles.tileLinkable}`}>

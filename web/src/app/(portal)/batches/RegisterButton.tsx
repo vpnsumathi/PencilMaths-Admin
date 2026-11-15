@@ -15,5 +15,5 @@ export function RegisterButton({ restAbsent = false }: { restAbsent?: boolean })
       </button>
     );
   }
-  return <button className={ui.primaryButton} disabled={pending}>{pending ? 'Saving…' : 'Save register'}</button>;
+  return <button className={ui.primaryButton} disabled={pending}>{pending ? 'Saving…' : 'Save attendance'}</button>;
 }

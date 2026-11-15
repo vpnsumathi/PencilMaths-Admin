@@ -1,0 +1,17 @@
+/* Extra classes in the student and family login (guide 24): My classes and the dashboard card. */
+.section { margin-top: 28px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+.head h2 { margin: 0 !important; }
+.line { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #ede9fe; color: #5b21b6; }
+.list { display: grid; gap: 12px; margin-top: 12px; }
+.cancelledCard { opacity: 0.75; }
+.cancelledCard .when { text-decoration: line-through; }
+.cancelPill { margin: 0; padding: 6px 12px; border-radius: 999px; background: var(--danger-soft); color: var(--danger); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.moved { margin: 4px 0 0; color: #92400e; font-size: 14px; font-weight: 600; }
+.note { margin: 0; padding: 12px 20px; border-top: 1px solid var(--border); font-size: 14px; white-space: pre-wrap; }
+.taken { margin: 12px 0 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; }
+.taken li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; justify-content: space-between; padding: 12px 16px; border-top: 1px solid var(--border); font-size: 14px; }
+.taken li:first-child { border-top: 0; }
+.taken small { display: block; color: var(--muted); font-size: 13px; }
+.empty { margin: 8px 0 0; color: var(--muted); font-size: 14px; }

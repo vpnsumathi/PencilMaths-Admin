@@ -11,7 +11,8 @@ import { createClient } from '@/lib/supabase/server';
 
 // The Class Schedule page's data (guide 21, section 12). Classes and people come from the app (class times,
 // batch students, the register); who is in the call comes from Google Meet, asked only while someone has the
-// page open, and shared for 20 seconds between staff watching the same class. Nothing is written every refresh:
+// page open, and kept for 20 seconds per server copy (best-effort: on Vercel each running copy has its own memory).
+// Nothing is written every refresh:
 // the only writes are new Google account links found on a Classroom class list.
 
 export const TEACHER_LATE_MINUTES = 5; // the teacher shows in red if not in the call this long after the start
@@ -84,7 +85,8 @@ export type Live = {
   teacherLate: boolean; // started at least TEACHER_LATE_MINUTES ago and the teacher isn't in the call
 };
 
-// Meet's answer for a room, shared for 20 seconds (also a failure, so a Google problem isn't asked again each time).
+// Meet's answer for a room, kept for 20 seconds (also a failure, so a Google problem isn't asked again each time).
+// In this server copy's memory only, so best-effort: several copies on Vercel may each ask Google once.
 type MeetAnswer = { ok: true; startedAt: string | null; people: InCall[] | null } | { ok: false; problem: string };
 const meetCache = new Map<string, { at: number; answer: MeetAnswer }>();
 const MEET_SECONDS = 20;

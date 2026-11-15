@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { Alerts } from '@/components/Alerts';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
@@ -10,6 +11,7 @@ import { STUDENT_STATUSES, UUID, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { createDriveFolder } from '../actions';
 import { AttendanceCard, cardPeriod, type CardPeriod } from '../AttendanceCard';
+import { ExtraClassesCard } from '../ExtraClassesCard';
 import { HandInLink } from '../HandInLink';
 import { PortalAccess } from '../PortalAccess';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
@@ -91,6 +93,10 @@ export default async function StudentPage({ params, searchParams }: Props) {
         <PortalAccess studentId={student.id} authUserId={student.auth_user_id} suggestedEmail={guardian?.email ?? null} />
       )}
       <AttendanceCard studentId={student.id} period={period} {...attendance} />
+      {/* Extra classes (guide 24): loads on its own, so the rest of the page never waits for it. */}
+      <Suspense fallback={null}>
+        <ExtraClassesCard studentId={student.id} staff />
+      </Suspense>
       <StudentForm
         student={student as Student}
         guardian={guardian as Guardian | null}
@@ -140,6 +146,9 @@ async function TeacherView({ student, period }: { student: Basic; period: CardPe
         <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
       </div>
       <AttendanceCard studentId={student.id} period={period} {...attendance} note="your classes" />
+      <Suspense fallback={null}>
+        <ExtraClassesCard studentId={student.id} staff={false} />
+      </Suspense>
       <section className={ui.card} style={{ maxWidth: 900 }}>
         <h2>Classes with you</h2>
         <ul className={ui.list}>

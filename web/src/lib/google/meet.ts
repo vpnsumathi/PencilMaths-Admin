@@ -34,6 +34,22 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const createSpace = () =>
   call<Space>('/spaces', { method: 'POST', body: JSON.stringify({ config: { accessType: MEET_ACCESS } }) });
 
+// Closes a room the app made, for Recreate room: from now on only invited people can get in without knocking (the
+// app invites nobody, and its account never joins to let anyone in), and a call still going on in it is ended.
+// Returns false if Google refused (the old link may then still work); the new room is used either way.
+export async function retireSpace(spaceName: string): Promise<boolean> {
+  try {
+    await call<Space>(`/${spaceName}?${new URLSearchParams({ updateMask: 'config.accessType' })}`,
+      { method: 'PATCH', body: JSON.stringify({ config: { accessType: 'RESTRICTED' } }) });
+  } catch (e) {
+    console.error('Closing the old Meet room:', e);
+    return false;
+  }
+  // Google answers with an error when no call is going on, which is fine.
+  await call(`/${spaceName}:endActiveConference`, { method: 'POST', body: '{}' }).catch(() => undefined);
+  return true;
+}
+
 // The room as Google has it now (its current link). spaceName is "spaces/…".
 export const getSpace = (spaceName: string) => call<Space>(`/${spaceName}`);
 

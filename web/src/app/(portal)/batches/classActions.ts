@@ -62,7 +62,7 @@ export async function saveRegister(form: FormData) {
   const path = `/batches/${batchId}`;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(classDate)) redirectWith(path, 'error', 'Choose the class date.');
   const back = `${path}?class_date=${classDate}`;
-  if (classDate > todayInUk()) redirectWith(path, 'error', 'The register can\'t be taken for a date in the future.');
+  if (classDate > todayInUk()) redirectWith(path, 'error', 'Attendance can\'t be taken for a date in the future.');
 
   const marks: { student_id: string; status: string; reason?: string }[] = [];
   for (const [key, value] of form.entries()) {
@@ -87,11 +87,11 @@ export async function saveRegister(form: FormData) {
   const { data: changed, error } = await supabase.rpc('save_register', { p_batch: batchId, p_date: classDate, p_marks: marks });
   if (error) {
     console.error('saveRegister failed:', error.message);
-    redirectWith(back, 'error', dbProblem(error, 'Could not save the register. Nothing was changed.'));
+    redirectWith(back, 'error', dbProblem(error, 'Could not save the attendance. Nothing was changed.'));
   }
 
   revalidatePath(path);
   revalidatePath('/batches');
-  redirectWith(back, 'ok', `Register saved for ${formatDate(classDate)}: `
+  redirectWith(back, 'ok', `Attendance saved for ${formatDate(classDate)}: `
     + (changed === 0 ? 'nothing needed changing.' : changed === 1 ? '1 entry changed.' : `${changed} entries changed.`));
 }

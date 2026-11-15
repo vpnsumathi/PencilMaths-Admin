@@ -253,7 +253,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
       {/* Loads on its own, so the rest of the page doesn't wait for the register. */}
       <Suspense fallback={(
         <Section id="attendance" title="Attendance" summary="Loading…" forceOpen={Boolean(classDate)}>
-          <Skeleton label="Loading the register"><Bone width="60%" /><Bone width="80%" style={{ marginTop: 10 }} /></Skeleton>
+          <Skeleton label="Loading attendance"><Bone width="60%" /><Bone width="80%" style={{ marginTop: 10 }} /></Skeleton>
         </Section>
       )}>
         <AttendanceSection batchId={batch.id} classDate={classDate} />

@@ -16,10 +16,15 @@ async function run(form: FormData, replace: boolean) {
   let message: string;
   let ok = true;
   try {
-    await (replace ? recreateMeetRoom(id, viewer.userId) : ensureMeetRoom(id, viewer.userId));
-    message = replace
-      ? 'New Meet room made. Join class uses it from now on; the old room\'s link is no longer used.'
-      : 'Meet room made. At class time, Join class opens it, and the Class Schedule page shows who is in the call.';
+    if (replace) {
+      const closed = await recreateMeetRoom(id, viewer.userId);
+      message = closed
+        ? 'New Meet room made: Join class uses its new link from now on. The old room is closed, so the old link no longer lets anyone in.'
+        : 'New Meet room made: Join class uses its new link from now on. Google wouldn\'t close the old room, so anyone who kept the old link may still get in.';
+    } else {
+      await ensureMeetRoom(id, viewer.userId);
+      message = 'Meet room made. At class time, Join class opens it, and the Class Schedule page shows who is in the call.';
+    }
   } catch (e) {
     console.error('Meet room:', e);
     ok = false;

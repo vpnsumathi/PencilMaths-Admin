@@ -6,6 +6,7 @@ import { loadLive, loadSchedule, type Live, type TodayClass } from '@/lib/classS
 import { ukClock, type LivePerson } from '@/lib/liveClass';
 import { UUID, WEEKDAYS } from '@/lib/options';
 import { linkGooglePerson, unlinkGooglePerson } from './actions';
+import { ExtraLive, ExtraWeek, loadWeekExtras } from './ExtraSchedule';
 import { LiveRefresh } from './LiveRefresh';
 import styles from './schedule.module.css';
 
@@ -19,7 +20,8 @@ type Props = { searchParams: Promise<{ class?: string; ok?: string; error?: stri
 export default async function ClassSchedulePage({ searchParams }: Props) {
   const viewer = await requireStaff();
   const { class: picked, ok, error: problem } = await searchParams;
-  const s = await loadSchedule();
+  const [s, extras] = await Promise.all([loadSchedule(), loadWeekExtras()]);
+  const extrasOn = extras.filter((r) => r.status === 'live');
   const onNow = s.today.filter((c) => c.state === 'live' || c.state === 'soon');
   const chosen = UUID.test(picked ?? '') ? s.today.find((c) => c.batchId === picked) ?? null : null;
   const [live, detail] = await Promise.all([
@@ -36,7 +38,7 @@ export default async function ClassSchedulePage({ searchParams }: Props) {
           <h1 className={ui.title}>Class Schedule</h1>
           <p className={ui.subtitle}>Classes on now and who is in the Google Meet call, today&apos;s classes, and the week</p>
         </div>
-        <LiveRefresh active={onNow.length > 0} updatedAt={updatedAt} />
+        <LiveRefresh active={onNow.length > 0 || extrasOn.length > 0} updatedAt={updatedAt} />
       </div>
       <Alerts ok={ok} problem={problem} />
       {!s.meetReady && (
@@ -48,7 +50,7 @@ export default async function ClassSchedulePage({ searchParams }: Props) {
 
       <section className={styles.block} aria-labelledby="live-title">
         <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
-        {live.length === 0 ? (
+        {live.length === 0 && extrasOn.length === 0 ? (
           <p className={ui.empty}>
             No classes on right now.
             {(() => {
@@ -56,11 +58,13 @@ export default async function ClassSchedulePage({ searchParams }: Props) {
               return next ? ` Next today: ${next.time} ${next.code}${next.teacher ? ` with ${next.teacher}` : ''}.` : '';
             })()}
           </p>
-        ) : (
+        ) : live.length > 0 && (
           <div className={styles.cards}>
             {live.map((l, i) => <LiveCard key={l.batchId + l.time} live={l} cls={onNow[i]} selected={chosen?.batchId === l.batchId} />)}
           </div>
         )}
+        {/* Extra classes on now (guide 24). */}
+        <ExtraLive rows={extrasOn} />
       </section>
 
       {shown && chosen && <Details live={shown} cls={chosen} date={s.date} />}
@@ -84,6 +88,8 @@ export default async function ClassSchedulePage({ searchParams }: Props) {
           </ol>
         )}
       </section>
+
+      <ExtraWeek rows={extras} />
 
       <section className={styles.block} aria-labelledby="week-title">
         <h2 id="week-title" className={styles.blockTitle}>This week</h2>
@@ -109,7 +115,7 @@ const STATE_LABEL = { later: 'Later', soon: 'Starting soon', live: 'Live', done:
 
 function registerLine(c: TodayClass) {
   const r = c.register;
-  if (!r) return c.state === 'done' ? 'No register' : '';
+  if (!r) return c.state === 'done' ? 'No attendance' : '';
   return `${r.present + r.late} attended (${r.late} late) · ${r.absent} absent · ${r.clicked} pressed Join class`;
 }
 
@@ -174,7 +180,7 @@ function Details({ live, cls, date }: { live: Live; cls: TodayClass; date: strin
           </p>
         </div>
         <div className={ui.formActions}>
-          <Link href={`/batches/${cls.batchId}?class_date=${date}#attendance`} className={ui.button}>Open register</Link>
+          <Link href={`/batches/${cls.batchId}?class_date=${date}#attendance`} className={ui.button}>Open attendance</Link>
           {cls.hasRoom && <a href={`/batches/${cls.batchId}/meet`} target="_blank" rel="noopener noreferrer" className={ui.button}>Open the Meet room</a>}
           <Link href="/class-schedule" className={ui.button}>Close</Link>
         </div>
@@ -182,7 +188,7 @@ function Details({ live, cls, date }: { live: Live; cls: TodayClass; date: strin
 
       <div className={ui.tableWrap}>
         <table className={ui.table}>
-          <thead><tr><th>Person</th><th>Google Meet</th><th>Pressed Join class</th><th>Register</th><th /></tr></thead>
+          <thead><tr><th>Person</th><th>Google Meet</th><th>Pressed Join class</th><th>Attendance</th><th /></tr></thead>
           <tbody>
             {people.map((p) => {
               const st = personState(p);
