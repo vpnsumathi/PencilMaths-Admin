@@ -1,11 +1,15 @@
 import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { findOrCreateFolder } from '@/lib/google/drive';
+import { ensureStudentDriveFolder } from '@/lib/students/driveFolder';
 
-// Class notes and documents on the batch page, shown to the batch's students in /me/notes.
-// Files go to Google Drive: PencilMaths / Class notes / <batch code>. See Help/22-class-notes.md and
-// supabase/migrations/20261111000002_class_notes.sql.
+// Class notes and documents on the batch page and the student page, shown to students in /me/notes.
+// A note is for the whole batch, for a few chosen students, or (staff only) a personal note for one student.
+// Files go to Google Drive: PencilMaths / Class notes / <batch code>, or, for a note for one student, that
+// student's own folder: PencilMaths / Students / <code name> / Class notes.
+// See Help/22-class-notes.md, 20261111000002_class_notes.sql and 20261117000001_class_notes_for_students.sql.
 
-export const NOTES_NOT_READY = 'The database is not ready for this yet: run 20261111000002_class_notes.sql in Supabase first.';
+export const NOTES_NOT_READY = 'The database is not ready for this yet: run 20261111000002_class_notes.sql and 20261117000001_class_notes_for_students.sql in Supabase first.';
 
 // Files are sent straight from the browser to Drive, so they can be bigger than the 4 MB that goes through
 // our server. 50 MB covers long slide decks.
@@ -46,9 +50,22 @@ export async function batchNotesFolder(batchCode: string) {
   return findOrCreateFolder(batchCode.replace(/[\\/:*?"<>|]/g, '-'), notes.id);
 }
 
-// The class_notes table is not there yet: the database script has not been run on this Supabase project.
+// A student's own Class notes folder (PencilMaths / Students / <code name> / Class notes), made the first time.
+// The student's folder is made too if they don't have one yet. `client` must be able to read and add the
+// student's folder row: the staff login, or the full-rights connection after a teacher's access was checked.
+export async function studentNotesFolder(studentId: string, client: SupabaseClient) {
+  await ensureStudentDriveFolder(studentId, client);
+  const { data } = await client
+    .from('file_links').select('external_id')
+    .eq('student_id', studentId).eq('owner_type', 'student_folder').eq('provider', 'google_drive')
+    .maybeSingle();
+  if (!data?.external_id) throw new Error('The student\'s Google Drive folder was not found.');
+  return findOrCreateFolder('Class notes', data.external_id);
+}
+
+// The class notes scripts have not been run on this Supabase project yet (a table, column or function is missing).
 export function notesTableMissing(error: { code?: string } | null) {
-  return error?.code === '42P01' || error?.code === 'PGRST205' || error?.code === 'PGRST200';
+  return ['42P01', '42703', '42883', 'PGRST200', 'PGRST202', 'PGRST205'].includes(error?.code ?? '');
 }
 
 // What a note is for, as the form sends it: "topic:<id>" (curriculum topic), "lesson:<id>" (Lesson library)

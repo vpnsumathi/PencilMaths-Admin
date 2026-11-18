@@ -259,7 +259,8 @@ export default async function BatchPage({ params, searchParams }: Props) {
         <AttendanceSection batchId={batch.id} classDate={classDate} />
       </Suspense>
 
-      <ClassNotesSection batch={batch} usesLibrary={usesLibrary} />
+      <ClassNotesSection batch={batch} usesLibrary={usesLibrary}
+        students={students.map((s) => ({ id: s.id, name: `${s.first_name} ${s.last_name}`.trim() }))} />
 
       <ClassLinkSection batchId={batch.id} info={classLink ? { ...classLink, class_link: joinLink } : null}
         teacher={teacher} closed={Boolean(batch.closed_on)} classroom={classroom} classroomReady={!classroomError}

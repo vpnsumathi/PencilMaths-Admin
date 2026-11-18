@@ -30,6 +30,11 @@ function Sheets({ h }: { h: Homework }) {
   );
 }
 
+// "Assigned 12 Nov 2026": the day the homework was set (homework_sheets.set_on), so families know when it was given.
+function Assigned({ h }: { h: Homework }) {
+  return <>Assigned {formatDate(h.set_on)}</>;
+}
+
 const TABS = [
   { key: 'todo', label: 'Assigned' },
   { key: 'handed', label: 'Submitted' },
@@ -110,11 +115,10 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
           <h3>{h.title}</h3>
           <Sheets h={h} />
           <p className={styles.muted}>
-            {h.due_on
-              ? <span className={h.due_on < today ? styles.overdue : undefined}>
-                  {h.due_on < today ? 'Overdue: was due' : 'Due'} {formatDate(h.due_on)}
-                </span>
-              : `Set ${formatDate(h.set_on)}`}
+            <Assigned h={h} />
+            {h.due_on && <> · <span className={h.due_on < today ? styles.overdue : undefined}>
+                {h.due_on < today ? 'Overdue: was due' : 'Due'} {formatDate(h.due_on)}
+              </span></>}
           </p>
           <HandInForm action={handInMyFile} sheetId={h.sheet_id} title={h.title} />
         </article>
@@ -130,7 +134,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
           <h3>{h.title}</h3>
           <Sheets h={h} />
           <p className={styles.muted}>
-            {h.status === 'excused'
+            <Assigned h={h} /> · {h.status === 'excused'
               ? 'Excused'
               : <><strong className={styles.marked}>✓ Submitted</strong> · waiting to be corrected · {h.files} file{h.files === 1 ? '' : 's'}</>}
           </p>
@@ -149,6 +153,7 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
           <p className={styles.subject}>{h.subject}</p>
           <h3>{h.title}</h3>
           <Sheets h={h} />
+          <p className={styles.muted}><Assigned h={h} /></p>
           <p className={styles.marked}>
             ✅ {h.mark !== null ? `${h.mark}${h.max_mark ? ` / ${h.max_mark}` : ''}` : 'Corrected'}
           </p>

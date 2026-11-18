@@ -7,27 +7,32 @@ import notes from './notes.module.css';
 export const metadata = { title: 'Class notes and documents' };
 
 type Note = {
-  id: string; title: string; body: string | null; created_at: string; batch_id: string; subject: string;
-  topic: string | null; has_file: boolean; is_link: boolean; file_name: string | null;
+  id: string; title: string; body: string | null; created_at: string; batch_id: string | null; subject: string | null;
+  topic: string | null; for_you: boolean; has_file: boolean; is_link: boolean; file_name: string | null;
 };
 
-// The class notes and documents teachers have shared with the student's classes, newest first.
-// With more than one class, tabs pick one subject (?subject=Maths); "All" shows everything.
+// A personal note (not for any class) has no subject: it is grouped under "Personal".
+const PERSONAL = 'Personal';
+
+// The class notes and documents teachers have shared with the student's classes, and notes just for them,
+// newest first. With more than one subject (or personal notes), tabs pick one (?subject=Maths); "All" shows everything.
 export default async function MyClassNotes({ searchParams }: { searchParams: Promise<{ subject?: string }> }) {
   const { subject: asked } = await searchParams;
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('my_class_notes');
   if (error) console.error('my_class_notes failed:', error.message);
-  const all = (data ?? []) as Note[];
+  const all = ((data ?? []) as Note[]).map((n) => ({ ...n, subject: n.subject ?? PERSONAL }));
 
-  const subjects = [...new Set(all.map((n) => n.subject))].sort();
+  // Subjects in name order, with Personal last.
+  const subjects = [...new Set(all.map((n) => n.subject))]
+    .sort((a, b) => Number(a === PERSONAL) - Number(b === PERSONAL) || a.localeCompare(b));
   const subject = asked && subjects.includes(asked) ? asked : null;
   const shown = subject ? all.filter((n) => n.subject === subject) : all;
 
   return (
     <>
       <h1>Class notes and documents</h1>
-      <p className={styles.muted}>Notes, worksheets and documents your teachers have shared with your class.</p>
+      <p className={styles.muted}>Notes, worksheets and documents your teachers have shared with your class, or just with you.</p>
 
       {subjects.length > 1 && (
         <nav className={styles.tabs} aria-label="Subjects">
@@ -44,7 +49,10 @@ export default async function MyClassNotes({ searchParams }: { searchParams: Pro
       <div className={notes.list}>
         {shown.map((n) => (
           <article key={n.id} className={styles.card}>
-            <p className={styles.subject}>{n.subject}{n.topic ? ` · ${n.topic}` : ''}</p>
+            <p className={styles.subject}>
+              {n.subject}{n.topic ? ` · ${n.topic}` : ''}
+              {n.for_you && <span className={notes.forYou}>Just for you</span>}
+            </p>
             <h3>{n.title}</h3>
             <p className={styles.muted}>Added {formatDay(n.created_at)}</p>
             {n.body && <p className={notes.body}>{n.body}</p>}

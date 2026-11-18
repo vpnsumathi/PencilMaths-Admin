@@ -4,26 +4,28 @@ import ui from '@/components/ui.module.css';
 import { notesTableMissing, NOTES_NOT_READY } from '@/lib/classNotes';
 import { formatDay } from '@/lib/format';
 import { createClient } from '@/lib/supabase/server';
-import { ClassNoteForm, type TopicGroup } from './ClassNoteForm';
+import { ClassNoteForm, type NoteStudent, type TopicGroup } from './ClassNoteForm';
 import styles from './classNotes.module.css';
 import { removeClassNote } from './notesActions';
 
 type Note = {
   id: string; title: string; body: string | null; provider: string | null; url: string | null; file_name: string | null;
-  created_by_name: string | null; created_at: string;
+  created_by_name: string | null; created_at: string; audience: string;
   batch_topics: { name: string } | null; lessons: { code: string; name: string } | null;
+  class_note_students: { students: { first_name: string; last_name: string } | null }[];
 };
 
 // Class notes and documents of one batch: staff and the batch's teacher add notes, files and links, optionally
-// for one lesson plan topic. The batch's students see them in their login under Class Notes/Documents (/me/notes).
-export async function ClassNotesSection({ batch, usesLibrary }: {
-  batch: { id: string; subject_id: string; year_group: number }; usesLibrary: boolean;
+// for one lesson plan topic, for the whole batch or for chosen students. Those students see them in their login
+// under Class Notes/Documents (/me/notes).
+export async function ClassNotesSection({ batch, usesLibrary, students }: {
+  batch: { id: string; subject_id: string; year_group: number }; usesLibrary: boolean; students: NoteStudent[];
 }) {
   const supabase = await createClient();
   const [{ data, error }, { data: lessons }, { data: topics }] = await Promise.all([
     supabase
       .from('class_notes')
-      .select('id, title, body, provider, url, file_name, created_by_name, created_at, batch_topics(name), lessons(code, name)')
+      .select('id, title, body, provider, url, file_name, created_by_name, created_at, audience, batch_topics(name), lessons(code, name), class_note_students(students(first_name, last_name))')
       .eq('batch_id', batch.id)
       .order('created_at', { ascending: false }),
     // The topics to choose from: the Lesson library's lessons (grouped by term and module), or the batch's
@@ -63,14 +65,15 @@ export async function ClassNotesSection({ batch, usesLibrary }: {
     <Section id="class-notes" title="Class notes and documents"
       summary={notes.length === 0 ? 'None yet' : `${notes.length} note${notes.length === 1 ? '' : 's'} · latest ${formatDay(notes[0].created_at)}`}>
       <p className={ui.hint} style={{ marginTop: 0 }}>
-        Students in this batch see these in their login, under <strong>Class Notes/Documents</strong>.
+        Students in this batch see these in their login, under <strong>Class Notes/Documents</strong>. A note for chosen
+        students is seen only by them.
       </p>
 
       {/* The form folds away behind "Add a note" once there are notes, so the list is what you see first. */}
       <details className={styles.add} open={notes.length === 0}>
         <summary className={ui.primaryButton}>＋ Add a note</summary>
         <div className={styles.addBody}>
-          <ClassNoteForm batchId={batch.id} topics={groups} />
+          <ClassNoteForm mode="batch" batchId={batch.id} topics={groups} students={students} />
         </div>
       </details>
 
@@ -78,19 +81,24 @@ export async function ClassNotesSection({ batch, usesLibrary }: {
       <ul className={styles.notes}>
         {notes.map((n) => {
           const topic = n.lessons ? `${n.lessons.code} ${n.lessons.name}` : n.batch_topics?.name;
+          const names = n.class_note_students.map((r) => r.students ? `${r.students.first_name} ${r.students.last_name}`.trim() : null)
+            .filter(Boolean).sort().join(', ');
           return (
             <li key={n.id} className={styles.note}>
               <div className={styles.head}>
                 <div>
                   <strong>{n.title}</strong>
                   {topic && <span className={styles.topic}>{topic}</span>}
+                  {n.audience === 'students'
+                    ? <span className={`${styles.forWhom} ${styles.forSome}`}>For: {names || 'chosen students'}</span>
+                    : <span className={styles.forWhom}>Whole batch</span>}
                   <div className={ui.stamp}>Added {formatDay(n.created_at)}{n.created_by_name ? ` by ${n.created_by_name}` : ''}</div>
                 </div>
                 <form action={removeClassNote}>
-                  <input type="hidden" name="batch_id" value={batch.id} />
+                  <input type="hidden" name="back" value={`/batches/${batch.id}`} />
                   <input type="hidden" name="note_id" value={n.id} />
                   <ConfirmButton className={ui.dangerButton}
-                    message={`Remove "${n.title}"? Students will no longer see it.${n.provider === 'google_drive' ? ' The file stays in Google Drive.' : ''}`}>
+                    message={`Remove "${n.title}"? ${n.audience === 'students' ? 'The chosen students' : 'Students'} will no longer see it.${n.provider === 'google_drive' ? ' The file stays in Google Drive.' : ''}`}>
                     Remove
                   </ConfirmButton>
                 </form>

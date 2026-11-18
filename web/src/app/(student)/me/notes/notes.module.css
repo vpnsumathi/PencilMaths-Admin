@@ -1,3 +1,8 @@
 /* Class notes and documents in the student login (/me/notes). The cards reuse student.module.css. */
 .list { display: grid; gap: 12px; margin-top: 16px; }
 .body { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.5; }
+/* A note given to this student personally (not to the whole class). */
+.forYou {
+  display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px;
+  background: #fff4e5; color: #8a4b00; font-size: 11px; letter-spacing: 0; text-transform: none; vertical-align: 1px;
+}

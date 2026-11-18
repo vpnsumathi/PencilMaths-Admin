@@ -14,6 +14,7 @@ import { AttendanceCard, cardPeriod, type CardPeriod } from '../AttendanceCard';
 import { ExtraClassesCard } from '../ExtraClassesCard';
 import { HandInLink } from '../HandInLink';
 import { PortalAccess } from '../PortalAccess';
+import { StudentNotesCard } from '../StudentNotesCard';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
 
 export const metadata = { title: 'Student' };
@@ -97,6 +98,10 @@ export default async function StudentPage({ params, searchParams }: Props) {
       <Suspense fallback={null}>
         <ExtraClassesCard studentId={student.id} staff />
       </Suspense>
+      {/* Class notes and documents for this student (guide 22 §9): loads on its own too. */}
+      <Suspense fallback={null}>
+        <StudentNotesCard studentId={student.id} firstName={student.first_name} teacher={false} />
+      </Suspense>
       <StudentForm
         student={student as Student}
         guardian={guardian as Guardian | null}
@@ -148,6 +153,9 @@ async function TeacherView({ student, period }: { student: Basic; period: CardPe
       <AttendanceCard studentId={student.id} period={period} {...attendance} note="your classes" />
       <Suspense fallback={null}>
         <ExtraClassesCard studentId={student.id} staff={false} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <StudentNotesCard studentId={student.id} firstName={student.first_name} teacher />
       </Suspense>
       <section className={ui.card} style={{ maxWidth: 900 }}>
         <h2>Classes with you</h2>
