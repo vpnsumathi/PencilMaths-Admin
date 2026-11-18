@@ -64,7 +64,7 @@ export default async function MyClasses({ searchParams }: { searchParams: Promis
                       <>
                         <p className={styles.checkInTimes}>
                           <strong>Check in:</strong>{' '}
-                          {c.times.map((t) => `${WEEKDAYS[t.weekday].slice(0, 3)} ${shiftTime(t.start_time, -w.before_minutes)}–${shiftTime(t.start_time, w.after_minutes)}`).join(' · ')}
+                          {c.times.map((t) => `${WEEKDAYS[t.weekday].slice(0, 3)} ${formatTime(shiftTime(t.start_time, -w.before_minutes))}–${formatTime(shiftTime(t.start_time, w.after_minutes))}`).join(' · ')}
                         </p>
                         <p className={styles.muted}>Late after {w.late_minutes} minutes. At other times the button just opens your class.</p>
                       </>

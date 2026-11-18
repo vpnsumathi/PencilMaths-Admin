@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
 import { CLASS_WINDOW, cleanClassLink, currentClass } from '@/lib/classLink';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatTime } from '@/lib/format';
 import { STUDENT_STATUSES, todayInUk, UUID, WEEKDAYS, yearLabel } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { setBatchClosed, setTopicStatus } from '../actions';
@@ -127,7 +127,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
   const topicList = topics ?? [];
   const topicsDone = topicList.filter((t) => t.status === 'complete').length;
   const topicNow = topicList.find((t) => t.status === 'in_progress') ?? topicList.find((t) => t.status !== 'complete');
-  const times = (slots ?? []).map((s) => `${WEEKDAYS[s.weekday]} ${s.start_time.slice(0, 5)}`).join(', ');
+  const times = (slots ?? []).map((s) => `${WEEKDAYS[s.weekday]} ${formatTime(s.start_time)}`).join(', ');
   const teacherName = (() => {
     const t = (teachers ?? []).find((x) => x.id === batch.teacher_id);
     return t ? `${t.first_name} ${t.last_name}` : null;

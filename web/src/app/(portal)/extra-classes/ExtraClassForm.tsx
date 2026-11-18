@@ -7,6 +7,7 @@ import ui from '@/components/ui.module.css';
 import { KIND_LABEL, LENGTHS, type ExtraKind } from '@/lib/extraClasses';
 import { checkExtraClass, saveExtraClass, studentAbsences, type Absence, type CheckResult } from './actions';
 import styles from './extra.module.css';
+import { times12 } from '@/lib/format';
 
 export type PickStudent = {
   id: string; name: string; code: string; status: string;
@@ -255,19 +256,19 @@ export function ExtraClassForm({ mode, students, subjects, teachers, initial, lo
           {!slotChanged ? <p className={styles.checking}>The time, teacher and students haven&apos;t changed.</p>
             : !teacherId || !date || !time || ids.length === 0 ? <p className={styles.checking}>Choose the students, teacher, date and time to check for clashes.</p>
               : checking ? <p className={styles.checking}>Checking…</p>
-                : check?.problem ? <p className={styles.checking}>{check.problem}</p>
+                : check?.problem ? <p className={styles.checking}>{times12(check.problem)}</p>
                   : check && errors.length === 0 && warnings.length === 0 ? <p className={styles.okLine}>✓ No clashes: the teacher and {ids.length === 1 ? 'the student are' : 'the students are'} free.</p>
                     : null}
           {errors.length > 0 && (
             <div className={`${ui.alert} ${ui.alertError}`} style={{ margin: '0 0 8px' }}>
               <b>This time can&apos;t be used:</b>
-              <ul className={styles.checkList}>{errors.map((m) => <li key={m}>{m}</li>)}</ul>
+              <ul className={styles.checkList}>{errors.map((m) => <li key={m}>{times12(m)}</li>)}</ul>
             </div>
           )}
           {warnings.length > 0 && (
             <div className={`${ui.alert} ${ui.alertWarn}`} style={{ margin: 0 }}>
               <b>Please check:</b>
-              <ul className={styles.checkList}>{warnings.map((m) => <li key={m}>{m}</li>)}</ul>
+              <ul className={styles.checkList}>{warnings.map((m) => <li key={m}>{times12(m)}</li>)}</ul>
               {errors.length === 0 && (
                 <label className={styles.anyway}>
                   <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />

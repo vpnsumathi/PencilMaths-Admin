@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { readFilters, reportArgs, setByText, type ListRow } from '@/lib/attendanceReport';
 import { getViewer } from '@/lib/auth';
 import { ATTENDANCE_LABEL, markLabel } from '@/lib/classLink';
-import { formatClock, formatDay } from '@/lib/format';
+import { formatClock, formatDay, formatTime } from '@/lib/format';
 import { createClient } from '@/lib/supabase/server';
 
 const CHUNK = 5000; // the most attendance_list returns in one go
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     'Attendance', 'Set by', 'Portal check-in', 'Last change', 'Reason', 'Changed by', 'Changed on'];
   const lines = rows.map((r) => [
     r.class_date,
-    r.start_time ? r.start_time.slice(0, 5) : '',
+    r.start_time ? formatTime(r.start_time) : '',
     r.batch_code, r.subject, r.student_code, r.first_name, r.last_name,
     markLabel(r.status, r.source),
     setByText(r.source, r.set_by),

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Field } from '@/components/Field';
 import ui from '@/components/ui.module.css';
-import { formatTime } from '@/lib/format';
+import { inputTime } from '@/lib/format';
 import { todayInUk, WEEKDAYS, yearLabel, YEARS } from '@/lib/options';
 import { createBatch, updateBatch } from './actions';
 
@@ -85,7 +85,7 @@ export function BatchForm({ batch, subjects, teachers, embedded = false }: {
               <option value="">Day…</option>
               {Object.entries(WEEKDAYS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <input name={`slot_time_${i}`} type="time" defaultValue={formatTime(slot.start_time)} className={ui.input} aria-label={`Class ${i + 1} time`} />
+            <input name={`slot_time_${i}`} type="time" defaultValue={inputTime(slot.start_time)} className={ui.input} aria-label={`Class ${i + 1} time`} />
           </div>
         ))}
         {/* Saves the whole form (batch details and class times). */}

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { saveStudent } from './actions';
 import { DuplicateWarning } from './DuplicateWarning';
 import { YearBatchFilter } from './YearBatchFilter';
+import { times12 } from '@/lib/format';
 
 export type Student = {
   id: string;
@@ -125,7 +126,7 @@ export function StudentForm({ student, guardian, enrolments = [], folder, option
                 <option value="">No batch yet</option>
                 {options.batches.filter((b) => b.subject_id === s.id).map((b) => (
                   <option key={b.id} value={b.id} data-year={b.year_group}>
-                    {b.code}{b.name ? ` ${b.name}` : ''} · {yearLabel(b.year_group)} · {b.schedule ?? 'no times'} ({b.member_count}/{b.capacity}{b.member_count >= b.capacity && b.id !== e?.batch_id ? ' · full' : ''})
+                    {b.code}{b.name ? ` ${b.name}` : ''} · {yearLabel(b.year_group)} · {times12(b.schedule) ?? 'no times'} ({b.member_count}/{b.capacity}{b.member_count >= b.capacity && b.id !== e?.batch_id ? ' · full' : ''})
                   </option>
                 ))}
               </select>

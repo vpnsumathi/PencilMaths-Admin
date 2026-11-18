@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { isTeacher } from '@/lib/auth';
 import { CLASS_WINDOW, cleanClassLink, currentClass } from '@/lib/classLink';
-import { formatDate } from '@/lib/format';
+import { formatDate, times12 } from '@/lib/format';
 import { yearShort } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
@@ -68,7 +68,7 @@ export default async function BatchesPage({ searchParams }: Props) {
                   <td>{b.subject}</td>
                   <td>{yearShort(b.year_group)}</td>
                   {!teacher && <td>{b.teacher}</td>}
-                  <td>{b.schedule ?? '—'}</td>
+                  <td>{times12(b.schedule) ?? '—'}</td>
                   <td>
                     {joinLinks.get(b.id)
                       ? <a href={joinLinks.get(b.id)!} target="_blank" rel="noopener noreferrer" className={ui.link}>Join class</a>

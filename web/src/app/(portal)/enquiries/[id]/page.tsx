@@ -8,6 +8,7 @@ import { ENQUIRY_STAGES, OPEN_STAGES, stageTone, UUID, yearLabel } from '@/lib/o
 import { createClient } from '@/lib/supabase/server';
 import { convertToStudent, setStage } from '../actions';
 import { EnquiryForm, type Enquiry } from '../EnquiryForm';
+import { formatClock, formatDay } from '@/lib/format';
 
 export const metadata = { title: 'Enquiry' };
 
@@ -87,7 +88,7 @@ export default async function EnquiryPage({ params, searchParams }: Props) {
             <li key={ev.id}>
               <span>{ENQUIRY_STAGES[ev.stage] ?? ev.stage}</span>
               <span className={ui.muted}>
-                {new Date(ev.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/London' })}
+                {formatDay(ev.at)}, {formatClock(ev.at)}
                 {(ev.staff as unknown as { full_name: string } | null)?.full_name && ` · ${(ev.staff as unknown as { full_name: string }).full_name}`}
               </span>
             </li>

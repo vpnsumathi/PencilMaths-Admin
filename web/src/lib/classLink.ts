@@ -1,6 +1,8 @@
 // The class link: the Google Classroom (or Google Meet) address a batch uses for its online class.
 // Used when staff save a link on the batch page and again just before a student is sent to it.
 // The database checks the same thing (batches_class_link_check), so a link that isn't Google's can never be stored.
+import { clock12 } from './format';
+
 
 const ALLOWED_HOSTS = ['classroom.google.com', 'meet.google.com'];
 
@@ -27,7 +29,7 @@ export type ClassWindow = { before_minutes: number; after_minutes: number; late_
 // late after 10. For pages that don't ask the database (the Class Schedule page, Join class going to Meet).
 export const CLASS_WINDOW: ClassWindow = { before_minutes: 15, after_minutes: 60, late_minutes: 10 };
 
-// "16:00:00" plus or minus some minutes → "15:45". Class times never run across midnight.
+// "16:00:00" plus or minus some minutes → "15:45" (24-hour; show it with formatTime). Class times never run across midnight.
 export function shiftTime(time: string, minutes: number) {
   const [h, m] = time.split(':').map(Number);
   const total = Math.min(Math.max(h * 60 + m + minutes, 0), 24 * 60 - 1);
@@ -79,7 +81,7 @@ export function currentClass(times: { weekday: number; start_time: string }[], w
     const start = h * 60 + m;
     if (t.weekday === weekday && minute >= start - window.before_minutes && minute <= start + window.after_minutes) {
       const time = t.start_time.slice(0, 5);
-      return { time, started: minute >= start, label: minute >= start ? `Class now · started ${time}` : `Starting soon · ${time}` };
+      return { time, started: minute >= start, label: minute >= start ? `Class now · started ${clock12(time)}` : `Starting soon · ${clock12(time)}` };
     }
   }
   return null;

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { nextClass } from '@/app/(student)/me/dashboard';
 import ui from '@/components/ui.module.css';
 import { CLASS_WINDOW, cleanClassLink, currentClass } from '@/lib/classLink';
-import { dayLabel, KIND_LABEL, ukClock, ukDate, type ListResult } from '@/lib/extraClasses';
+import { dayLabel, KIND_LABEL, ukClock, ukClock24, ukDate, type ListResult } from '@/lib/extraClasses';
 import { createClient } from '@/lib/supabase/server';
 import { ExtraBadge } from '../extra-classes/bits';
 import styles from '../dashboard.module.css';
@@ -68,7 +68,7 @@ export async function NextClass() {
       title: `${r.students.map((s) => s.name).join(', ')} · ${KIND_LABEL[r.kind]} · ${r.subject} · ${time}`,
       link: live ? `/extra-classes/${r.id}/meet` : null,
       now: live ? { started, label: started ? `Class now · started ${ukClock(r.starts_at)}` : `Starting soon · ${ukClock(r.starts_at)}` } : null,
-      when: dayLabel(r.starts_at), sort: `${ukDate(r.starts_at)} ${ukClock(r.starts_at)}`,
+      when: dayLabel(r.starts_at), sort: `${ukDate(r.starts_at)} ${ukClock24(r.starts_at)}`,
     };
   });
 

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import ui from '@/components/ui.module.css';
+import { formatClock } from '@/lib/format';
 
 // Refreshes the Class Schedule page every 30 seconds while a class is on, only while the page is on screen
 // (no refreshing in a hidden tab). The Refresh button does it straight away.
@@ -12,7 +13,7 @@ export function LiveRefresh({ active, updatedAt }: { active: boolean; updatedAt:
   const [clock, setClock] = useState('');
 
   useEffect(() => {
-    setClock(new Date(updatedAt).toLocaleTimeString('en-GB', { timeZone: 'Europe/London' }));
+    setClock(formatClock(updatedAt));
   }, [updatedAt]);
 
   useEffect(() => {

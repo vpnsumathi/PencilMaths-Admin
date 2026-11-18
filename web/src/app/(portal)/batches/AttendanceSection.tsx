@@ -88,9 +88,9 @@ export async function AttendanceSection({ batchId, classDate }: { batchId: strin
             <strong>{formatDate(date)}{date === today ? ' (today)' : ''}</strong>
             {register.start_time
               ? <> · class time {formatTime(register.start_time)}. A student who presses Join class between{' '}
-                  {shiftTime(register.start_time, -register.window.before_minutes)} and{' '}
-                  {shiftTime(register.start_time, register.window.after_minutes)} is marked Present, or Late after{' '}
-                  {shiftTime(register.start_time, register.window.late_minutes)}.</>
+                  {formatTime(shiftTime(register.start_time, -register.window.before_minutes))} and{' '}
+                  {formatTime(shiftTime(register.start_time, register.window.after_minutes))} is marked Present, or Late after{' '}
+                  {formatTime(shiftTime(register.start_time, register.window.late_minutes))}.</>
               : <> · no class is planned on this day. You can still take attendance by hand.</>}
             {!register.session_id && register.class_day && <> No attendance yet for this day.</>}
           </p>

@@ -1,4 +1,5 @@
 import type { AttendanceTotals, ClassWindow } from '@/lib/classLink';
+import { clock12 } from '@/lib/format';
 
 // The shape my_dashboard() returns (see supabase/migrations/20261020000003_student_dashboard_tiles.sql, and
 // 20261111000001_class_link_attendance.sql for batch_id, has_class_link and attendance).
@@ -25,7 +26,7 @@ export type Dashboard = {
   };
 };
 
-// The next class from the weekly times, in UK time: { date: "2026-10-21", time: "17:00", label: "Tomorrow, 17:00" }.
+// The next class from the weekly times, in UK time: { date: "2026-10-21", time: "17:00", label: "Tomorrow, 5:00 PM" }.
 export function nextClass(times: StudentClass['times'], now = new Date()) {
   if (times.length === 0) return null;
   const parts = Object.fromEntries(
@@ -49,5 +50,5 @@ export function nextClass(times: StudentClass['times'], now = new Date()) {
   d.setUTCDate(d.getUTCDate() + best!.days);
   const day = best!.days === 0 ? 'Today' : best!.days === 1 ? 'Tomorrow'
     : d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' });
-  return { date: d.toISOString().slice(0, 10), time: best!.time, label: `${day}, ${best!.time}` };
+  return { date: d.toISOString().slice(0, 10), time: best!.time, label: `${day}, ${clock12(best!.time)}` };
 }

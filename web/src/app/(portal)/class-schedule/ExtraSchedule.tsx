@@ -9,11 +9,13 @@ import styles from './schedule.module.css';
 
 // Extra classes on the Class Schedule page (guide 24): the ones on now (with check-ins; who is in the Meet call is
 // on the class's own page), and this week's, each with the Extra label. Not cancelled ones.
-export async function loadWeekExtras(): Promise<ListRow[]> {
+// teacherId: a teacher's own Class Schedule. The database already lists only a teacher's own extra classes; the
+// teacher filter is a second lock, as in loadSchedule.
+export async function loadWeekExtras(teacherId?: string): Promise<ListRow[]> {
   const supabase = await createClient();
   const { from, to } = rangeDates('week');
   const { data, error } = await supabase.rpc('extra_class_list', {
-    p: { from, to, status: ['upcoming', 'live', 'to_mark', 'done', 'no_show'], order: 'soonest', page_size: 300 },
+    p: { from, to, status: ['upcoming', 'live', 'to_mark', 'done', 'no_show'], order: 'soonest', page_size: 300, ...(teacherId ? { teacher: teacherId } : {}) },
   });
   if (error && error.code !== 'PGRST202') console.error('Class Schedule extra classes:', error.message);
   return (data as ListResult | null)?.rows ?? [];
@@ -49,17 +51,20 @@ export function ExtraLive({ rows }: { rows: ListRow[] }) {
   );
 }
 
-export function ExtraWeek({ rows }: { rows: ListRow[] }) {
+// teacherView: a teacher's own page, so no Teacher column and no Create link (only the office creates extra classes).
+export function ExtraWeek({ rows, teacherView = false }: { rows: ListRow[]; teacherView?: boolean }) {
   const today = todayInUk();
   return (
     <section className={styles.block} aria-labelledby="extra-week-title">
       <h2 id="extra-week-title" className={styles.blockTitle}>Extra classes this week <ExtraBadge /></h2>
       {rows.length === 0 ? (
-        <p className={ui.empty}>No extra classes this week. <Link href="/extra-classes/new" className={ui.link}>Create one</Link>.</p>
+        teacherView
+          ? <p className={ui.empty}>You have no extra classes this week.</p>
+          : <p className={ui.empty}>No extra classes this week. <Link href="/extra-classes/new" className={ui.link}>Create one</Link>.</p>
       ) : (
         <div className={ui.tableWrap}>
           <table className={ui.table}>
-            <thead><tr><th>Day</th><th>Time</th><th>Class</th><th>Students</th><th>Teacher</th><th>Status</th></tr></thead>
+            <thead><tr><th>Day</th><th>Time</th><th>Class</th><th>Students</th>{!teacherView && <th>Teacher</th>}<th>Status</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} style={ukDate(r.starts_at) === today ? { background: 'var(--brand-ring)' } : undefined}>
@@ -67,7 +72,7 @@ export function ExtraWeek({ rows }: { rows: ListRow[] }) {
                   <td>{ukClock(r.starts_at)}–{ukClock(r.ends_at)}</td>
                   <td><Link href={`/extra-classes/${r.id}`} className={ui.link}>{r.code}</Link> <span className={x.sub}>· {KIND_LABEL[r.kind]} · {r.subject}</span></td>
                   <td>{names(r)}</td>
-                  <td>{r.teacher}</td>
+                  {!teacherView && <td>{r.teacher}</td>}
                   <td><ExtraStatusPill status={r.status} /></td>
                 </tr>
               ))}

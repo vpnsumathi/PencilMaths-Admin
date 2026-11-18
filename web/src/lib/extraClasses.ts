@@ -4,6 +4,7 @@
 import { termStart } from './attendanceReport';
 import { ATTENDANCE_LABEL, markLabel } from './classLink';
 import { todayInUk, UUID } from './options';
+import { clock12 } from './format';
 
 export type ExtraStatus = 'upcoming' | 'live' | 'to_mark' | 'done' | 'no_show' | 'cancelled';
 export type ExtraKind = 'catch_up' | 'extra_practice' | 'exam_prep' | 'other';
@@ -24,12 +25,14 @@ export const LENGTHS = [30, 45, 60, 90, 120];
 // ---------- Times (always UK time) ----------
 const UK = 'Europe/London';
 const part = (iso: string, o: Intl.DateTimeFormatOptions) => new Date(iso).toLocaleString('en-GB', { timeZone: UK, ...o });
-export const ukClock = (iso: string | null | undefined) => (iso ? part(iso, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : '');
+// "4:30 PM", for showing (12-hour clock, see lib/format.ts). ukClock24 ("16:30") is for sorting and comparing.
+export const ukClock24 = (iso: string) => part(iso, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+export const ukClock = (iso: string | null | undefined) => (iso ? clock12(ukClock24(iso)) : '');
 // "Mon 17 Nov 2026"
 export const ukDay = (iso: string) => part(iso, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-// "Mon 17 Nov 2026, 16:30–17:15"
+// "Mon 17 Nov 2026, 4:30 PM–5:15 PM"
 export const whenText = (starts: string, ends: string) => `${ukDay(starts)}, ${ukClock(starts)}–${ukClock(ends)}`;
-// "Mon 17 Nov, 16:30" (no year), for short lines.
+// "Mon 17 Nov, 4:30 PM" (no year), for short lines.
 export const shortWhen = (iso: string) => `${part(iso, { weekday: 'short', day: 'numeric', month: 'short' })}, ${ukClock(iso)}`;
 // A UK date ("2026-11-17") from a moment.
 export const ukDate = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: UK });
@@ -40,7 +43,7 @@ const addDays = (date: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-// "Today, 17:00", "Tomorrow, 17:00" or "Monday 17 Nov, 17:00" (UK time), like the weekly classes' next-class label.
+// "Today, 5:00 PM", "Tomorrow, 5:00 PM" or "Monday 17 Nov, 5:00 PM" (UK time), like the weekly classes' next-class label.
 export function dayLabel(iso: string) {
   const today = todayInUk();
   const date = ukDate(iso);

@@ -5,6 +5,7 @@ import { FocusMessage } from '@/components/FocusMessage';
 import ui from '@/components/ui.module.css';
 import { bulkImport, makeDriveFolders, type ImportReport, type ImportState } from './actions';
 import styles from './import.module.css';
+import { times12 } from '@/lib/format';
 
 const BADGE = { new: ui.badgeOk, change: ui.badgeBrand, same: ui.badgeMuted };
 
@@ -180,7 +181,7 @@ export function ImportForm() {
                       const what = batchWhat(b);
                       return (
                         <tr key={b.batch}>
-                          <td>{b.batch}</td><td>{b.teacher}</td><td>{b.times}</td>
+                          <td>{b.batch}</td><td>{b.teacher}</td><td>{times12(b.times)}</td>
                           <td><span className={`${ui.badge} ${what.tone}`}>{what.text}</span></td>
                         </tr>
                       );

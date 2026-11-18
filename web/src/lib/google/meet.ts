@@ -54,6 +54,7 @@ export async function retireSpace(spaceName: string): Promise<boolean> {
 export const getSpace = (spaceName: string) => call<Space>(`/${spaceName}`);
 
 // The room's most recent call, or null if nobody has ever started one.
+// The call's name is "conferenceRecords/…"; each person in it is "conferenceRecords/…/participants/…".
 export async function latestCall(spaceName: string): Promise<ConferenceRecord | null> {
   const found = await call<{ conferenceRecords?: ConferenceRecord[] }>(
     `/conferenceRecords?${new URLSearchParams({ filter: `space.name = "${spaceName}"`, pageSize: '1' })}`);
@@ -69,6 +70,7 @@ export async function callPeople(conferenceName: string): Promise<InCall[]> {
     const found = await call<{ participants?: RawParticipant[]; nextPageToken?: string }>(`/${conferenceName}/participants?${query}`);
     for (const p of found.participants ?? []) {
       people.push({
+        participantId: p.name,
         googleId: p.signedinUser?.user?.replace(/^users\//, '') ?? null,
         name: p.signedinUser?.displayName ?? p.anonymousUser?.displayName ?? p.phoneUser?.displayName ?? 'Someone',
         kind: p.signedinUser ? 'signed_in' : p.phoneUser ? 'phone' : 'anonymous',

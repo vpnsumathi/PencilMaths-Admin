@@ -4,7 +4,7 @@ import { CLASS_WINDOW } from '@/lib/classLink';
 import { classMembers, classroomProblem, type Member } from '@/lib/google/classroom';
 import { callPeople, latestCall, meetProblem } from '@/lib/google/meet';
 import {
-  buildLive, callIsForClass, classState, ukNow, type Expected, type GoogleLink, type Guest, type InCall, type LivePerson,
+  buildLive, callIsForClass, classState, ukNow, type CallLink, type Expected, type GoogleLink, type Guest, type InCall, type LivePerson,
 } from '@/lib/liveClass';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -13,7 +13,8 @@ import { createClient } from '@/lib/supabase/server';
 // batch students, the register); who is in the call comes from Google Meet, asked only while someone has the
 // page open, and kept for 20 seconds per server copy (best-effort: on Vercel each running copy has its own memory).
 // Nothing is written every refresh:
-// the only writes are new Google account links found on a Classroom class list.
+// the only writes are new Google account links found on a Classroom class list. "This is…" and "Not them?" go
+// through the database's link functions (20261118000001_meet_linking.sql), which check who may link whom.
 
 export const TEACHER_LATE_MINUTES = 5; // the teacher shows in red if not in the call this long after the start
 
@@ -31,13 +32,18 @@ export type WeekSlot = { batchId: string; code: string; subject: string | null; 
 
 const fullName = (p: { first_name: string; last_name: string } | null) => (p ? `${p.first_name} ${p.last_name}` : null);
 
-export async function loadSchedule(now = new Date()) {
+// teacherId: the teacher's own Class Schedule (guide 21, section 13). The database rules already give a teacher only
+// their own open batches (and their rooms, classes and attendance); asking for teacher_id as well is a second lock,
+// so the teacher page can never show another teacher's class even if a rule is changed by mistake.
+export async function loadSchedule({ teacherId }: { teacherId?: string } = {}, now = new Date()) {
   const supabase = await createClient();
   const uk = ukNow(now);
+  let batchQuery = supabase.from('batches')
+    .select('id, code, name, teacher_id, subjects(name), teachers(first_name, last_name), batch_slots(weekday, start_time)')
+    .is('closed_on', null);
+  if (teacherId) batchQuery = batchQuery.eq('teacher_id', teacherId);
   const [{ data: batches, error }, { data: rooms, error: roomError }] = await Promise.all([
-    supabase.from('batches')
-      .select('id, code, name, teacher_id, subjects(name), teachers(first_name, last_name), batch_slots(weekday, start_time)')
-      .is('closed_on', null).order('code'),
+    batchQuery.order('code'),
     supabase.from('batch_meet_rooms').select('batch_id'),
   ]);
   if (error) throw error;
@@ -74,7 +80,10 @@ export async function loadSchedule(now = new Date()) {
       register: registers.get(c.batchId) ?? null,
     };
   });
-  return { date: uk.date, weekday: uk.weekday, today, week, meetReady: !roomError };
+  // Open batches with no class time yet: they can't be on the timetable, so the teacher page lists them.
+  const unscheduled = list.filter((b) => b.batch_slots.length === 0)
+    .map((b) => ({ batchId: b.id, code: b.code, name: b.name, subject: b.subjects?.name ?? null }));
+  return { date: uk.date, weekday: uk.weekday, today, week, unscheduled, batchCount: list.length, meetReady: !roomError };
 }
 
 export type Live = {
@@ -87,7 +96,8 @@ export type Live = {
 
 // Meet's answer for a room, kept for 20 seconds (also a failure, so a Google problem isn't asked again each time).
 // In this server copy's memory only, so best-effort: several copies on Vercel may each ask Google once.
-type MeetAnswer = { ok: true; startedAt: string | null; people: InCall[] | null } | { ok: false; problem: string };
+// conference: the call's name ("conferenceRecords/…"), which phone and signed-out callers' links belong to.
+type MeetAnswer = { ok: true; startedAt: string | null; conference: string | null; people: InCall[] | null } | { ok: false; problem: string };
 const meetCache = new Map<string, { at: number; answer: MeetAnswer }>();
 const MEET_SECONDS = 20;
 
@@ -99,8 +109,8 @@ async function askMeet(space: string, date: string, time: string): Promise<MeetA
   try {
     const call = await latestCall(space);
     answer = call && callIsForClass(call.startTime, date, time, CLASS_WINDOW)
-      ? { ok: true, startedAt: call.startTime ?? null, people: await callPeople(call.name) }
-      : { ok: true, startedAt: null, people: null };
+      ? { ok: true, startedAt: call.startTime ?? null, conference: call.name, people: await callPeople(call.name) }
+      : { ok: true, startedAt: null, conference: null, people: null };
   } catch (e) {
     console.error('Google Meet check:', e);
     answer = { ok: false, problem: meetProblem(e) };
@@ -108,6 +118,26 @@ async function askMeet(space: string, date: string, time: string): Promise<MeetA
   if (meetCache.size > 200) meetCache.clear();
   meetCache.set(key, { at: Date.now(), answer });
   return answer;
+}
+
+// Everyone in (or who has been in) today's Meet call of a batch, for "This is…" and "Not them?": the actions check
+// that the account or caller really is in this batch's call before they link anyone. The batch is read with the
+// signed-in login's rules, so a teacher gets nothing for a batch that isn't theirs. Uses the same 20-second answer
+// the page showed, so someone on the page is found. null: no call today, no room, or Meet can't be reached.
+export async function todaysCall(batchId: string, now = new Date()) {
+  const supabase = await createClient();
+  const uk = ukNow(now);
+  const [{ data: batch }, { data: room }] = await Promise.all([
+    supabase.from('batches').select('id, batch_slots(weekday, start_time)').eq('id', batchId).is('closed_on', null).maybeSingle(),
+    supabase.from('batch_meet_rooms').select('space_name').eq('batch_id', batchId).maybeSingle(),
+  ]);
+  const slots = ((batch?.batch_slots ?? []) as { weekday: number; start_time: string }[]).filter((x) => x.weekday === uk.weekday);
+  if (!room || slots.length === 0) return null;
+  for (const s of slots) {
+    const meet = await askMeet(room.space_name as string, uk.date, s.start_time.slice(0, 5));
+    if (meet.ok && meet.conference && meet.people) return { date: uk.date, conference: meet.conference, people: meet.people };
+  }
+  return null;
 }
 
 // A Classroom class list, kept for 2 minutes per class. It is only asked for while someone in the call can't be
@@ -144,8 +174,9 @@ export function emailKey(email: string | null | undefined) {
 // Recognises Google accounts in the call from the class's Classroom list, by email: the teacher's Email on their
 // page, or a parent's email on the family. Only a sure match is saved (one person with that email). For everyone
 // else, `why` says what stopped it, so staff know whether to choose with "This is…" or fix an email.
+// forTeacher: the reasons leave out the email (usually a parent's, which teachers can't see) and point to the office.
 async function linkFromClassroom(courseId: string, unknownIds: string[], teacher: { id: string; email: string | null } | null,
-  students: { id: string; emails: string[] }[], staffId: string | null): Promise<{ links: GoogleLink[]; why: Map<string, string> }> {
+  students: { id: string; emails: string[] }[], staffId: string | null, forTeacher: boolean): Promise<{ links: GoogleLink[]; why: Map<string, string> }> {
   const why = new Map<string, string>();
   const list = await classList(courseId);
   if (!list.members) {
@@ -174,6 +205,10 @@ async function linkFromClassroom(courseId: string, unknownIds: string[], teacher
       rows.push({ google_user_id: id, ...row, display_name: m.name, email: m.email, matched_by: 'classroom', linked_by: staffId });
       continue;
     }
+    if (forTeacher) {
+      why.set(id, `On the Google Classroom class list as ${as}, but the app can't be sure who it is from the emails it has. Choose who it is, or ask the office to check the emails.`);
+      continue;
+    }
     why.set(id, isTeacher
       ? `${m.email} is both the teacher's Email and a parent's email in this batch, so the app won't guess.`
       : matches.length > 1
@@ -189,33 +224,46 @@ async function linkFromClassroom(courseId: string, unknownIds: string[], teacher
   return { links: rows, why };
 }
 
+// Who is looking: staff see everything; a batch's teacher sees their own class only, without parents' phones or
+// emails, and accounts linked to someone outside the batch show without that person's name.
+export type LiveViewer = { kind: 'staff'; userId: string } | { kind: 'teacher'; teacherId: string };
+
 // One class today: who is expected, and where each of them is.
-export async function loadLive(c: { batchId: string; time: string; minutesIn: number }, staffId: string | null, now = new Date()): Promise<Live> {
+// The batch, its students, the attendance and the room are read with the viewer's own database rules (a teacher gets
+// nothing for someone else's batch). The teacher's email, parents' details and the Google account links are then read
+// with the server's key, because teachers can't read them, and only what this viewer may see is passed on.
+export async function loadLive(c: { batchId: string; time: string; minutesIn: number }, viewer: LiveViewer, now = new Date()): Promise<Live> {
   const supabase = await createClient();
+  const admin = createAdminClient();
+  const forTeacher = viewer.kind === 'teacher';
   const uk = ukNow(now);
   const [{ data: batch }, { data: enrols }, { data: session }, { data: room }, { data: classroom }] = await Promise.all([
-    supabase.from('batches').select('id, code, teacher_id, teachers(id, first_name, last_name, personal_email)').eq('id', c.batchId).maybeSingle(),
+    supabase.from('batches').select('id, code, teacher_id').eq('id', c.batchId).is('closed_on', null).maybeSingle(),
     supabase.from('enrolments').select('students(id, code, first_name, last_name, family_id)')
       .eq('batch_id', c.batchId).is('ended_on', null).lte('started_on', uk.date),
     supabase.from('class_sessions').select('attendance(student_id, status, source, joined_at)').eq('batch_id', c.batchId).eq('class_date', uk.date).maybeSingle(),
     supabase.from('batch_meet_rooms').select('space_name').eq('batch_id', c.batchId).maybeSingle(),
     supabase.from('batch_classrooms').select('course_id').eq('batch_id', c.batchId).maybeSingle(),
   ]);
+  // Second lock for a teacher: only their own batch, even if a database rule were changed by mistake.
+  const allowed = Boolean(batch) && (!forTeacher || batch!.teacher_id === viewer.teacherId);
   type Student = { id: string; code: string; first_name: string; last_name: string; family_id: string | null };
   type Teacher = { id: string; first_name: string; last_name: string; personal_email: string | null };
-  const t = (batch?.teachers ?? null) as unknown as Teacher | null;
-  const students = [...new Map(((enrols ?? []) as unknown as { students: Student | null }[])
+  const students = allowed ? [...new Map(((enrols ?? []) as unknown as { students: Student | null }[])
     .filter((e) => e.students).map((e) => [e.students!.id, e.students!])).values()]
-    .sort((a, b) => a.first_name.localeCompare(b.first_name));
+    .sort((a, b) => a.first_name.localeCompare(b.first_name)) : [];
   const familyIds = [...new Set(students.map((s) => s.family_id).filter(Boolean))] as string[];
   const personIds = students.map((s) => s.id);
-  const [{ data: guardians }, { data: savedLinks }] = await Promise.all([
-    familyIds.length ? supabase.from('guardians').select('family_id, phone, email, is_primary').in('family_id', familyIds) : Promise.resolve({ data: [] }),
-    personIds.length || t
-      ? supabase.from('google_people').select('google_user_id, student_id, teacher_id')
-        .or([personIds.length ? `student_id.in.(${personIds.join(',')})` : '', t ? `teacher_id.eq.${t.id}` : ''].filter(Boolean).join(','))
+  const teacherId = allowed ? (batch!.teacher_id as string | null) : null;
+  const [{ data: teacherRow }, { data: guardians }, { data: savedLinks }] = await Promise.all([
+    teacherId ? admin.from('teachers').select('id, first_name, last_name, personal_email').eq('id', teacherId).maybeSingle() : Promise.resolve({ data: null }),
+    familyIds.length ? admin.from('guardians').select('family_id, phone, email, is_primary').in('family_id', familyIds) : Promise.resolve({ data: [] }),
+    personIds.length || teacherId
+      ? admin.from('google_people').select('google_user_id, student_id, teacher_id')
+        .or([personIds.length ? `student_id.in.(${personIds.join(',')})` : '', teacherId ? `teacher_id.eq.${teacherId}` : ''].filter(Boolean).join(','))
       : Promise.resolve({ data: [] }),
   ]);
+  const t = (teacherRow ?? null) as Teacher | null;
   const marks = new Map((((session?.attendance ?? []) as { student_id: string; status: string; source: string; joined_at: string | null }[]))
     .map((a) => [a.student_id, a]));
   const family = (id: string | null) => ((guardians ?? []) as { family_id: string; phone: string | null; email: string | null; is_primary: boolean }[])
@@ -227,7 +275,7 @@ export async function loadLive(c: { batchId: string; time: string; minutesIn: nu
       const m = marks.get(s.id);
       return {
         id: s.id, kind: 'student' as const, name: `${s.first_name} ${s.last_name}`, code: s.code,
-        phone: whatsappNumber(family(s.family_id).find((g) => g.phone)?.phone ?? null),
+        phone: forTeacher ? null : whatsappNumber(family(s.family_id).find((g) => g.phone)?.phone ?? null),
         clickedAt: m?.joined_at ?? null, mark: m && m.source === 'staff' ? m.status : null,
       };
     }),
@@ -235,8 +283,8 @@ export async function loadLive(c: { batchId: string; time: string; minutesIn: nu
 
   const base = { batchId: c.batchId, code: batch?.code ?? '', time: c.time, updatedAt: now.toISOString() };
   const finish = (status: Live['status'], problem: string | null, startedAt: string | null, people: InCall[] | null, links: GoogleLink[],
-    knownAs?: Map<string, string>, why?: Map<string, string>): Live => {
-    const live = buildLive(expected, people, links, knownAs);
+    knownAs?: Map<string, string>, why?: Map<string, string>, callLinks?: CallLink[]): Live => {
+    const live = buildLive(expected, people, links, knownAs, callLinks);
     const guests = live.guests.map((g) => ({ ...g, why: (g.googleId && why?.get(g.googleId)) || null }));
     const teacher = live.people.find((p) => p.kind === 'teacher') ?? null;
     return {
@@ -246,11 +294,18 @@ export async function loadLive(c: { batchId: string; time: string; minutesIn: nu
         && (status === 'ok' || status === 'no_call') && teacher?.state !== 'in_meet',
     };
   };
+  if (!allowed) return finish('error', 'This class isn\'t one of yours.', null, null, []);
   if (!room) return finish('no_room', null, null, null, []);
   const meet = await askMeet(room.space_name as string, uk.date, c.time);
   if (!meet.ok) return finish('error', meet.problem, null, null, []);
   // No call yet in this class's time: nobody is in it (that is a real answer, not missing data).
   if (!meet.people) return finish('no_call', null, null, [], (savedLinks ?? []) as GoogleLink[]);
+
+  // Phone and signed-out callers linked for this call (This is…, this class only).
+  const { data: callLinks } = meet.conference && meet.people.some((p) => !p.googleId)
+    ? await admin.from('meet_call_guests').select('participant_name, kind, display_name, student_id, teacher_id')
+      .eq('batch_id', c.batchId).eq('conference_name', meet.conference)
+    : { data: [] };
 
   let links = (savedLinks ?? []) as GoogleLink[];
   const linked = new Set(links.map((l) => l.google_user_id));
@@ -262,21 +317,26 @@ export async function loadLive(c: { batchId: string; time: string; minutesIn: nu
   if (unknown.length && classroom?.course_id) {
     const { links: found, why: reasons } = await linkFromClassroom(classroom.course_id as string, unknown,
       t ? { id: t.id, email: emailKey(t.personal_email) } : null,
-      students.map((s) => ({ id: s.id, emails: family(s.family_id).map((g) => emailKey(g.email)).filter(Boolean) as string[] })), staffId);
+      students.map((s) => ({ id: s.id, emails: family(s.family_id).map((g) => emailKey(g.email)).filter(Boolean) as string[] })),
+      viewer.kind === 'staff' ? viewer.userId : null, forTeacher);
     links = [...links, ...found];
     for (const [id, text] of reasons) why.set(id, text);
     const now2 = new Set(found.map((l) => l.google_user_id));
     unknown = unknown.filter((id) => !now2.has(id));
   }
-  // Accounts linked to someone outside this batch: shown by that name, as a guest.
+  // Accounts linked to someone outside this batch: shown as a guest, by that name for staff. A teacher sees only that
+  // it is someone outside the batch (and can't move the link: the office can).
   const knownAs = new Map<string, string>();
   if (unknown.length) {
-    const { data: others } = await supabase.from('google_people')
+    const { data: others } = await admin.from('google_people')
       .select('google_user_id, students(first_name, last_name), teachers(first_name, last_name)').in('google_user_id', unknown);
     for (const o of (others ?? []) as unknown as { google_user_id: string; students: Teacher | null; teachers: Teacher | null }[]) {
       const n = fullName(o.students ?? o.teachers);
-      if (n) knownAs.set(o.google_user_id, n);
+      if (n) knownAs.set(o.google_user_id, forTeacher ? OUTSIDE_BATCH : n);
     }
   }
-  return finish('ok', null, meet.startedAt, meet.people, links, knownAs, why);
+  return finish('ok', null, meet.startedAt, meet.people, links, knownAs, why, (callLinks ?? []) as CallLink[]);
 }
+
+// What a teacher sees for an account linked to someone outside their batch.
+export const OUTSIDE_BATCH = 'someone outside this batch';

@@ -5,7 +5,7 @@ import {
   type Attention, type CorrectionRow, type Filters, type Grid, type ListRow, type Summary,
 } from '@/lib/attendanceReport';
 import { ATTENDANCE_LABEL, markLabel } from '@/lib/classLink';
-import { formatClock, formatDate, formatDay } from '@/lib/format';
+import { formatClock, formatDate, formatDay, formatTime } from '@/lib/format';
 import { isTeacher } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import styles from './attendance.module.css';
@@ -402,7 +402,7 @@ function AttentionView({ a }: { a: Attention }) {
           <ul className={styles.items}>
             {a.missing.map((m) => (
               <li key={`${m.batch_id}-${m.class_date}`}>
-                <span><b>{m.batch_code}</b> · {weekdayShort(m.class_date)} {formatDate(m.class_date)} {m.start_time.slice(0, 5)}</span>
+                <span><b>{m.batch_code}</b> · {weekdayShort(m.class_date)} {formatDate(m.class_date)} {formatTime(m.start_time)}</span>
                 <Link href={`/batches/${m.batch_id}?class_date=${m.class_date}#attendance`} className={ui.button}>Take attendance</Link>
               </li>
             ))}
