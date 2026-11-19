@@ -1,5 +1,5 @@
 import 'server-only';
-import { send } from './auth';
+import { GOOGLE_TIMEOUT_MS, send } from './auth';
 
 // Talks to Google Classroom with the same Google account as Drive (the class owner is always that account, so a
 // class stays with Pencil Maths when a teacher leaves). Needs the Classroom permissions in the refresh token
@@ -27,7 +27,7 @@ export class GoogleError extends Error {
 }
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await send(`${API}${path}`, init.body ? { ...init, headers: { 'Content-Type': 'application/json' } } : init);
+  const res = await send(`${API}${path}`, init.body ? { ...init, headers: { 'Content-Type': 'application/json' } } : init, GOOGLE_TIMEOUT_MS);
   const raw = await res.text();
   let body: { error?: { status?: string; message?: string } } & Record<string, unknown> = {};
   try { body = raw ? JSON.parse(raw) : {}; } catch { /* not JSON: keep the status only */ }
@@ -169,6 +169,7 @@ export function classroomProblem(e: unknown): string {
     return 'The app couldn\'t sign in to Google. The Google connection may need renewing (guide 21, section 11).';
   }
   if (e instanceof GoogleError && e.status === 429) return 'Google is busy. Please try again in a minute.';
+  if (e instanceof Error && e.name === 'TimeoutError') return 'Google Classroom didn\'t answer in time. Please try again.';
   if (e instanceof GoogleError) return `Google Classroom said: ${message.slice(0, 200)}`;
   return 'Could not reach Google Classroom. Please try again.';
 }

@@ -47,9 +47,14 @@ export const ATTENDANCE_LABEL: Record<string, string> = { present: 'Present', la
 // Badge colour (see StatusBadge) for each attendance status.
 export const ATTENDANCE_TONE: Record<string, string> = { present: 'active', late: 'trial', absent: 'left' };
 
-// One class's mark in words. A portal check-in counts as attended, but says "Checked in" until the teacher confirms it.
-export function markLabel(status: string, source?: string | null) {
-  if (source === 'link') return status === 'late' ? 'Checked in late' : 'Checked in';
+// One class's mark in words. A check-in counts as attended, but says "Checked in" until the teacher confirms it.
+// fromMeet (guide 21, section 15): true when Google Meet saw them join the call, "Checked in (Meet)"; false when it
+// is only a Join class press, "Checked in (button)"; left out where the page doesn't know, plain "Checked in".
+export function markLabel(status: string, source?: string | null, fromMeet?: boolean) {
+  if (source === 'link') {
+    const how = fromMeet === undefined ? '' : fromMeet ? ' (Meet)' : ' (button)';
+    return `${status === 'late' ? 'Checked in late' : 'Checked in'}${how}`;
+  }
   return ATTENDANCE_LABEL[status] ?? status;
 }
 // Badge colour for markLabel.

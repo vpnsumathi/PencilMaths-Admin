@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { Alerts } from '@/components/Alerts';
 import ui from '@/components/ui.module.css';
 import { requireStaffOrTeacher } from '@/lib/auth';
+import { checkAfterPage } from '@/lib/meetCheck';
 import { loadLive, loadSchedule, type Live, type TodayClass } from '@/lib/classSchedule';
 import { clock12 } from '@/lib/format';
 import { UUID, WEEKDAYS } from '@/lib/options';
@@ -29,12 +31,11 @@ export default async function ClassSchedulePage({ searchParams }: Props) {
   const extrasOn = extras.filter((r) => r.status === 'live');
   const onNow = s.today.filter((c) => c.state === 'live' || c.state === 'soon');
   const chosen = UUID.test(picked ?? '') ? s.today.find((c) => c.batchId === picked) ?? null : null;
-  const [live, detail] = await Promise.all([
-    Promise.all(onNow.map((c) => loadLive(c, viewer))),
-    chosen && !onNow.includes(chosen) ? loadLive(chosen, viewer) : Promise.resolve(null),
-  ]);
-  const shown = chosen ? (detail ?? live[onNow.indexOf(chosen)]) : null;
   const updatedAt = new Date().toISOString();
+  const next = s.today.find((c) => c.state === 'later');
+  const nextLine = next ? ` Next today: ${clock12(next.time)} ${next.code}${next.teacher ? ` with ${next.teacher}` : ''}.` : '';
+  // Nothing on now: still catch up on finished classes nobody looked at, once the page is sent (guide 21, section 15).
+  if (onNow.length === 0 && extrasOn.length === 0 && !chosen) checkAfterPage();
 
   return (
     <>
@@ -53,26 +54,17 @@ export default async function ClassSchedulePage({ searchParams }: Props) {
         </p>
       )}
 
-      <section className={styles.block} aria-labelledby="live-title">
-        <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
-        {live.length === 0 && extrasOn.length === 0 ? (
-          <p className={ui.empty}>
-            No classes on right now.
-            {(() => {
-              const next = s.today.find((c) => c.state === 'later');
-              return next ? ` Next today: ${clock12(next.time)} ${next.code}${next.teacher ? ` with ${next.teacher}` : ''}.` : '';
-            })()}
-          </p>
-        ) : live.length > 0 && (
-          <div className={styles.cards}>
-            {live.map((l, i) => <LiveCard key={l.batchId + l.time} live={l} cls={onNow[i]} selected={chosen?.batchId === l.batchId} />)}
-          </div>
-        )}
-        {/* Extra classes on now (guide 24). */}
-        <ExtraLive rows={extrasOn} />
-      </section>
-
-      {shown && chosen && <Details live={shown} cls={chosen} date={s.date} />}
+      {/* The classes on now wait for Google Meet, so they come in on their own: today and the week show at once. */}
+      {onNow.length === 0 && extrasOn.length === 0 && !chosen ? (
+        <section className={styles.block} aria-labelledby="live-title">
+          <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
+          <p className={ui.empty}>No classes on right now.{nextLine}</p>
+        </section>
+      ) : (
+        <Suspense fallback={<LiveWaiting />}>
+          <LiveNow onNow={onNow} extrasOn={extrasOn} chosen={chosen} date={s.date} viewer={viewer} nextLine={nextLine} />
+        </Suspense>
+      )}
 
       <section className={styles.block} aria-labelledby="today-title">
         <h2 id="today-title" className={styles.blockTitle}>Today · {WEEKDAYS[s.weekday]}</h2>
@@ -112,6 +104,50 @@ export default async function ClassSchedulePage({ searchParams }: Props) {
           ))}
         </div>
       </section>
+    </>
+  );
+}
+
+function LiveWaiting() {
+  return (
+    <section className={styles.block} aria-labelledby="live-title" aria-busy="true">
+      <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
+      <p className={ui.empty}>Asking Google Meet who is in the call…</p>
+    </section>
+  );
+}
+
+// Live now and one class's details: these ask Google Meet (each class gives up after 10 seconds, lib/meetCalls.ts).
+async function LiveNow({ onNow, extrasOn, chosen, date, viewer, nextLine }: {
+  onNow: TodayClass[]; extrasOn: Awaited<ReturnType<typeof loadWeekExtras>>; chosen: TodayClass | null; date: string;
+  viewer: { kind: 'staff'; userId: string }; nextLine: string;
+}) {
+  const [live, detail] = await Promise.all([
+    Promise.all(onNow.map((c) => loadLive(c, viewer))),
+    chosen && !onNow.includes(chosen) ? loadLive(chosen, viewer) : Promise.resolve(null),
+  ]);
+  const shown = chosen ? (detail ?? live[onNow.indexOf(chosen)]) : null;
+  // Once the page is sent: save what Meet saw in the classes on now (check-in from Meet, at most every 2 minutes),
+  // then catch up on finished classes nobody looked at (guide 21, section 15).
+  checkAfterPage([
+    ...live.filter((l) => l.status === 'ok').map((l) => ({ kind: 'batch' as const, batchId: l.batchId, date })),
+    ...extrasOn.filter((r) => r.has_meet_room).map((r) => ({ kind: 'extra' as const, id: r.id })),
+  ]);
+  return (
+    <>
+      <section className={styles.block} aria-labelledby="live-title">
+        <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
+        {live.length === 0 && extrasOn.length === 0 ? (
+          <p className={ui.empty}>No classes on right now.{nextLine}</p>
+        ) : live.length > 0 && (
+          <div className={styles.cards}>
+            {live.map((l, i) => <LiveCard key={l.batchId + l.time} live={l} cls={onNow[i]} selected={chosen?.batchId === l.batchId} />)}
+          </div>
+        )}
+        {/* Extra classes on now (guide 24). */}
+        <ExtraLive rows={extrasOn} />
+      </section>
+      {shown && chosen && <Details live={shown} cls={chosen} date={date} />}
     </>
   );
 }

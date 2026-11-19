@@ -52,7 +52,7 @@ export function ProblemPage({ title, children, look, error, reset, home }: Props
   return (
     <main className={auth.page}>
       <section className={auth.card} role={error ? 'alert' : undefined}>
-        <Image src="/logo.png" alt="Pencil Maths" width={181} height={60} priority className={auth.logo} />
+        <Image src="/logo.png" alt="PencilMaths" width={181} height={60} priority className={auth.logo} />
         <h1 className={auth.title}>{title}</h1>
         <p className={auth.subtitle}>{children}</p>
         <div className={auth.form}>

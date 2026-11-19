@@ -24,7 +24,7 @@ export default function LoginPage() {
         </div>
 
         <div className={styles.brandTop}>
-          <Image className={styles.logo} src="/logo-on-dark.png" alt="Pencil Maths" width={163} height={54} priority />
+          <Image className={styles.logo} src="/logo-on-dark.png" alt="PencilMaths" width={163} height={54} priority />
         </div>
 
         <div className={styles.brandBody}>
@@ -40,13 +40,13 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className={styles.brandFoot}>© {new Date().getFullYear()} Pencil Maths</p>
+        <p className={styles.brandFoot}>© {new Date().getFullYear()} PencilMaths</p>
       </aside>
 
       {/* Right: the sign-in form */}
       <main className={styles.formSide}>
         <div className={styles.mobileBrand}>
-          <Image className={styles.logo} src="/logo-transparent.png" alt="Pencil Maths" width={163} height={54} priority />
+          <Image className={styles.logo} src="/logo-transparent.png" alt="PencilMaths" width={163} height={54} priority />
         </div>
         <LoginForm />
       </main>

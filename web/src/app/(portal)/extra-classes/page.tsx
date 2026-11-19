@@ -214,7 +214,7 @@ function Tiles({ f, s }: { f: Filters; s: Summary }) {
     <div className={att.tiles}>
       {tile('upcoming', 'Upcoming')}
       {tile('live', 'Live now')}
-      {tile('to_mark', 'To mark', true)}
+      {tile('to_mark', 'Mark attendance', true)}
       {tile('done', 'Done')}
       {tile('no_show', 'No-shows', true)}
       {tile('cancelled', 'Cancelled')}

@@ -1,13 +1,16 @@
 import Link from 'next/link';
 import ui from '@/components/ui.module.css';
+import { StatusBadge } from '@/components/StatusBadge';
 import {
   attendanceHref, markLetter, RANGES, readFilters, reportArgs, setByText, SHOW, TABS,
-  type Attention, type CorrectionRow, type Filters, type Grid, type ListRow, type Summary,
+  type Attention, type CorrectionRow, type Filters, type Grid, type ListRow, type MeetAttention, type Summary, type TeacherList,
 } from '@/lib/attendanceReport';
 import { ATTENDANCE_LABEL, markLabel } from '@/lib/classLink';
 import { formatClock, formatDate, formatDay, formatTime } from '@/lib/format';
 import { isTeacher } from '@/lib/auth';
+import { checkAfterPage } from '@/lib/meetCheck';
 import { createClient } from '@/lib/supabase/server';
+import { TEACHER_STATUS, TEACHER_TONE, teacherLine } from '../batches/MeetCheckBox';
 import styles from './attendance.module.css';
 
 export const metadata = { title: 'Attendance' };
@@ -30,10 +33,11 @@ export default async function AttendancePage({ searchParams }: Props) {
   const supabase = await createClient();
   const args = reportArgs(f);
 
-  const [teacher, summaryRes, attentionRes, { data: batches }, { data: students }, { data: teachers }, tabRes] = await Promise.all([
+  const [teacher, summaryRes, attentionRes, meetRes, { data: batches }, { data: students }, { data: teachers }, tabRes] = await Promise.all([
     isTeacher(),
     supabase.rpc('attendance_summary', args),
     supabase.rpc('attendance_attention', args),
+    supabase.rpc('meet_attention', { p_from: f.from, p_to: f.to }),
     supabase.from('batch_list').select('id, code, name, subject, closed_on').order('closed_on', { ascending: false, nullsFirst: true }).order('code'),
     supabase.from('students').select('id, code, first_name, last_name').order('first_name').order('last_name'),
     supabase.from('teachers').select('id, first_name, last_name').order('first_name'),
@@ -43,15 +47,33 @@ export default async function AttendancePage({ searchParams }: Props) {
         ? supabase.rpc('attendance_list', { ...args, p_show: f.show, p_limit: PAGE_SIZE, p_offset: (f.page - 1) * PAGE_SIZE })
         : f.tab === 'corrections'
           ? supabase.rpc('attendance_corrections', { ...args, p_limit: PAGE_SIZE, p_offset: (f.page - 1) * PAGE_SIZE })
-          : Promise.resolve({ data: null, error: null }),
+          : f.tab === 'teachers'
+            ? supabase.rpc('teacher_attendance_list', { p_from: f.from, p_to: f.to, p_teacher: f.teacher, p_limit: PAGE_SIZE, p_offset: (f.page - 1) * PAGE_SIZE })
+            : Promise.resolve({ data: null, error: null }),
   ]);
+  // Once the page is sent: check a few finished classes with Google Meet that nobody looked at (guide 21, section 15).
+  checkAfterPage();
+  // Classes Google Meet didn't confirm, for Needs attention (empty until 20261119000002_meet_check_in.sql has run).
+  if (meetRes.error && meetRes.error.code !== 'PGRST202') console.error('Attendance page, Meet checks:', meetRes.error.message);
+  const meetIssues = ((meetRes.data ?? []) as MeetAttention[])
+    .filter((m) => (!f.batch || m.batch_id === f.batch) && (!f.teacher || m.teacher_id === f.teacher) && (!f.student || m.kind === 'batch'));
+  // All Attendance: which check-ins Google Meet saw ("Checked in (Meet)") and which are only a Join class press.
+  const listRows = f.tab === 'all' ? ((tabRes.data as { rows?: ListRow[] } | null)?.rows ?? []).filter((r) => r.source === 'link') : [];
+  const { data: meetSessions } = listRows.length
+    ? await supabase.from('class_sessions').select('batch_id, class_date, attendance(student_id, meet_joined_at)')
+      .in('batch_id', [...new Set(listRows.map((r) => r.batch_id))]).in('class_date', [...new Set(listRows.map((r) => r.class_date))])
+    : { data: [] };
+  const meetJoins = new Map<string, string>();
+  for (const cs of (meetSessions ?? []) as { batch_id: string; class_date: string; attendance: { student_id: string; meet_joined_at: string | null }[] }[]) {
+    for (const a of cs.attendance ?? []) if (a.meet_joined_at) meetJoins.set(`${cs.batch_id}|${cs.class_date}|${a.student_id}`, a.meet_joined_at);
+  }
 
   const failed = summaryRes.error ?? attentionRes.error ?? tabRes.error;
   if (failed) console.error('Attendance page:', failed.message);
   const notReady = failed?.code === 'PGRST202';
   const summary = summaryRes.data as Summary | null;
   const attention = attentionRes.data as Attention | null;
-  const attentionCount = attention ? attention.unconfirmed.length + attention.missing.length + attention.streaks.length : 0;
+  const attentionCount = (attention ? attention.unconfirmed.length + attention.missing.length + attention.streaks.length : 0) + meetIssues.length;
   const batchName = (batches ?? []).find((b) => b.id === f.batch);
 
   return (
@@ -147,9 +169,10 @@ export default async function AttendancePage({ searchParams }: Props) {
             {f.tab === 'list' && (f.batch
               ? <GridView f={f} grid={tabRes.data as Grid} />
               : <ChooseBatch f={f} batches={(batches ?? []).filter((b) => !b.closed_on)} />)}
-            {f.tab === 'all' && <ListView f={f} data={tabRes.data as { total: number; rows: ListRow[] }} />}
+            {f.tab === 'all' && <ListView f={f} data={tabRes.data as { total: number; rows: ListRow[] }} meetJoins={meetJoins} />}
             {f.tab === 'corrections' && <CorrectionsView f={f} data={tabRes.data as { total: number; rows: CorrectionRow[] }} />}
-            {f.tab === 'attention' && attention && <AttentionView a={attention} />}
+            {f.tab === 'teachers' && <TeachersView f={f} data={tabRes.data as TeacherList | null} teacher={teacher} />}
+            {f.tab === 'attention' && attention && <AttentionView a={attention} meet={meetIssues} />}
           </section>
         </>
       )}
@@ -308,7 +331,8 @@ function Pager({ f, total }: { f: Filters; total: number }) {
   );
 }
 
-function ListView({ f, data }: { f: Filters; data: { total: number; rows: ListRow[] } | null }) {
+// meetJoins: "batch|date|student" → when Google Meet first saw a checked-in student in the call.
+function ListView({ f, data, meetJoins }: { f: Filters; data: { total: number; rows: ListRow[] } | null; meetJoins: Map<string, string> }) {
   if (!data) return <p className={ui.empty}>The attendance could not be loaded.</p>;
   if (data.total === 0) return <p className={ui.empty}>Nothing matches these filters.</p>;
   return (
@@ -316,15 +340,20 @@ function ListView({ f, data }: { f: Filters; data: { total: number; rows: ListRo
       <div className={styles.tableScroll}>
         <table className={ui.table}>
           <thead>
-            <tr><th>Date</th><th>Batch</th><th>Student</th><th>Attendance</th><th>Set by</th><th>Portal check-in</th><th>Changes / notes</th></tr>
+            <tr><th>Date</th><th>Batch</th><th>Student</th><th>Attendance</th><th>Set by</th><th>Join class pressed</th><th>Changes / notes</th></tr>
           </thead>
           <tbody>
-            {data.rows.map((r) => (
+            {data.rows.map((r) => {
+              const inMeet = r.source === 'link' ? meetJoins.get(`${r.batch_id}|${r.class_date}|${r.student_id}`) ?? null : null;
+              return (
               <tr key={`${r.class_date}-${r.batch_id}-${r.student_id}`}>
                 <td><Link href={`/batches/${r.batch_id}?class_date=${r.class_date}#attendance`} className={ui.link}>{weekdayShort(r.class_date)} {formatDate(r.class_date)}</Link></td>
                 <td>{r.batch_code} <span className={ui.muted}>· {r.subject}</span></td>
                 <td><Link href={`/students/${r.student_id}`} className={ui.link}>{r.first_name} {r.last_name}</Link></td>
-                <td><span className={`${styles.pill} ${styles[`pill${markLetter(r)}`]}`}>{markLabel(r.status, r.source)}</span></td>
+                <td>
+                  <span className={`${styles.pill} ${styles[`pill${markLetter(r)}`]}`}>{markLabel(r.status, r.source, r.source === 'link' ? Boolean(inMeet) : undefined)}</span>
+                  {inMeet && <div className={ui.muted} style={{ fontSize: 12 }}>in Meet from {formatClock(inMeet)}</div>}
+                </td>
                 <td>{setByText(r.source, r.set_by)}</td>
                 <td>{r.joined_at ? formatClock(r.joined_at) : '—'}</td>
                 <td className={styles.wrapCell}>
@@ -337,7 +366,8 @@ function ListView({ f, data }: { f: Filters; data: { total: number; rows: ListRo
                   ) : '—'}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -374,8 +404,56 @@ function CorrectionsView({ f, data }: { f: Filters; data: { total: number; rows:
   );
 }
 
-function AttentionView({ a }: { a: Attention }) {
-  if (a.unconfirmed.length + a.missing.length + a.streaks.length === 0) {
+// The Teachers tab (guide 21, section 15): each class's teacher as Google Meet saw them join. A record of each class
+// (record keeping), not an assessment of teachers. Staff correct a record
+// from that class's attendance (the batch page, or the extra class page). A teacher sees only their own classes.
+function TeachersView({ f, data, teacher }: { f: Filters; data: TeacherList | null; teacher: boolean }) {
+  if (!data) return <p className={ui.empty}>The database is not ready for this yet: run 20261119000002_meet_check_in.sql in Supabase first.</p>;
+  if (data.total === 0) {
+    return <p className={ui.empty}>No teacher joins in these dates. They are recorded from Google Meet for classes with a Meet room made by the app.</p>;
+  }
+  const s = data.summary;
+  const hours = Math.floor(s.minutes / 60);
+  return (
+    <>
+      <p className={ui.hint} style={{ margin: '0 0 10px' }}>
+        {s.on_time} on time · {s.late} late (more than 5 minutes after the start) · {s.not_seen} not seen in Meet · {s.absent} absent
+        {s.minutes > 0 ? ` · ${hours ? `${hours} h ` : ''}${s.minutes % 60} min in calls` : ''}.
+        {' A record of each class, kept for record keeping, not to assess teachers.'}
+        {teacher ? ' Ask the office if one of yours is wrong.' : ' To correct one, open the class and use "Correct the teacher\'s attendance".'}
+      </p>
+      <div className={styles.tableScroll}>
+        <table className={ui.table}>
+          <thead><tr><th>Class</th><th>Teacher</th><th>Attendance</th><th>From Google Meet</th></tr></thead>
+          <tbody>
+            {data.rows.map((r) => {
+              const href = r.extra ? `/extra-classes/${r.extra_class_id}` : `/batches/${r.batch_id}?class_date=${r.date}#attendance`;
+              return (
+                <tr key={r.id}>
+                  <td><Link href={href} className={ui.link}>{weekdayShort(r.date)} {formatDate(r.date)} {formatClock(r.starts_at)}</Link> · {r.class_code}{r.extra ? ' (extra)' : ''}</td>
+                  <td>{r.teacher}</td>
+                  <td><StatusBadge status={TEACHER_TONE[r.status] ?? 'closed'} label={TEACHER_STATUS[r.status] ?? r.status} /></td>
+                  <td className={styles.wrapCell}>{teacherLine(r)}{r.source === 'staff' && r.corrected_by ? ` · by ${r.corrected_by}` : ''}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <Pager f={f} total={data.total} />
+    </>
+  );
+}
+
+const MEET_WHY: Record<MeetAttention['why'], string> = {
+  not_checked: 'Not checked with Google Meet yet (it is checked when someone opens a dashboard or this page).',
+  error: 'Google Meet couldn\'t be asked',
+  unknown_guests: 'Someone in the call couldn\'t be identified, so Join class presses still count',
+  not_final: 'Checked during the class, but not yet after it ended',
+};
+
+function AttentionView({ a, meet }: { a: Attention; meet: MeetAttention[] }) {
+  if (a.unconfirmed.length + a.missing.length + a.streaks.length + meet.length === 0) {
     return <p className={ui.empty}>Nothing needs attention in these dates. 🎉</p>;
   }
   return (
@@ -404,6 +482,29 @@ function AttentionView({ a }: { a: Attention }) {
               <li key={`${m.batch_id}-${m.class_date}`}>
                 <span><b>{m.batch_code}</b> · {weekdayShort(m.class_date)} {formatDate(m.class_date)} {formatTime(m.start_time)}</span>
                 <Link href={`/batches/${m.batch_id}?class_date=${m.class_date}#attendance`} className={ui.button}>Take attendance</Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <section>
+        <h3>Classes Google Meet didn&apos;t confirm <span className={styles.count}>{meet.length}</span></h3>
+        <p className={ui.hint}>
+          Finished classes with a Meet room where the check-in from Meet isn&apos;t complete. Join class presses count for these until
+          it is. Check the attendance and save it (a saved class drops off this list), or press Refresh from Meet there.
+        </p>
+        {meet.length === 0 ? <p className={ui.empty}>None.</p> : (
+          <ul className={styles.items}>
+            {meet.map((m) => (
+              <li key={`${m.kind}-${m.batch_id ?? m.extra_class_id}-${m.class_date}`}>
+                <span><b>{m.code}</b>{m.kind === 'extra' ? ' (extra)' : ''} · {weekdayShort(m.class_date)} {formatDate(m.class_date)} {formatClock(m.starts_at)}</span>
+                <span className={ui.muted}>
+                  {MEET_WHY[m.why]}
+                  {m.why === 'error' && m.problem ? `: ${m.problem}` : ''}
+                  {m.why === 'unknown_guests' && m.unknown_guests ? ` (${m.unknown_guests})` : ''}
+                </span>
+                <Link href={m.kind === 'extra' ? `/extra-classes/${m.extra_class_id}` : `/batches/${m.batch_id}?class_date=${m.class_date}#attendance`}
+                  className={ui.button}>Open attendance</Link>
               </li>
             ))}
           </ul>

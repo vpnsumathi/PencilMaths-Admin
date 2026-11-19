@@ -1,6 +1,7 @@
 import 'server-only';
-import { callPeople, createSpace, getSpace, latestCall, meetProblem, retireSpace } from '@/lib/google/meet';
+import { createSpace, getSpace, retireSpace } from '@/lib/google/meet';
 import { buildLive, type GoogleLink, type Guest, type InCall, type LivePerson } from '@/lib/liveClass';
+import { classCallPeople } from '@/lib/meetCalls';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { whatsappNumber } from '@/app/(portal)/_dashboard/homework';
 import type { Detail } from './extraClasses';
@@ -80,28 +81,15 @@ export type ExtraLive = {
   teacher: LivePerson | null; students: LivePerson[]; guests: Guest[]; inMeet: number;
 };
 
-// Meet's answer for a room, kept for 20 seconds so staff watching the same class don't each ask Google. The cache
-// lives in one server copy's memory: on Vercel several copies can run, each with its own, so it is best-effort
-// (enough at this size; a shared cache would be needed only if Google's limits were ever reached).
+// Meet's answer: every call in the class's room from the check-in opening to the end of the class (a call that
+// restarted is still this class), kept for 20 seconds (lib/meetCalls.ts) so staff watching the same class don't each
+// ask Google.
 type Answer = { ok: true; startedAt: string | null; people: InCall[] | null } | { ok: false; problem: string };
-const cache = new Map<string, { at: number; answer: Answer }>();
 
-async function askMeet(space: string, opensAt: string): Promise<Answer> {
-  const hit = cache.get(space);
-  if (hit && Date.now() - hit.at < 20_000) return hit.answer;
-  let answer: Answer;
-  try {
-    const call = await latestCall(space);
-    // Only a call started for this class counts (from 15 minutes before the check-in opens).
-    const forThis = call?.startTime && new Date(call.startTime).getTime() >= new Date(opensAt).getTime() - 15 * 60_000;
-    answer = call && forThis ? { ok: true, startedAt: call.startTime ?? null, people: await callPeople(call.name) } : { ok: true, startedAt: null, people: null };
-  } catch (e) {
-    console.error('Extra class Meet check:', e);
-    answer = { ok: false, problem: meetProblem(e) };
-  }
-  if (cache.size > 200) cache.clear();
-  cache.set(space, { at: Date.now(), answer });
-  return answer;
+async function askMeet(space: string, opensAt: string, endsAt: string): Promise<Answer> {
+  const found = await classCallPeople(space, new Date(opensAt), new Date(endsAt));
+  if (!found.ok) return found;
+  return found.calls.length ? { ok: true, startedAt: found.calls[0].startTime ?? null, people: found.people } : { ok: true, startedAt: null, people: null };
 }
 
 // Matches the people in the class's call to its teacher and students, using the saved Google account links
@@ -129,7 +117,7 @@ export async function loadExtraLive(c: Detail): Promise<ExtraLive> {
   };
   const space = room?.meet_space_name as string | null;
   if (!space) return finish('no_room', null, null, null);
-  const meet = await askMeet(space, c.opens_at);
+  const meet = await askMeet(space, c.opens_at, c.ends_at);
   if (!meet.ok) return finish('error', meet.problem, null, null);
   if (!meet.people) return finish('no_call', null, null, []);
   return finish('ok', null, meet.startedAt, meet.people);

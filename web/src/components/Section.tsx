@@ -9,7 +9,7 @@ type Props = {
   title: string;
   // One short line next to the title, so a closed section still says what is in it ("3 notes · latest 11 Nov").
   summary?: React.ReactNode;
-  // Open the first time the page is shown (e.g. Students and Homework on the batch page).
+  // Open the first time the page is shown (the batch page no longer uses this: every section starts closed).
   defaultOpen?: boolean;
   // Open now whatever was chosen before (e.g. the Attendance register after choosing a date).
   forceOpen?: boolean;

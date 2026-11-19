@@ -3,35 +3,35 @@ import { Section } from '@/components/Section';
 import { StatusBadge } from '@/components/StatusBadge';
 import ui from '@/components/ui.module.css';
 import { formatDate } from '@/lib/format';
+import { formatTrackerDate, standingLabel, standingTone, summaryLine, trackLessons } from '@/lib/lessons/tracker';
+import { loadLessons, loadProgress, loadTracker, LESSON_STATUS, viewLessons, type PlanLessonRow } from '@/lib/lessons/trackerData';
 import { createClient } from '@/lib/supabase/server';
 import { setLessonStatus } from './actions';
 import { CompleteLesson } from './CompleteLesson';
 import { PlannerPicker } from './PlannerPicker';
 
-const STATUS: Record<string, string> = { not_started: 'Not started', in_progress: 'In progress', complete: 'Completed' };
 
-type Lesson = {
-  id: string; term: number; module: string; code: string; name: string; position: number;
-  lesson_homework: { id: string; slot: number; code: string; url: string | null }[];
-};
+type Lesson = PlanLessonRow & { lesson_homework: { id: string; slot: number; code: string; url: string | null }[] };
 
 // The class's lesson plan from the Lesson library: Term and Module dropdowns, then that module's lessons
-// with Start, Mark completed (sends Hw-1/2/3) and Undo. Opens on the module the class is on.
+// with Start, Mark completed (sends Hw-1/2/3) and Undo. Opens on the module the class is on. With a Lesson Tracker,
+// each lesson also shows its Class No., planned date and how it stands; the whole plan with dates is a page of its own.
 export async function LessonPlanner({ batch, students, today, term: askedTerm, moduleName: askedModule }: {
   batch: { id: string; subject_id: string; year_group: number }; students: number; today: string;
   term?: string; moduleName?: string;
 }) {
   const supabase = await createClient();
-  const [{ data: lessonRows }, { data: progressRows }, { data: sentRows }] = await Promise.all([
-    supabase.from('lessons').select('id, term, module, code, name, position, lesson_homework(id, slot, code, url)')
-      .eq('subject_id', batch.subject_id).eq('year_group', batch.year_group)
-      .order('term').order('position'),
-    supabase.from('batch_lessons').select('lesson_id, status, started_on, completed_on').eq('batch_id', batch.id),
+  const [{ lessons: all }, progress, { tracker, saved }, { data: sentRows }] = await Promise.all([
+    loadLessons<Lesson>(supabase, batch, 'lesson_homework(id, slot, code, url)'),
+    loadProgress(supabase, batch.id),
+    loadTracker(supabase, batch.id),
     supabase.from('homework_sheets').select('lesson_homework_id').eq('batch_id', batch.id).not('lesson_homework_id', 'is', null),
   ]);
-  const lessons = (lessonRows ?? []) as Lesson[];
-  const progress = new Map((progressRows ?? []).map((p) => [p.lesson_id as string, p]));
+  // A lesson taken out of the spreadsheet stays only if the class already worked on it.
+  const kept = all.filter((l) => l.active || progress.has(l.id));
+  const lessons = kept.length ? kept : all;
   const sent = new Set((sentRows ?? []).map((s) => s.lesson_homework_id as string));
+  const { byLesson, summary } = trackLessons(viewLessons(all, progress), saved, today);
   const statusOf = (id: string) => (progress.get(id)?.status as string) ?? 'not_started';
 
   // Modules per term, in the order they first appear.
@@ -55,7 +55,11 @@ export async function LessonPlanner({ batch, students, today, term: askedTerm, m
   return (
     // Open by itself after choosing a term or module, or after Start / Undo (those send the term and module back).
     <Section id="lesson-plan" title="Lesson plan" forceOpen={Boolean(askedTerm || askedModule)}
-      summary={`Term ${term}: ${doneInTerm} of ${inTerm} lessons completed · now on ${current.code} ${current.name}`}>
+      summary={`Term ${term}: ${doneInTerm} of ${inTerm} lessons completed · now on ${current.code} ${current.name}${tracker && summary.overdue ? ` · ${summary.overdue} class${summary.overdue === 1 ? '' : 'es'} overdue` : ''}`}>
+      <p className={ui.muted} style={{ margin: '0 0 10px', fontSize: 13 }}>
+        {tracker ? `${summaryLine(summary, tracker)}. ` : ''}
+        <Link href={`/batches/${batch.id}/lesson-tracker`} className={ui.link}>Lesson plan with dates</Link>
+      </p>
       <PlannerPicker modules={modules} term={term} moduleName={moduleName} />
 
       <ol className={ui.list}>
@@ -64,6 +68,8 @@ export async function LessonPlanner({ batch, students, today, term: askedTerm, m
           const p = progress.get(l.id);
           const hw = [...l.lesson_homework].sort((a, b) => a.slot - b.slot);
           const sentHw = hw.filter((h) => sent.has(h.id));
+          const track = byLesson.get(l.id);
+          const trackLabel = track ? standingLabel(track.standing) : null;
           const hidden = (
             <>
               <input type="hidden" name="batch_id" value={batch.id} />
@@ -76,15 +82,18 @@ export async function LessonPlanner({ batch, students, today, term: askedTerm, m
             <li key={l.id} style={{ flexWrap: 'wrap' }} className={status === 'in_progress' ? ui.rowLive : undefined}>
               <span>
                 <strong>{l.code}</strong> {l.name}
+                {!l.active && <> <em className={ui.muted}>(removed from the plan)</em></>}
                 <span className={ui.muted}>
+                  {l.class_no != null && <> · Class {l.class_no}{track?.plannedOn ? `, ${formatTrackerDate(track.plannedOn)}` : ''}</>}
                   {' '}· {hw.map((h) => `Hw-${h.slot} ${h.code}${h.url ? '' : ' ⚠️'}`).join(' · ')}
                   {sentHw.length > 0 && ` · sent: ${sentHw.map((h) => `Hw-${h.slot}`).join(', ')}`}
                 </span>
               </span>
               <span className={ui.formActions}>
+                {track && trackLabel && <StatusBadge status={track.standing.kind} label={trackLabel} />}
                 <StatusBadge
-                  status={status === 'complete' ? 'active' : status === 'in_progress' ? 'in_progress' : 'closed'}
-                  label={status === 'complete' && p?.completed_on ? `Completed ${formatDate(p.completed_on as string)}` : STATUS[status]}
+                  status={status === 'complete' ? (track && standingTone(track.standing) === 'bad' ? 'late' : 'active') : status === 'in_progress' ? 'in_progress' : 'closed'}
+                  label={status === 'complete' && p?.completed_on ? `Completed ${formatDate(p.completed_on as string)}` : LESSON_STATUS[status]}
                 />
                 {status === 'not_started' && (
                   <form action={setLessonStatus}>{hidden}<button name="status" value="in_progress" className={ui.button}>Start</button></form>

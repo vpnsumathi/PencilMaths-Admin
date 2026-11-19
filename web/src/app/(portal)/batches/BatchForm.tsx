@@ -21,8 +21,9 @@ type Teacher = { id: string; first_name: string; last_name: string; subject_id: 
 // Used by "New batch" (no batch) and the batch page. Subject and year group are fixed once created,
 // because the lesson plan and enrolments depend on them.
 // embedded: inside the batch page's Batch settings section, so the two parts are plain groups, not cards.
-export function BatchForm({ batch, subjects, teachers, embedded = false }: {
-  batch?: Batch; subjects: Subject[]; teachers: Teacher[]; embedded?: boolean;
+// trackerButton: on New batch for admins, a second button that creates the batch and opens Set Lesson Tracker.
+export function BatchForm({ batch, subjects, teachers, embedded = false, trackerButton = false }: {
+  batch?: Batch; subjects: Subject[]; teachers: Teacher[]; embedded?: boolean; trackerButton?: boolean;
 }) {
   const Heading = embedded ? 'h3' : 'h2';
   const box = embedded ? ui.group : ui.card;
@@ -91,6 +92,12 @@ export function BatchForm({ batch, subjects, teachers, embedded = false }: {
         {/* Saves the whole form (batch details and class times). */}
         <div className={ui.formActions} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
           <button className={ui.primaryButton}>{batch ? 'Save' : 'Create batch'}</button>
+          {!batch && trackerButton && (
+            <button name="next" value="tracker" className={ui.button}
+              title="Creates the batch, then opens Set Lesson Tracker to give every class a date">
+              Create batch and set Lesson Tracker
+            </button>
+          )}
           {!embedded && <Link href="/batches" className={ui.button}>Cancel</Link>}
         </div>
       </section>

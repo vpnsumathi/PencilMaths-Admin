@@ -54,7 +54,7 @@ export default function AcceptInvite() {
   return (
     <main className={styles.page}>
       <section className={styles.card}>
-        <Image src="/logo.png" alt="Pencil Maths" width={181} height={60} priority className={styles.logo} />
+        <Image src="/logo.png" alt="PencilMaths" width={181} height={60} priority className={styles.logo} />
         {problem ? (
           <>
             <h1 className={styles.title}>This link has expired</h1>

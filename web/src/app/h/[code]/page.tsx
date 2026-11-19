@@ -28,7 +28,7 @@ export default async function HandInPage({ params }: { params: Promise<{ code: s
   return (
     <main className={styles.page}>
       <header className={styles.head}>
-        <p className={styles.brand}>Pencil Maths</p>
+        <p className={styles.brand}>PencilMaths</p>
         <h1>Hi {data.first_name} 👋</h1>
         <p className={styles.muted}>Submit your homework here: take a photo of each page, or choose a PDF or Word file.</p>
       </header>

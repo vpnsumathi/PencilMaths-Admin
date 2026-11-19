@@ -5,7 +5,7 @@ import './globals.css';
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: { default: 'Pencil Maths Admin', template: '%s · Pencil Maths Admin' },
+  title: { default: 'PencilMaths Admin', template: '%s · PencilMaths Admin' },
   robots: { index: false, follow: false }, // keep the admin portal out of search engines
 };
 

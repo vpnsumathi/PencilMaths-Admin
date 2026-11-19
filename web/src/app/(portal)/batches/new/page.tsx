@@ -10,7 +10,7 @@ export const metadata = { title: 'New batch' };
 type Props = { searchParams: Promise<{ error?: string }> };
 
 export default async function NewBatchPage({ searchParams }: Props) {
-  await requireStaff();
+  const viewer = await requireStaff();
   const { error: problem } = await searchParams;
   const supabase = await createClient();
   const [{ data: subjects }, { data: teachers }] = await Promise.all([
@@ -28,7 +28,7 @@ export default async function NewBatchPage({ searchParams }: Props) {
         </div>
       </div>
       <Alerts problem={problem} />
-      <BatchForm subjects={subjects ?? []} teachers={teachers ?? []} />
+      <BatchForm subjects={subjects ?? []} teachers={teachers ?? []} trackerButton={viewer.kind === 'staff' && viewer.role === 'admin'} />
     </>
   );
 }

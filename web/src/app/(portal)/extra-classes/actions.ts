@@ -7,6 +7,7 @@ import { NOT_READY } from '@/lib/extraClasses';
 import { ensureExtraMeetRoom, recreateExtraMeetRoom } from '@/lib/extraMeet';
 import { redirectWith, text } from '@/lib/form';
 import { meetProblem } from '@/lib/google/meet';
+import { syncClass } from '@/lib/meetCheck';
 import { todayInUk, UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
@@ -172,4 +173,22 @@ export async function extraMeetRoomAction(form: FormData) {
   }
   refresh(id);
   redirectWith(`/extra-classes/${id}`, ok ? 'ok' : 'error', message);
+}
+
+// Refresh from Meet on an extra class (guide 21, section 15): asks Google now who was in the class's call. For staff
+// and the class's teacher: the class is read with the viewer's own database rules first.
+export async function refreshExtraMeetCheckAction(form: FormData) {
+  await requireStaffOrTeacher();
+  const id = text(form, 'id');
+  if (!UUID.test(id)) redirectWith('/extra-classes', 'error', 'Extra class not found.');
+  const supabase = await createClient();
+  const { data } = await supabase.rpc('extra_class_detail', { p_id: id });
+  if (!data) redirectWith('/extra-classes', 'error', 'Extra class not found.');
+  const result = await syncClass({ kind: 'extra', id }, { force: true });
+  revalidatePath(`/extra-classes/${id}`);
+  if (!result) redirectWith(`/extra-classes/${id}`, 'error', 'Nothing to check with Google Meet for this class (no Meet room, cancelled, the check-in hasn\'t opened yet, or more than 30 days ago).');
+  if (result.state === 'error') redirectWith(`/extra-classes/${id}`, 'error', `Google Meet couldn't be asked: ${result.problem}`);
+  redirectWith(`/extra-classes/${id}`, 'ok', result.state === 'no_call'
+    ? 'Checked with Google Meet: nobody started the Meet room for this class, so Join class presses count.'
+    : `Checked with Google Meet: ${result.checkedIn} ${result.checkedIn === 1 ? 'student' : 'students'} seen in the call.`);
 }

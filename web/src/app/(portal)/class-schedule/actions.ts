@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { requireStaffOrTeacher } from '@/lib/auth';
 import { todaysCall } from '@/lib/classSchedule';
 import { redirectWith, text } from '@/lib/form';
+import { syncClass } from '@/lib/meetCheck';
+import { ukNow } from '@/lib/liveClass';
 import { UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 
@@ -35,6 +37,10 @@ function refused(batchId: string, where: string, error: { code?: string; message
 
 const NOT_IN_CALL = 'That person isn\'t in this batch\'s Meet call today, so they can\'t be linked. Refresh the page and try again.';
 
+// After a link changes, today's check-in from Meet is worked out again at once (guide 21, section 15), so the
+// student who was linked is checked in, and one whose link was taken away isn't. A problem here is only logged.
+const recheck = (batchId: string) => syncClass({ kind: 'batch', batchId, date: ukNow().date }, { force: true });
+
 export async function linkGooglePerson(form: FormData) {
   await requireStaffOrTeacher();
   const batchId = text(form, 'batch_id');
@@ -49,6 +55,7 @@ export async function linkGooglePerson(form: FormData) {
     p_batch: batchId, p_google_id: googleId, p_kind: who.kind, p_person: who.personId, p_display_name: seen.name,
   });
   if (error) refused(batchId, 'linkGooglePerson', error, 'Could not save who this is. Please try again.');
+  await recheck(batchId);
   revalidatePath('/class-schedule');
   redirectWith(back(batchId), 'ok', 'Saved. This Google account is recognised in every class from now on.');
 }
@@ -61,6 +68,7 @@ export async function unlinkGooglePerson(form: FormData) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('unlink_google_accounts', { p_batch: batchId, p_google_ids: googleIds });
   if (error) refused(batchId, 'unlinkGooglePerson', error, 'Could not take the link away. Please try again.');
+  if (data) await recheck(batchId);
   revalidatePath('/class-schedule');
   if (!data) redirectWith(back(batchId), 'error', 'That link was already taken away.');
   redirectWith(back(batchId), 'ok', 'Link taken away. That Google account now shows as an unidentified guest, so you can pick the right person.');
@@ -76,13 +84,14 @@ export async function linkCallGuest(form: FormData) {
   if (!UUID.test(batchId) || !PARTICIPANT.test(participant) || !who) redirectWith(back(batchId), 'error', 'Pick who this is first.');
   const call = await todaysCall(batchId);
   const seen = call?.people.find((p) => p.participantId === participant && !p.googleId && p.kind !== 'signed_in');
-  if (!call || !seen || !participant.startsWith(`${call.conference}/participants/`)) redirectWith(back(batchId), 'error', NOT_IN_CALL);
+  if (!call || !seen || !call.conferences.some((c) => participant.startsWith(`${c}/participants/`))) redirectWith(back(batchId), 'error', NOT_IN_CALL);
   const supabase = await createClient();
   const { error } = await supabase.rpc('link_call_guest', {
     p_batch: batchId, p_class_date: call.date, p_participant: participant, p_guest_kind: seen.kind,
     p_display_name: seen.name, p_kind: who.kind, p_person: who.personId,
   });
   if (error) refused(batchId, 'linkCallGuest', error, 'Could not save who this is. Please try again.');
+  await recheck(batchId);
   revalidatePath('/class-schedule');
   redirectWith(back(batchId), 'ok', `Saved for this class only. ${seen.kind === 'phone' ? 'A phone caller' : 'Someone not signed in to Google'} can't be recognised in another class, so choose who they are again next time.`);
 }
@@ -95,6 +104,7 @@ export async function unlinkCallGuest(form: FormData) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('unlink_call_guests', { p_batch: batchId, p_participants: participants });
   if (error) refused(batchId, 'unlinkCallGuest', error, 'Could not take the link away. Please try again.');
+  if (data) await recheck(batchId);
   revalidatePath('/class-schedule');
   if (!data) redirectWith(back(batchId), 'error', 'That link was already taken away.');
   redirectWith(back(batchId), 'ok', 'Link taken away. That caller now shows as an unidentified guest, so you can pick the right person.');

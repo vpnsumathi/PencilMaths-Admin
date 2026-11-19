@@ -25,8 +25,8 @@ export default async function StudentLayout({ children }: { children: React.Reac
     <div className={styles.shell}>
       <header className={styles.topbar}>
         {/* Logo file: web/public/logo.png (a copy is kept in the Logo folder at the top of the project). */}
-        <Link href="/me" className={styles.brand} aria-label="Pencil Maths: my dashboard">
-          <Image src="/logo.png" alt="Pencil Maths" width={136} height={45} priority />
+        <Link href="/me" className={styles.brand} aria-label="PencilMaths: my dashboard">
+          <Image src="/logo.png" alt="PencilMaths" width={136} height={45} priority />
         </Link>
         <StudentNav />
         {students.length > 1

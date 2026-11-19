@@ -53,14 +53,14 @@ export function AppShell({ staff, children }: { staff: Staff; children: React.Re
     <div className={styles.shell}>
       <header className={styles.topbar}>
         <button className={styles.iconButton} onClick={() => setOpen(true)} aria-label="Open menu"><MenuIcon /></button>
-        <span className={styles.brand}>Pencil Maths</span>
+        <span className={styles.brand}>PencilMaths</span>
       </header>
 
       {open && <div className={styles.backdrop} onClick={() => setOpen(false)} />}
 
       <aside className={`${styles.sidebar} ${open ? styles.open : ''}`}>
         <div className={styles.sidebarHead}>
-          <span className={styles.brand}>Pencil Maths <small>Admin</small></span>
+          <span className={styles.brand}>PencilMaths <small>Admin</small></span>
           <button className={`${styles.iconButton} ${styles.close}`} onClick={() => setOpen(false)} aria-label="Close menu"><XIcon /></button>
         </div>
 
@@ -110,4 +110,4 @@ export function AppShell({ staff, children }: { staff: Staff; children: React.Re
       <main className={styles.main}>{children}</main>
     </div>
   );
-}
+}

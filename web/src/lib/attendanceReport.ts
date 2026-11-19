@@ -16,6 +16,7 @@ export const TABS = {
   list: 'Attendance List',
   all: 'All Attendance',
   corrections: 'Corrections',
+  teachers: 'Teachers',
   attention: 'Needs attention',
 } as const;
 export type Tab = keyof typeof TABS;
@@ -137,6 +138,24 @@ export type ListRow = {
   student_id: string; student_code: string; first_name: string; last_name: string;
   status: Status; source: Source; joined_at: string | null; set_by: string | null; last_change: Change | null;
 };
+// teacher_attendance_list() (20261119000002_meet_check_in.sql): the teachers' joins, for the Teachers tab.
+export type TeacherRow = {
+  id: number; date: string; starts_at: string; class_code: string; extra: boolean; batch_id: string | null; extra_class_id: string | null;
+  teacher_id: string; teacher: string; first_join: string | null; last_leave: string | null; minutes: number | null; drops: number | null;
+  meet_status: 'on_time' | 'late' | 'not_seen'; status: 'on_time' | 'late' | 'not_seen' | 'absent'; source: 'meet' | 'staff';
+  reason: string | null; corrected_by: string | null; corrected_at: string | null;
+};
+export type TeacherList = {
+  total: number; rows: TeacherRow[];
+  summary: { on_time: number; late: number; not_seen: number; absent: number; minutes: number };
+};
+// meet_attention(): finished classes Google Meet didn't confirm, for Needs attention.
+export type MeetAttention = {
+  kind: 'batch' | 'extra'; batch_id: string | null; extra_class_id: string | null; code: string; teacher_id: string | null;
+  class_date: string; starts_at: string; why: 'not_checked' | 'error' | 'unknown_guests' | 'not_final';
+  problem: string | null; unknown_guests: number | null; checked_at: string | null;
+};
+
 export type CorrectionRow = {
   changed_at: string; class_date: string; batch_id: string; batch_code: string; student_id: string;
   first_name: string; last_name: string; from: Status; from_source: Source | null; to: Status; reason: string | null; by: string | null;

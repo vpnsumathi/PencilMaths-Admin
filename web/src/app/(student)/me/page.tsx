@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { yearLabel } from '@/lib/options';
 import styles from '../student.module.css';
 import { type Dashboard, nextClass } from './dashboard';
-import { currentClass } from '@/lib/classLink';
+import { CLASS_WINDOW, currentClass } from '@/lib/classLink';
+import { ukNow } from '@/lib/liveClass';
+import { checkAfterPage } from '@/lib/meetCheck';
 import { JoinClassButton } from './classes/JoinClassButton';
 import { getMyDashboard } from './myDashboard';
 import { getMyExtras } from './myExtras';
@@ -19,6 +21,14 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
     getMyDashboard() as Promise<Dashboard>, // the layout has already checked this is a student
     getMyExtras(),
   ]);
+  // Once the page is sent: check the student's own classes today whose check-in has opened with Google Meet, then
+  // catch up on finished classes nobody looked at (guide 21, section 15). Nothing waits for Google.
+  const uk = ukNow();
+  const before = (me.class_window ?? CLASS_WINDOW).before_minutes;
+  checkAfterPage(me.classes
+    .filter((c) => c.batch_id && c.times.some((t) => t.weekday === uk.weekday
+      && uk.minute >= Number(t.start_time.slice(0, 2)) * 60 + Number(t.start_time.slice(3, 5)) - before))
+    .map((c) => ({ kind: 'batch' as const, batchId: c.batch_id!, date: uk.date })));
   // An extra class within the next 7 days goes at the top (guide 24).
   const soon = (extras?.upcoming ?? []).filter((c) => !c.cancelled && new Date(c.starts_at).getTime() < Date.now() + 7 * 86400_000);
   const hw = me.homework;

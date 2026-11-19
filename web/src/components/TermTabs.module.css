@@ -1,0 +1,10 @@
+/* Term tabs on the Lesson Tracker pages (staff and student). They scroll sideways on a narrow phone. */
+.tabs { display: flex; gap: 6px; margin: 0 0 16px; border-bottom: 2px solid var(--brand); overflow-x: auto; }
+.tab {
+  padding: 10px 16px; border: 1px solid var(--border); border-bottom: 0; border-radius: 12px 12px 0 0;
+  background: var(--bg); color: var(--muted); font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.tab:hover { color: var(--text); background: var(--surface); }
+.active, .active:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
+.count { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; }
+.active .count { background: #fff; color: var(--brand-strong); }

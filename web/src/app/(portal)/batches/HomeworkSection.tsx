@@ -81,7 +81,7 @@ export async function HomeworkSection({ batchId, members, teacher = false }: { b
     : `${count} homework${waiting ? ` · ${waiting} to mark` : ' · nothing to mark'}`;
 
   return (
-    <Section id="homework" title="Upload Homework" summary={summary} defaultOpen>
+    <Section id="homework" title="Upload Homework" summary={summary}>
 
       <form action={createHomework} className={ui.fieldGrid} style={{ marginBottom: 16 }}>
         <input type="hidden" name="batch_id" value={batchId} />

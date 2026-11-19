@@ -2,19 +2,21 @@ import 'server-only';
 import { whatsappNumber } from '@/app/(portal)/_dashboard/homework';
 import { CLASS_WINDOW } from '@/lib/classLink';
 import { classMembers, classroomProblem, type Member } from '@/lib/google/classroom';
-import { callPeople, latestCall, meetProblem } from '@/lib/google/meet';
 import {
-  buildLive, callIsForClass, classState, ukNow, type CallLink, type Expected, type GoogleLink, type Guest, type InCall, type LivePerson,
+  buildLive, classState, classTimes, ukNow, type CallLink, type Expected, type GoogleLink, type Guest, type InCall, type LivePerson,
 } from '@/lib/liveClass';
+import { classCallPeople } from '@/lib/meetCalls';
+import { withinTime } from '@/lib/withinTime';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 // The Class Schedule page's data (guide 21, section 12). Classes and people come from the app (class times,
-// batch students, the register); who is in the call comes from Google Meet, asked only while someone has the
-// page open, and kept for 20 seconds per server copy (best-effort: on Vercel each running copy has its own memory).
-// Nothing is written every refresh:
-// the only writes are new Google account links found on a Classroom class list. "This is…" and "Not them?" go
-// through the database's link functions (20261118000001_meet_linking.sql), which check who may link whom.
+// batch students, the register); who is in the call comes from Google Meet (every call in the room during the
+// class's check-in time, lib/meetCalls.ts), asked only while someone has the page open, and kept for 20 seconds.
+// Nothing is written on every refresh: the page saves new Google account links found on a Classroom class list,
+// and the check-in from Meet (lib/meetCheck.ts) saves what Meet saw at most every 2 minutes per class.
+// "This is…" and "Not them?" go through the database's link functions (20261118000001_meet_linking.sql), which
+// check who may link whom.
 
 export const TEACHER_LATE_MINUTES = 5; // the teacher shows in red if not in the call this long after the start
 
@@ -94,30 +96,17 @@ export type Live = {
   teacherLate: boolean; // started at least TEACHER_LATE_MINUTES ago and the teacher isn't in the call
 };
 
-// Meet's answer for a room, kept for 20 seconds (also a failure, so a Google problem isn't asked again each time).
-// In this server copy's memory only, so best-effort: several copies on Vercel may each ask Google once.
-// conference: the call's name ("conferenceRecords/…"), which phone and signed-out callers' links belong to.
-type MeetAnswer = { ok: true; startedAt: string | null; conference: string | null; people: InCall[] | null } | { ok: false; problem: string };
-const meetCache = new Map<string, { at: number; answer: MeetAnswer }>();
-const MEET_SECONDS = 20;
+// Meet's answer for one weekly class today: every call in its check-in time (lib/meetCalls.ts, 20 seconds).
+// startedAt: when the first of them started. conferences: the calls' names ("conferenceRecords/…"), which phone and
+// signed-out callers' links belong to. people null: nobody has started the room in the class's time.
+type MeetAnswer = { ok: true; startedAt: string | null; conferences: string[]; people: InCall[] | null } | { ok: false; problem: string };
 
 async function askMeet(space: string, date: string, time: string): Promise<MeetAnswer> {
-  const key = `${space}|${date}|${time}`;
-  const hit = meetCache.get(key);
-  if (hit && Date.now() - hit.at < MEET_SECONDS * 1000) return hit.answer;
-  let answer: MeetAnswer;
-  try {
-    const call = await latestCall(space);
-    answer = call && callIsForClass(call.startTime, date, time, CLASS_WINDOW)
-      ? { ok: true, startedAt: call.startTime ?? null, conference: call.name, people: await callPeople(call.name) }
-      : { ok: true, startedAt: null, conference: null, people: null };
-  } catch (e) {
-    console.error('Google Meet check:', e);
-    answer = { ok: false, problem: meetProblem(e) };
-  }
-  if (meetCache.size > 200) meetCache.clear();
-  meetCache.set(key, { at: Date.now(), answer });
-  return answer;
+  const { opens, closes } = classTimes(date, time, CLASS_WINDOW);
+  const found = await classCallPeople(space, opens, closes);
+  if (!found.ok) return found;
+  if (found.calls.length === 0) return { ok: true, startedAt: null, conferences: [], people: null };
+  return { ok: true, startedAt: found.calls[0].startTime ?? null, conferences: found.calls.map((c) => c.name), people: found.people };
 }
 
 // Everyone in (or who has been in) today's Meet call of a batch, for "This is…" and "Not them?": the actions check
@@ -135,7 +124,7 @@ export async function todaysCall(batchId: string, now = new Date()) {
   if (!room || slots.length === 0) return null;
   for (const s of slots) {
     const meet = await askMeet(room.space_name as string, uk.date, s.start_time.slice(0, 5));
-    if (meet.ok && meet.conference && meet.people) return { date: uk.date, conference: meet.conference, people: meet.people };
+    if (meet.ok && meet.people) return { date: uk.date, conferences: meet.conferences, people: meet.people };
   }
   return null;
 }
@@ -151,7 +140,8 @@ async function classList(courseId: string): Promise<Roster> {
   if (kept && Date.now() - kept.at < ROSTER_SECONDS * 1000) return kept;
   let fresh: Roster;
   try {
-    fresh = { at: Date.now(), members: await classMembers(courseId), problem: null };
+    // At most 8 seconds for the whole list (several pages), so the Class Schedule isn't held up by Classroom.
+    fresh = { at: Date.now(), members: await withinTime(classMembers(courseId), 8_000), problem: null };
   } catch (e) {
     console.error('Classroom class list check:', e);
     fresh = { at: Date.now(), members: null, problem: classroomProblem(e) };
@@ -175,7 +165,8 @@ export function emailKey(email: string | null | undefined) {
 // page, or a parent's email on the family. Only a sure match is saved (one person with that email). For everyone
 // else, `why` says what stopped it, so staff know whether to choose with "This is…" or fix an email.
 // forTeacher: the reasons leave out the email (usually a parent's, which teachers can't see) and point to the office.
-async function linkFromClassroom(courseId: string, unknownIds: string[], teacher: { id: string; email: string | null } | null,
+// Also used by the check-in from Meet (lib/meetCheck.ts) for classes nobody watched live (staffId null).
+export async function linkFromClassroom(courseId: string, unknownIds: string[], teacher: { id: string; email: string | null } | null,
   students: { id: string; emails: string[] }[], staffId: string | null, forTeacher: boolean): Promise<{ links: GoogleLink[]; why: Map<string, string> }> {
   const why = new Map<string, string>();
   const list = await classList(courseId);
@@ -183,7 +174,7 @@ async function linkFromClassroom(courseId: string, unknownIds: string[], teacher
     for (const id of unknownIds) why.set(id, `The Google Classroom class list couldn't be read: ${list.problem}`);
     return { links: [], why };
   }
-  const rows = [];
+  const rows: { google_user_id: string; student_id: string | null; teacher_id: string | null; display_name: string | null; email: string; matched_by: string; linked_by: string | null }[] = [];
   for (const id of unknownIds) {
     const m = list.members.find((x) => x.googleId === id);
     if (!m) {
@@ -215,6 +206,18 @@ async function linkFromClassroom(courseId: string, unknownIds: string[], teacher
         ? `${m.email} is the parent's email for ${matches.length} students in this batch, so the app won't guess.`
         : `On the Google Classroom class list as ${as} (${m.email}), but no teacher or parent in this batch has that email. Choose who it is, or correct the email on their page.`);
   }
+  // A parent's email that belongs to a family with more than one child still here may be a Google account the
+  // brothers and sisters share (one account can belong to only one person), so it is never linked to one of them
+  // by itself: staff or the teacher choose with This is…, and the check-in from Meet keeps their presses.
+  const sharing = await childrenInFamily(rows.map((r) => r.student_id).filter((x): x is string => Boolean(x)));
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const n = rows[i].student_id ? sharing.get(rows[i].student_id!) ?? 1 : 1;
+    if (n < 2) continue;
+    why.set(rows[i].google_user_id, forTeacher
+      ? `This account's email belongs to a family with ${n} children, so it may be shared and the app won't guess. Choose who it is with This is…, and check their attendance.`
+      : `${rows[i].email} is the parent's email for ${n} children in the family, so the account may be shared and the app won't guess. Choose who it is with This is…, and check their attendance.`);
+    rows.splice(i, 1);
+  }
   if (rows.length === 0) return { links: [], why };
   const { error } = await createAdminClient().from('google_people').upsert(rows, { onConflict: 'google_user_id', ignoreDuplicates: true });
   if (error) {
@@ -222,6 +225,21 @@ async function linkFromClassroom(courseId: string, unknownIds: string[], teacher
     return { links: [], why };
   }
   return { links: rows, why };
+}
+
+// For each of these students: how many children of their family are still here (not left), counting themselves.
+export async function childrenInFamily(studentIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (studentIds.length === 0) return out;
+  const db = createAdminClient();
+  const { data: mine } = await db.from('students').select('id, family_id').in('id', studentIds);
+  const families = [...new Set(((mine ?? []) as { family_id: string | null }[]).map((s) => s.family_id).filter(Boolean))] as string[];
+  if (families.length === 0) return out;
+  const { data: all } = await db.from('students').select('family_id').in('family_id', families).neq('status', 'left');
+  const count = new Map<string, number>();
+  for (const s of (all ?? []) as { family_id: string }[]) count.set(s.family_id, (count.get(s.family_id) ?? 0) + 1);
+  for (const s of (mine ?? []) as { id: string; family_id: string | null }[]) if (s.family_id) out.set(s.id, count.get(s.family_id) ?? 1);
+  return out;
 }
 
 // Who is looking: staff see everything; a batch's teacher sees their own class only, without parents' phones or
@@ -302,9 +320,9 @@ export async function loadLive(c: { batchId: string; time: string; minutesIn: nu
   if (!meet.people) return finish('no_call', null, null, [], (savedLinks ?? []) as GoogleLink[]);
 
   // Phone and signed-out callers linked for this call (This is…, this class only).
-  const { data: callLinks } = meet.conference && meet.people.some((p) => !p.googleId)
+  const { data: callLinks } = meet.people.some((p) => !p.googleId)
     ? await admin.from('meet_call_guests').select('participant_name, kind, display_name, student_id, teacher_id')
-      .eq('batch_id', c.batchId).eq('conference_name', meet.conference)
+      .eq('batch_id', c.batchId).in('conference_name', meet.conferences)
     : { data: [] };
 
   let links = (savedLinks ?? []) as GoogleLink[];

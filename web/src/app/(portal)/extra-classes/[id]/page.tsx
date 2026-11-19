@@ -13,7 +13,10 @@ import { formatDate } from '@/lib/format';
 import { ukClock as clock, type LivePerson } from '@/lib/liveClass';
 import { UUID } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
-import { cancelExtraClass, extraMeetRoomAction, restoreExtraClass, saveExtraRegister } from '../actions';
+import { syncClass } from '@/lib/meetCheck';
+import { correctTeacherAttendanceAction } from '../../batches/meetActions';
+import { MeetCheckBox, type MeetCheck, type TeacherRecord } from '../../batches/MeetCheckBox';
+import { cancelExtraClass, extraMeetRoomAction, refreshExtraMeetCheckAction, restoreExtraClass, saveExtraRegister } from '../actions';
 import { ExtraStatusPill, Result } from '../bits';
 import styles from '../extra.module.css';
 
@@ -38,8 +41,25 @@ export default async function ExtraClassPage({ params, searchParams }: Props) {
     supabase.from('subjects').select('id, name'),
   ]);
   if (error?.code === 'PGRST202') return <p className={`${ui.alert} ${ui.alertError}`}>{NOT_READY}</p>;
-  const c = data as Detail | null;
+  let c = data as Detail | null;
   if (!c) notFound();
+  // Check the class with Google Meet (guide 21, section 15; at most every 2 minutes, not again once final), then
+  // read the class again if that changed anything.
+  if (c.status !== 'cancelled' && c.has_meet_room && new Date(c.opens_at).getTime() <= Date.now()) {
+    const synced = await syncClass({ kind: 'extra', id });
+    if (synced && (synced.checkedIn || synced.takenBack)) {
+      const { data: again } = await supabase.rpc('extra_class_detail', { p_id: id });
+      if (again) c = again as Detail;
+    }
+  }
+  const [{ data: check }, { data: record }, { data: meetMarks }] = await Promise.all([
+    supabase.from('meet_checks').select('state, problem, unknown_guests, final, checked_at').eq('extra_class_id', id).maybeSingle(),
+    supabase.from('teacher_class_attendance')
+      .select('id, starts_at, first_join, last_leave, minutes, drops, meet_status, status, source, reason').eq('extra_class_id', id).maybeSingle(),
+    supabase.from('extra_class_students').select('student_id, meet_joined_at').eq('extra_class_id', id),
+  ]);
+  // Before 20261119000002_meet_check_in.sql has run these come back empty, and the page works as before.
+  const meetAt = new Map(((meetMarks ?? []) as { student_id: string; meet_joined_at: string | null }[]).map((m) => [m.student_id, m.meet_joined_at]));
   const subjectNames = Object.fromEntries(((subjects ?? []) as { id: string; name: string }[]).map((s) => [s.id, s.name]));
 
   const now = Date.now();
@@ -129,7 +149,8 @@ export default async function ExtraClassPage({ params, searchParams }: Props) {
               <>
                 <p style={{ marginTop: 0 }}>
                   This class has its own Google Meet room. From {ukClock(c.opens_at)}, Join class opens it for the students (in their login)
-                  and for the teacher, and pressing it checks the student in. Moving the class keeps the same room.
+                  and for the teacher. Students are checked in from the Meet call (their first join counts); pressing Join class
+                  checks them in straight away, but on its own it only counts when Meet can&apos;t see the call. Moving the class keeps the same room.
                 </p>
                 <form action={extraMeetRoomAction}>
                   <input type="hidden" name="id" value={c.id} />
@@ -152,7 +173,12 @@ export default async function ExtraClassPage({ params, searchParams }: Props) {
 
       <section id="register" className={ui.card} style={{ marginTop: 16, maxWidth: 1100 }}>
         <h2>{registerOpen ? 'Attendance' : c.students.length === 1 ? 'Student' : `Students (${c.students.length})`}</h2>
-        {registerOpen ? <Register c={c} staff={staff} /> : <StudentsTable c={c} staff={staff} />}
+        {registerOpen && (
+          <MeetCheckBox check={(check ?? null) as MeetCheck} hasRoom={c.has_meet_room} opened={registerOpen} teacherName={c.teacher}
+            record={(record ?? null) as TeacherRecord} canRefresh canCorrect={staff} hidden={{ id: c.id }}
+            refreshAction={refreshExtraMeetCheckAction} correctAction={correctTeacherAttendanceAction} />
+        )}
+        {registerOpen ? <Register c={c} staff={staff} meetAt={meetAt} /> : <StudentsTable c={c} staff={staff} />}
       </section>
 
       {canCancel && (
@@ -238,19 +264,21 @@ function StudentsTable({ c, staff }: { c: Detail; staff: boolean }) {
 
 // The register: Present / Late / Absent for each student, like a batch register. A portal check-in shows as
 // chosen but stays "Checked in" until saved here; changing a saved mark needs a reason.
-function Register({ c, staff }: { c: Detail; staff: boolean }) {
+// meetAt: when Google Meet first saw each student in the class's call.
+function Register({ c, staff, meetAt }: { c: Detail; staff: boolean; meetAt: Map<string, string | null> }) {
   return (
     <form action={saveExtraRegister}>
       <input type="hidden" name="id" value={c.id} />
       <div className={styles.scroll}>
         <table className={styles.register}>
           <thead>
-            <tr><th>Student</th><th>Mark</th><th>Now</th><th>Portal check-in</th><th>Reason for a change</th>{staff && <th>Parent</th>}</tr>
+            <tr><th>Student</th><th>Mark attendance</th><th>Now</th><th>In Meet / Join class</th><th>Reason for a change</th>{staff && <th>Parent</th>}</tr>
           </thead>
           <tbody>
             {c.students.map((s) => {
               const phone = staff ? whatsappNumber(s.parent_phone) : null;
-              const showWhatsapp = phone && c.status === 'live' && !s.joined_at;
+              const inMeet = meetAt.get(s.id) ?? null;
+              const showWhatsapp = phone && c.status === 'live' && !s.joined_at && !inMeet;
               return (
                 <tr key={s.id}>
                   <td>
@@ -259,7 +287,7 @@ function Register({ c, staff }: { c: Detail; staff: boolean }) {
                     {s.missed_date && <div className={styles.sub}>Makes up for {s.missed_batch} · {formatDate(s.missed_date)}</div>}
                   </td>
                   <td>
-                    <span className={styles.choice} role="radiogroup" aria-label={`Mark for ${s.first_name}`}>
+                    <span className={styles.choice} role="radiogroup" aria-label={`Mark attendance for ${s.first_name}`}>
                       {(['present', 'late', 'absent'] as const).map((m) => (
                         <label key={m}>
                           <input type="radio" name={`mark_${s.id}`} value={m} defaultChecked={s.mark === m} />
@@ -269,10 +297,14 @@ function Register({ c, staff }: { c: Detail; staff: boolean }) {
                     </span>
                   </td>
                   <td>
-                    <Result mark={s.mark} source={s.mark_source} />
+                    <Result mark={s.mark} source={s.mark_source} fromMeet={s.mark_source === 'link' ? Boolean(inMeet) : undefined} />
                     {s.mark_source === 'staff' && s.marked_by && <div className={styles.sub}>by {s.marked_by}{s.marked_at ? `, ${ukClock(s.marked_at)}` : ''}</div>}
                   </td>
-                  <td>{s.joined_at ? ukClock(s.joined_at) : <span className={ui.muted}>—</span>}</td>
+                  <td>
+                    {inMeet ? <>In Meet from {ukClock(inMeet)}</> : null}
+                    {s.joined_at ? <div className={inMeet ? styles.sub : undefined}>Pressed Join class at {ukClock(s.joined_at)}</div> : null}
+                    {!inMeet && !s.joined_at && <span className={ui.muted}>—</span>}
+                  </td>
                   <td><input name={`reason_${s.id}`} className={`${ui.input} ${styles.reason}`} maxLength={300} placeholder={s.mark ? 'Needed to change the mark' : 'Optional'} /></td>
                   {staff && (
                     <td>

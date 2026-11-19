@@ -12,7 +12,9 @@ import { lessonCodePrefix, yearLabel, YEARS } from '@/lib/options';
 const PATH = '/lesson-library';
 
 // Reads a "Term Lesson Plan - Year N" (or GCSE - H / GCSE - F) spreadsheet and saves its lessons and homework codes.
-// Running it again with an updated spreadsheet updates the lessons; nothing is deleted.
+// Running it again with an updated spreadsheet updates the lessons. Lessons no longer in the spreadsheet are
+// marked inactive (kept for their history, but no longer planned or shown in the plan); nothing is deleted.
+// The optional "Class No." column is saved for the Lesson Tracker.
 export async function importLessonPlan(form: FormData) {
   const subject = text(form, 'subject_id');
   const year = Number(text(form, 'year_group'));
@@ -44,14 +46,20 @@ export async function importLessonPlan(form: FormData) {
       ? 'Nothing imported: a homework code is already used by another lesson.'
       : 'Could not import the lesson plan.');
   }
-  const r = data as { added: number; updated: number; sheets: number };
+  const r = data as { added: number; updated: number; sheets: number; removed?: number };
   const modules = new Set(plan.lessons.map((l) => l.module)).size;
   const terms = new Set(plan.lessons.map((l) => l.term)).size;
+  const withClass = plan.lessons.filter((l) => l.class_no != null).length;
+  const extra = [
+    withClass ? `${withClass} lessons have a Class No.` : '',
+    r.removed ? `${r.removed} lesson(s) no longer in the spreadsheet are now marked "Removed from the plan".` : '',
+    plan.warnings.length ? `Check: ${plan.warnings.slice(0, 3).join(' ')}` : '',
+  ].filter(Boolean).join(' ');
 
   revalidatePath(PATH);
   redirectWith(`${back}&term=1`, 'ok',
     `Imported ${yearLabel(year)}: ${terms} term(s), ${modules} modules, ${plan.lessons.length} lessons ` +
-    `(${r.added} new, ${r.updated} updated) and ${r.sheets} homework codes. Now upload the worksheets.`);
+    `(${r.added} new, ${r.updated} updated) and ${r.sheets} homework codes. ${extra ? `${extra} ` : ''}Now upload the worksheets.`);
 }
 
 export type UploadResult = { ok: true; code: string } | { ok: false; error: string };

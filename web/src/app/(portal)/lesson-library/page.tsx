@@ -11,7 +11,10 @@ export const metadata = { title: 'Lesson library' };
 
 type Props = { searchParams: Promise<{ ok?: string; error?: string; subject?: string; year?: string; term?: string }> };
 type Homework = { slot: number; code: string; url: string | null; file_name: string | null };
-type Lesson = { id: string; module: string; code: string; name: string; position: number; lesson_homework: Homework[] };
+type Lesson = {
+  id: string; module: string; code: string; name: string; position: number; lesson_homework: Homework[];
+  class_no?: number | null; active?: boolean;
+};
 
 // Admin only: import each year's lesson plan (terms, modules, lessons, Hw-1/2/3 codes) and upload the worksheets.
 export default async function LessonLibraryPage({ searchParams }: Props) {
@@ -30,12 +33,19 @@ export default async function LessonLibraryPage({ searchParams }: Props) {
   const term = Number(pick.term) || 1;
   const terms = [...new Set((plans ?? []).filter((p) => p.subject_id === subject && p.year_group === year).map((p) => p.term))].sort();
 
-  const { data: lessons } = await supabase
+  // Class No. and Removed come from 20261119000001_lesson_tracker.sql; before it has run, the page shows the
+  // lessons without them.
+  const lessonQuery = (columns: string) => supabase
     .from('lessons')
-    .select('id, module, code, name, position, lesson_homework(slot, code, url, file_name)')
+    .select(`id, module, code, name, position, ${columns}lesson_homework(slot, code, url, file_name)`)
     .eq('subject_id', subject).eq('year_group', year).eq('term', term)
     .order('position');
-  const rows = (lessons ?? []) as Lesson[];
+  const first = await lessonQuery('class_no, active, ');
+  const trackerReady = !first.error;
+  const lessons = trackerReady ? first.data : (await lessonQuery('')).data;
+  const rows = (lessons ?? []) as unknown as Lesson[];
+  const hasClassNo = rows.some((l) => l.class_no != null);
+  const removedCount = rows.filter((l) => l.active === false).length;
   const allHw = rows.flatMap((l) => l.lesson_homework);
   const ready = allHw.filter((h) => h.url).length;
   const subjectName = (subjects ?? []).find((s) => s.id === subject)?.name ?? subject;
@@ -57,8 +67,10 @@ export default async function LessonLibraryPage({ searchParams }: Props) {
           <h2>1. Import a lesson plan</h2>
           <p className={ui.muted}>
             The &quot;Term Lesson Plan - Year N&quot; spreadsheet: sheets <strong>Term 1</strong>, <strong>Term 2</strong>, <strong>Term 3</strong> with
-            columns Module, Lesson Code, Lesson, Hw - 1, Hw - 2, Hw - 3. Lesson codes start with the year: <code>Y5-</code>,
-            or <code>GH-</code> for GCSE - H and <code>GF-</code> for GCSE - F. Importing again updates it; nothing is deleted.
+            columns Module, Lesson Code, Lesson, Hw - 1, Hw - 2, Hw - 3, and <strong>Class No.</strong> (<code>Class 1</code>, <code>Class 2</code> …,
+            used by the Lesson Tracker; lessons with the same Class No. are taught in the same class, and an empty cell means no class date).
+            Lesson codes start with the year: <code>Y5-</code>, or <code>GH-</code> for GCSE - H and <code>GF-</code> for GCSE - F.
+            Importing again updates it. Lessons no longer in the spreadsheet are marked &quot;Removed from the plan&quot;; nothing is deleted.
           </p>
           <form action={importLessonPlan} className={ui.fieldGrid}>
             <Field label="Subject">
@@ -110,17 +122,24 @@ export default async function LessonLibraryPage({ searchParams }: Props) {
               {terms.map((t) => (
                 <Link key={t} href={link({ term: t })} className={t === term ? ui.primaryButton : ui.button}>Term {t}</Link>
               ))}
-              <span className={ui.muted}>{rows.length} lessons · {ready} of {allHw.length} worksheets uploaded</span>
+              <span className={ui.muted}>
+                {rows.length - removedCount} lessons · {ready} of {allHw.length} worksheets uploaded
+                {removedCount > 0 && <> · {removedCount} removed from the plan</>}
+              </span>
             </div>
+            {trackerReady && !hasClassNo && (
+              <p className={ui.muted}>No lesson in this term has a Class No. Add a <strong>Class No.</strong> column to the spreadsheet
+                and import it again to use the Lesson Tracker.</p>
+            )}
             <div className={ui.tableWrap}>
               <table className={ui.table}>
-                <thead><tr><th>Module</th><th>Code</th><th>Lesson</th><th>Hw-1</th><th>Hw-2</th><th>Hw-3</th></tr></thead>
+                <thead><tr><th>Module</th><th>Code</th><th>Lesson</th><th>Hw-1</th><th>Hw-2</th><th>Hw-3</th>{trackerReady && <th>Class No.</th>}</tr></thead>
                 <tbody>
                   {rows.map((l, i) => (
-                    <tr key={l.id}>
+                    <tr key={l.id} className={l.active === false ? ui.muted : undefined}>
                       <td>{i === 0 || rows[i - 1].module !== l.module ? <strong>{l.module}</strong> : ''}</td>
                       <td>{l.code}</td>
-                      <td>{l.name}</td>
+                      <td>{l.name}{l.active === false && <> <em>(removed from the plan)</em></>}</td>
                       {[1, 2, 3].map((slot) => {
                         const h = l.lesson_homework.find((x) => x.slot === slot);
                         if (!h) return <td key={slot}>—</td>;
@@ -132,6 +151,7 @@ export default async function LessonLibraryPage({ searchParams }: Props) {
                           </td>
                         );
                       })}
+                      {trackerReady && <td>{l.class_no != null ? `Class ${l.class_no}` : '—'}</td>}
                     </tr>
                   ))}
                 </tbody>

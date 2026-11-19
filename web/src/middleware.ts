@@ -4,7 +4,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 type CookieList = { name: string; value: string; options: CookieOptions }[];
 
 // Pages anyone can open without signing in.
-const PUBLIC_PATHS = ['/login', '/auth', '/h/'];
+// /api/cron/: Vercel Cron, which checks its own secret (CRON_SECRET) instead of a login.
+const PUBLIC_PATHS = ['/login', '/auth', '/h/', '/api/cron/'];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

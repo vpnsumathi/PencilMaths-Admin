@@ -68,7 +68,9 @@ export async function createBatch(form: FormData) {
 
   const problem = !subjectId ? 'Choose a subject.'
     : !YEARS.includes(yearGroup) ? 'Choose a year group.'
-    : commonProblem(common) ?? (typeof slots === 'string' ? slots : null);
+    : commonProblem(common) ?? (typeof slots === 'string' ? slots : null)
+      ?? (text(form, 'next') === 'tracker' && slots.length === 0
+        ? 'Add at least one weekly class time: the Lesson Tracker plans the classes on those days.' : null);
   if (problem) redirectWith('/batches/new', 'error', problem);
 
   const supabase = await createClient();
@@ -87,6 +89,8 @@ export async function createBatch(form: FormData) {
 
   revalidatePath('/batches');
   revalidatePath('/');
+  // "Create batch and set Lesson Tracker": straight to the lesson plan with dates, with Set Lesson Tracker open.
+  if (text(form, 'next') === 'tracker') redirectWith(`/batches/${batchId}/lesson-tracker?set=1`, 'ok', 'Batch created. Now set its Lesson Tracker.');
   redirectWith(`/batches/${batchId}`, 'ok', 'Batch created.');
 }
 

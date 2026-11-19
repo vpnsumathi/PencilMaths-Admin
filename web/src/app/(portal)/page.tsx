@@ -4,6 +4,7 @@ import {
   AlertIcon, ClipboardCheckIcon, MailIcon, UsersIcon,
 } from '@/components/icons';
 import { getViewer } from '@/lib/auth';
+import { checkAfterPage } from '@/lib/meetCheck';
 import { BarChart } from './_dashboard/BarChart';
 import { loadDashboard, NEW_DAYS, type AttentionItem } from './_dashboard/data';
 import { HomeworkPanel, HomeworkPanelLoading } from './_dashboard/HomeworkPanel';
@@ -34,6 +35,8 @@ export default async function Dashboard() {
   const firstName = viewer?.fullName.split(' ')[0] ?? '';
   const attention = teacher ? d.attention.filter((a) => a.kind !== 'enquiry') : d.attention;
   const longDate = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/London' });
+  // Once the page is sent: check a few finished classes with Google Meet that nobody looked at (guide 21, section 15).
+  checkAfterPage();
 
   return (
     <>

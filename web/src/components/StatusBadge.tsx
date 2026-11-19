@@ -12,6 +12,12 @@ const TONES: Record<string, string> = {
   on_leave: ui.badgeMuted,
   closed: ui.badgeMuted,
   left: ui.badgeDanger,
+  // Lesson Tracker
+  early: ui.badgeOk,
+  on_time: ui.badgeOk,
+  late: ui.badgeDanger,
+  overdue: ui.badgeDanger,
+  due_today: ui.badgeLive,
 };
 
 export function StatusBadge({ status, label }: { status: string; label: string }) {

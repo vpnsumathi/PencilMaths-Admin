@@ -18,7 +18,7 @@ export default async function ResetPassword({ searchParams }: { searchParams: Pr
     <main className={styles.page}>
       <section className={styles.card}>
         {/* Logo file: web/public/logo.png (a copy is kept in the Logo folder at the top of the project). */}
-        <Image src="/logo.png" alt="Pencil Maths" width={181} height={60} priority className={styles.logo} />
+        <Image src="/logo.png" alt="PencilMaths" width={181} height={60} priority className={styles.logo} />
         <h1 className={styles.title}>Choose your password</h1>
         <p className={styles.subtitle}>
           For {user.email}. Use at least 8 characters. You&apos;ll sign in with your email and this password.

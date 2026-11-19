@@ -145,7 +145,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
     ...(teacher ? [] : [{ id: 'batch-settings', label: 'Batch settings' }]),
   ];
 
-  // Students and Homework (the everyday work) start open; the other sections start closed and open when needed.
+  // Every section starts closed (since 19 Nov 2026), so the page opens short; press one, use the section bar or Expand all.
   // Each section remembers being opened or closed for the rest of the visit.
   return (
     <>
@@ -163,7 +163,8 @@ export default async function BatchPage({ params, searchParams }: Props) {
           </p>
         </div>
         <div className={ui.formActions}>
-          <Link href={`/attendance?batch=${batch.id}`} className={ui.button}>Attendance List</Link>
+          <Link href={`/attendance?batch=${batch.id}`} className={ui.secondaryButton}>Attendance List</Link>
+          {usesLibrary && <Link href={`/batches/${batch.id}/lesson-tracker`} className={ui.secondaryButton}>Lesson plan with dates</Link>}
           {joinHref && !batch.closed_on && (
             <a href={joinHref} target="_blank" rel="noopener noreferrer" className={ui.primaryButton}>
               {meetNow ? 'Join class (Meet)' : 'Join class'}
@@ -175,7 +176,7 @@ export default async function BatchPage({ params, searchParams }: Props) {
 
       <SectionNav links={sections} />
 
-      <Section id="students" title="Students" defaultOpen
+      <Section id="students" title="Students"
         summary={`${students.length} of ${batch.capacity} places used`}>
         {students.length === 0 ? (
           <p className={ui.empty}>{teacher ? 'No students in this batch yet.' : <>No students yet. Add them from a student&apos;s page.</>}</p>

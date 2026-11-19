@@ -39,6 +39,17 @@
 .history summary { cursor: pointer; width: fit-content; }
 .history ul { margin: 4px 0 0; padding-left: 18px; }
 
+/* The check-in from Google Meet above the attendance: what Meet said, the teacher's join, Refresh from Meet. */
+.meetCheck {
+  display: grid; gap: 8px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+  font-size: 13px; background: var(--surface);
+}
+.meetCheck p { margin: 0; }
+.meetRow { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; }
+.meetRow > p { flex: 1 1 260px; }
+.correctForm { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.correctForm input[name='reason'] { flex: 1 1 220px; }
+
 @media (min-width: 768px) {
   .register li { grid-template-columns: minmax(160px, 1fr) minmax(200px, 1.4fr) auto; }
 }

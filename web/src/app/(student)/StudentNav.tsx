@@ -5,11 +5,12 @@ import { usePathname } from 'next/navigation';
 import nav from './nav.module.css';
 import styles from './student.module.css';
 
-// short: the label on phones, where the four tabs share one row.
+// short: the label on phones, where the tabs share one row.
 const LINKS = [
   { href: '/me', label: 'Dashboard' },
   { href: '/me/classes', label: 'Classes' },
   { href: '/me/homework', label: 'Homework' },
+  { href: '/me/lesson-plan', label: 'Lesson Plan', short: 'Plan' },
   { href: '/me/notes', label: 'Class Notes/Documents', short: 'Notes' },
 ];
 

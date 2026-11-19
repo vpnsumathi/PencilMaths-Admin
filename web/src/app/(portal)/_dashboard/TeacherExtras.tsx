@@ -30,7 +30,7 @@ export async function TeacherExtras() {
                 <strong>Take attendance: {r.code} · {shortWhen(r.starts_at)}</strong>
                 <span>{r.students.map((s) => s.name).join(', ')} · {r.subject}</span>
               </span>
-              <span className={`${styles.pill} ${styles.danger}`}>To mark</span>
+              <span className={`${styles.pill} ${styles.danger}`}>Mark attendance</span>
             </Link>
           </li>
         ))}

@@ -1,5 +1,5 @@
 // Small helpers for showing values on screen.
-import { yearLabel } from './options';
+import { yearLabel } from './options.ts';
 
 // "2026-10-07" → "7 Oct 2026". Date-only values are read as UTC so they never shift by a day.
 export function formatDate(value: string | null | undefined) {

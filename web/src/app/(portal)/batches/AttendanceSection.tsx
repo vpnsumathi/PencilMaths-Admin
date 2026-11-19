@@ -1,12 +1,17 @@
 import Link from 'next/link';
 import { Section } from '@/components/Section';
 import ui from '@/components/ui.module.css';
+import { getViewer } from '@/lib/auth';
 import { ATTENDANCE_LABEL, markLabel, shiftTime, type ClassWindow } from '@/lib/classLink';
 import { formatClock, formatDate, formatDay, formatTime } from '@/lib/format';
+import { classTimes } from '@/lib/liveClass';
+import { syncClass } from '@/lib/meetCheck';
 import { todayInUk } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import styles from './attendance.module.css';
 import { saveRegister } from './classActions';
+import { correctTeacherAttendanceAction, refreshMeetCheckAction } from './meetActions';
+import { MeetCheckBox, type MeetCheck, type TeacherRecord } from './MeetCheckBox';
 import { RegisterButton } from './RegisterButton';
 
 // What batch_register() returns (supabase/migrations/20261111000001_class_link_attendance.sql).
@@ -25,14 +30,21 @@ type Register = {
   window: ClassWindow;
 };
 
-// How an entry got its status, in words, for the middle column.
-function how(s: Entry) {
-  const joined = s.joined_at ? `checked in on the portal at ${formatClock(s.joined_at)}` : '';
+// How an entry got its status, in words, for the middle column. meetAt: when Google Meet first saw them in the
+// class's call (guide 21, section 15). meetSees: Meet saw this class's call, so a press alone is not enough.
+function how(s: Entry, meetAt: string | null, meetSees: boolean) {
+  const pressed = s.joined_at ? `pressed Join class at ${formatClock(s.joined_at)}` : '';
+  const inMeet = meetAt ? `in the Meet call from ${formatClock(meetAt)}` : '';
   const gone = s.in_batch ? '' : ' · no longer in this batch';
   if (!s.status) return `Not marked yet${gone}`;
-  if (s.source === 'auto') return `Has not checked in${gone}`;
-  if (s.source === 'link') return `${markLabel(s.status, s.source)} on the portal at ${formatClock(s.joined_at)} · not confirmed${gone}`;
-  return `Set by ${s.marked_by ?? 'staff'}${joined ? ` · ${joined}` : ''}${gone}`;
+  if (s.source === 'auto') {
+    return pressed ? `Has not checked in · ${pressed}, but Google Meet didn't see them in the call${gone}` : `Has not checked in${gone}`;
+  }
+  if (s.source === 'link') {
+    if (meetAt) return `${markLabel(s.status, s.source, true)} · ${inMeet} · not confirmed${gone}`;
+    return `${markLabel(s.status, s.source, false)} · ${pressed || 'pressed Join class'}${meetSees ? ' · not seen in the Meet call yet' : ''} · not confirmed${gone}`;
+  }
+  return `Set by ${s.marked_by ?? 'staff'}${[pressed, inMeet].filter(Boolean).map((b) => ` · ${b}`).join('')}${gone}`;
 }
 
 // The attendance register of one class day: who checked in on the portal, and Present / Late / Absent for staff or
@@ -44,8 +56,28 @@ export async function AttendanceSection({ batchId, classDate }: { batchId: strin
   // Only a real date that isn't in the future; anything else shows today.
   const date = classDate && /^\d{4}-\d{2}-\d{2}$/.test(classDate) && classDate <= today ? classDate : today;
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc('batch_register', { p_batch: batchId, p_date: date });
+  // The batch page has already read the batch with the viewer's own rules, so they may see it: check this class with
+  // Google Meet first (at most every 2 minutes; not again once it is final), so the marks below are up to date.
+  const viewer = await getViewer();
+  await syncClass({ kind: 'batch', batchId, date });
+  const [{ data, error }, { data: meetMarks }, { data: check }, { data: record }, { data: room }] = await Promise.all([
+    supabase.rpc('batch_register', { p_batch: batchId, p_date: date }),
+    supabase.from('class_sessions').select('attendance(student_id, meet_joined_at)').eq('batch_id', batchId).eq('class_date', date).maybeSingle(),
+    supabase.from('meet_checks').select('state, problem, unknown_guests, final, checked_at').eq('batch_id', batchId).eq('class_date', date).maybeSingle(),
+    supabase.from('teacher_class_attendance')
+      .select('id, starts_at, first_join, last_leave, minutes, drops, meet_status, status, source, reason, teachers(first_name, last_name)')
+      .eq('batch_id', batchId).eq('class_date', date).maybeSingle(),
+    supabase.from('batch_meet_rooms').select('batch_id').eq('batch_id', batchId).maybeSingle(),
+  ]);
   const register = data as Register | null;
+  // Before 20261119000002_meet_check_in.sql has run these come back empty, and the page works as before.
+  const meetAt = new Map((((meetMarks?.attendance ?? []) as { student_id: string; meet_joined_at: string | null }[]))
+    .map((a) => [a.student_id, a.meet_joined_at]));
+  const meetCheck = (check ?? null) as MeetCheck;
+  const meetSees = meetCheck?.state === 'seen';
+  const teacherRecord = (record ?? null) as (TeacherRecord & { teachers: { first_name: string; last_name: string } | null }) | null;
+  const opened = Boolean(register?.start_time)
+    && classTimes(date, register!.start_time!.slice(0, 5), register!.window).opens.getTime() <= Date.now();
   // For the section header: the latest class with a register.
   const last = register?.recent[0];
   const summary = !register ? 'Not available yet'
@@ -87,13 +119,22 @@ export async function AttendanceSection({ batchId, classDate }: { batchId: strin
           <p className={ui.hint} style={{ margin: '0 0 8px' }}>
             <strong>{formatDate(date)}{date === today ? ' (today)' : ''}</strong>
             {register.start_time
-              ? <> · class time {formatTime(register.start_time)}. A student who presses Join class between{' '}
+              ? <> · class time {formatTime(register.start_time)}. A student who joins the class&apos;s Google Meet call between{' '}
                   {formatTime(shiftTime(register.start_time, -register.window.before_minutes))} and{' '}
-                  {formatTime(shiftTime(register.start_time, register.window.after_minutes))} is marked Present, or Late after{' '}
-                  {formatTime(shiftTime(register.start_time, register.window.late_minutes))}.</>
+                  {formatTime(shiftTime(register.start_time, register.window.after_minutes))} is checked in as Present, or Late after{' '}
+                  {formatTime(shiftTime(register.start_time, register.window.late_minutes))} (their first join counts).
+                  Pressing Join class checks them in straight away; when Meet saw the call, a press with no join in it
+                  doesn&apos;t count once the class is over.</>
               : <> · no class is planned on this day. You can still take attendance by hand.</>}
             {!register.session_id && register.class_day && <> No attendance yet for this day.</>}
           </p>
+
+          {register.start_time && (
+            <MeetCheckBox check={meetCheck} hasRoom={Boolean(room)} opened={opened}
+              teacherName={teacherRecord?.teachers ? `${teacherRecord.teachers.first_name} ${teacherRecord.teachers.last_name}` : null}
+              record={teacherRecord} canRefresh={Boolean(viewer)} canCorrect={viewer?.kind === 'staff'}
+              hidden={{ batch_id: batchId, class_date: date }} refreshAction={refreshMeetCheckAction} correctAction={correctTeacherAttendanceAction} />
+          )}
 
           {register.students.length === 0 ? (
             <p className={ui.empty}>No students in this batch.</p>
@@ -106,7 +147,7 @@ export async function AttendanceSection({ batchId, classDate }: { batchId: strin
                   <li key={s.id}>
                     <input type="hidden" name="student" value={s.id} />
                     <strong>{s.first_name} {s.last_name}</strong>
-                    <span className={styles.how}>{how(s)}</span>
+                    <span className={styles.how}>{how(s, meetAt.get(s.id) ?? null, meetSees)}</span>
                     <div className={styles.markCell}>
                     <fieldset className={styles.choices}>
                       <legend className={ui.srOnly}>Attendance for {s.first_name} {s.last_name}</legend>

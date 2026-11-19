@@ -16,7 +16,7 @@ export const KIND_LABEL: Record<ExtraKind, string> = {
   catch_up: 'Catch-up', extra_practice: 'Extra practice', exam_prep: 'Exam prep', other: 'Other',
 };
 export const STATUS_LABEL: Record<ExtraStatus, string> = {
-  upcoming: 'Upcoming', live: 'Live now', to_mark: 'To mark', done: 'Done', no_show: 'No-show', cancelled: 'Cancelled',
+  upcoming: 'Upcoming', live: 'Live now', to_mark: 'Mark attendance', done: 'Done', no_show: 'No-show', cancelled: 'Cancelled',
 };
 export const ASKED_BY: Record<AskedBy, string> = { family: 'Family', teacher: 'Teacher', office: 'Office' };
 // How long a class can be on the form (the database allows 15 to 180 minutes, in steps of 5).
@@ -120,10 +120,10 @@ export type TeacherChange = {
 
 // ---------- Words for marks and results ----------
 // One student's result on a class, in words: "Present", "Checked in", "Not marked" …
-export function resultText(mark: Mark | null, source: Source | null, cancelled = false) {
+export function resultText(mark: Mark | null, source: Source | null, cancelled = false, fromMeet?: boolean) {
   if (cancelled) return 'Cancelled';
   if (!mark) return 'Not marked';
-  return markLabel(mark, source);
+  return markLabel(mark, source, fromMeet);
 }
 // Colour key for a result (see the .r* classes in extra.module.css).
 export function resultTone(mark: Mark | null, source: Source | null, cancelled = false) {

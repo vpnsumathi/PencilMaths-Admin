@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { Alerts } from '@/components/Alerts';
 import ui from '@/components/ui.module.css';
+import { checkAfterPage } from '@/lib/meetCheck';
 import { loadLive, loadSchedule, type Live, type TodayClass, type WeekSlot } from '@/lib/classSchedule';
 import { KIND_LABEL, ukClock, ukClock24, ukDate, type ListRow } from '@/lib/extraClasses';
 import { clock12 } from '@/lib/format';
@@ -29,13 +31,11 @@ export async function TeacherSchedule({ teacherId, params = {} }: { teacherId: s
   const clashes = findClashes(s.week, extras);
   // Only a class of this teacher's today can be opened (?class= of another batch is ignored).
   const chosen = UUID.test(params.class ?? '') ? s.today.find((c) => c.batchId === params.class) ?? null : null;
-  const viewer = { kind: 'teacher' as const, teacherId };
-  const [live, detail] = await Promise.all([
-    Promise.all(onNow.map((c) => loadLive(c, viewer))),
-    chosen && !onNow.includes(chosen) ? loadLive(chosen, viewer) : Promise.resolve(null),
-  ]);
-  const shown = chosen ? (detail ?? live[onNow.indexOf(chosen)]) : null;
   const updatedAt = new Date().toISOString();
+  const next = todayItems.find((c) => c.state === 'later');
+  const nextLine = next ? ` Your next class today: ${clock12(next.time)} ${next.title}.` : '';
+  // Nothing on now: still catch up on finished classes nobody looked at, once the page is sent (guide 21, section 15).
+  if (onNow.length === 0 && extrasOn.length === 0 && !chosen) checkAfterPage();
 
   return (
     <>
@@ -61,25 +61,22 @@ export async function TeacherSchedule({ teacherId, params = {} }: { teacherId: s
             </div>
           )}
 
-          <section className={styles.block} aria-labelledby="live-title">
-            <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
-            {onNow.length === 0 && extrasOn.length === 0 ? (
-              <p className={ui.empty}>
-                No class on right now.
-                {(() => {
-                  const next = todayItems.find((c) => c.state === 'later');
-                  return next ? ` Your next class today: ${clock12(next.time)} ${next.title}.` : '';
-                })()}
-              </p>
-            ) : (
-              <div className={styles.cards}>
-                {onNow.map((c, i) => <BatchNow key={c.batchId + c.time} c={c} date={s.date} live={live[i]} selected={chosen?.batchId === c.batchId} />)}
-                {extrasOn.map((r) => <ExtraNow key={r.id} r={r} />)}
-              </div>
-            )}
-          </section>
-
-          {shown && chosen && <Details live={shown} cls={chosen} date={s.date} forTeacher />}
+          {/* The classes on now wait for Google Meet, so they come in on their own: today and the week show at once. */}
+          {onNow.length === 0 && extrasOn.length === 0 && !chosen ? (
+            <section className={styles.block} aria-labelledby="live-title">
+              <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
+              <p className={ui.empty}>No class on right now.{nextLine}</p>
+            </section>
+          ) : (
+            <Suspense fallback={(
+              <section className={styles.block} aria-labelledby="live-title" aria-busy="true">
+                <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
+                <p className={ui.empty}>Asking Google Meet who is in the call…</p>
+              </section>
+            )}>
+              <TeacherLiveNow teacherId={teacherId} onNow={onNow} extrasOn={extrasOn} chosen={chosen} date={s.date} nextLine={nextLine} />
+            </Suspense>
+          )}
 
           <section className={styles.block} aria-labelledby="today-title">
             <h2 id="today-title" className={styles.blockTitle}>Today · {WEEKDAYS[s.weekday]}</h2>
@@ -162,6 +159,40 @@ function fromExtra(r: ListRow): Item {
 // A weekly class on now: Join class opens the batch's Meet room (at class time only, checked again by the server);
 // without a room the batch page has the class link. Open attendance goes to today's attendance on the batch page.
 // Who is in the call opens the class's details (who Meet sees, and This is… for anyone it couldn't match).
+// Live now and one class's details: these ask Google Meet (each class gives up after 10 seconds, lib/meetCalls.ts).
+async function TeacherLiveNow({ teacherId, onNow, extrasOn, chosen, date, nextLine }: {
+  teacherId: string; onNow: TodayClass[]; extrasOn: ListRow[]; chosen: TodayClass | null; date: string; nextLine: string;
+}) {
+  const viewer = { kind: 'teacher' as const, teacherId };
+  const [live, detail] = await Promise.all([
+    Promise.all(onNow.map((c) => loadLive(c, viewer))),
+    chosen && !onNow.includes(chosen) ? loadLive(chosen, viewer) : Promise.resolve(null),
+  ]);
+  const shown = chosen ? (detail ?? live[onNow.indexOf(chosen)]) : null;
+  // Once the page is sent: save what Meet saw in the classes on now (check-in from Meet, at most every 2 minutes),
+  // then catch up on finished classes nobody looked at (guide 21, section 15).
+  checkAfterPage([
+    ...live.filter((l) => l.status === 'ok').map((l) => ({ kind: 'batch' as const, batchId: l.batchId, date })),
+    ...extrasOn.filter((r) => r.has_meet_room).map((r) => ({ kind: 'extra' as const, id: r.id })),
+  ]);
+  return (
+    <>
+      <section className={styles.block} aria-labelledby="live-title">
+        <h2 id="live-title" className={styles.blockTitle}>Live now</h2>
+        {onNow.length === 0 && extrasOn.length === 0 ? (
+          <p className={ui.empty}>No class on right now.{nextLine}</p>
+        ) : (
+          <div className={styles.cards}>
+            {onNow.map((c, i) => <BatchNow key={c.batchId + c.time} c={c} date={date} live={live[i]} selected={chosen?.batchId === c.batchId} />)}
+            {extrasOn.map((r) => <ExtraNow key={r.id} r={r} />)}
+          </div>
+        )}
+      </section>
+      {shown && chosen && <Details live={shown} cls={chosen} date={date} forTeacher />}
+    </>
+  );
+}
+
 function BatchNow({ c, date, live, selected }: { c: TodayClass; date: string; live: Live; selected: boolean }) {
   const meetKnown = live.status === 'ok' || live.status === 'no_call';
   return (
