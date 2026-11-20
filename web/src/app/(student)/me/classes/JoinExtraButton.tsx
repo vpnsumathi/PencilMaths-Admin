@@ -11,12 +11,13 @@ function Label() {
 
 // Join an extra class at join time (from 15 minutes before the start to the end). Pressing it checks the student
 // in and opens the class's Google Meet room. Pressing it twice does no harm: the first press is the one that counts.
-export function JoinExtraButton({ id, back = '/me/classes' }: { id: string; back?: '/me' | '/me/classes' }) {
+// className: the button's look where the page wants its own (the home page's Up next card).
+export function JoinExtraButton({ id, back = '/me/classes', className }: { id: string; back?: '/me' | '/me/classes'; className?: string }) {
   return (
     <form action={joinExtraClass} className={styles.joinForm}>
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="back" value={back} />
-      <button className={styles.join}><Label /></button>
+      <button className={className ?? styles.join}><Label /></button>
     </form>
   );
 }

@@ -1,0 +1,80 @@
+/* Student area on phones (600px wide or less): a slim top bar with an account button, and a tab bar along the
+   bottom of the screen. Bigger screens keep the tabs in the top bar and never see these (guide 12, section 3.1). */
+
+.desktop { display: contents; } /* the name, Password and Sign out in the top bar, on bigger screens */
+.menu, .bottom { display: none; }
+
+@media (max-width: 600px) {
+  /* Doubled class: wins over .nav in student.module.css whichever file loads first. */
+  .desktop, .desktopNav.desktopNav { display: none; }
+
+  /* Room under the page for the bottom bar, and for the iPhone home bar. Doubled class: wins over .main's padding. */
+  .mainPad.mainPad { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .logo { height: 34px; width: auto; }
+  .bar.bar { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: 8px; }
+
+  /* ---------- Account button and its menu ---------- */
+  .menu { display: block; position: relative; }
+  .account {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px 0 6px;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+    font-weight: 600; color: var(--text); cursor: pointer; list-style: none; user-select: none;
+  }
+  .account::-webkit-details-marker { display: none; }
+  .account:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-ring); }
+  .menu[open] .account { border-color: var(--brand); }
+  .avatar {
+    display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--brand); color: #fff; font-size: 14px; font-weight: 700;
+  }
+  .accountName { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .panel {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: min(300px, calc(100vw - 24px));
+    padding: 8px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+    box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.25);
+  }
+  .signedIn { margin: 0; padding: 8px 10px 10px; font-size: 14px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .signedIn strong { display: block; color: var(--text); font-size: 16px; }
+  .switch { display: grid; gap: 6px; padding: 10px; border-bottom: 1px solid var(--border); }
+  .switchLabel { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .switch select { width: 100%; max-width: none; min-height: 44px; }
+  .menuItem {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 0 10px;
+    border: 0; border-radius: 12px; background: none; color: var(--text);
+    font: inherit; font-weight: 600; text-decoration: none; text-align: left; cursor: pointer;
+  }
+  .menuItem svg { color: var(--muted); flex: none; }
+  .menuItem:hover, .menuItem:focus-visible { outline: none; background: var(--bg); }
+  .menuItems { display: grid; padding-top: 6px; }
+
+  /* ---------- Bottom tab bar ---------- */
+  .bottom {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    padding: 0 max(0px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(0px, env(safe-area-inset-left));
+    background: var(--surface); border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 16px -8px rgba(15, 23, 42, 0.12);
+  }
+  .bottomTab {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-height: 58px; color: var(--muted); font-size: 12px; font-weight: 600; text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottomTab:focus-visible { outline: none; background: var(--brand-ring); }
+  .bottomTabOn { color: var(--brand); }
+  /* A short line above the open tab. */
+  .bottomTabOn::before {
+    content: ''; position: absolute; top: 0; left: 25%; right: 25%; height: 3px;
+    border-radius: 0 0 3px 3px; background: var(--brand);
+  }
+  .bottomBadge {
+    position: absolute; top: 5px; left: calc(50% + 6px); min-width: 18px; padding: 0 5px; border-radius: 999px;
+    background: var(--danger); color: #fff; font-size: 11px; line-height: 18px; text-align: center;
+  }
+}
+
+/* Phone keyboard open (the screen gets short): hide the bottom bar so the message box has room. */
+@media (max-width: 600px) and (max-height: 440px) {
+  .bottom { display: none; }
+}

@@ -48,6 +48,8 @@ export default async function MyClasses({ searchParams }: { searchParams: Promis
                     {c.batch_code ? `Class ${c.batch_code}` : 'Class not chosen yet'}
                   </h2>
                   <p className={styles.muted}>Teacher: <strong className={styles.strong}>{c.teacher ?? 'To be confirmed'}</strong></p>
+                  {/* On phones the Lesson plan isn't in the bottom tab bar, so each class links to its own. */}
+                  <Link href={`/me/lesson-plan?subject=${encodeURIComponent(c.subject)}`} className={styles.planLink}>Lesson plan →</Link>
                 </div>
                 <div className={styles.pills}>
                   {now && <p className={`${styles.nextPill} ${styles.nowPill}`}>{now.label}</p>}
@@ -110,9 +112,9 @@ export default async function MyClasses({ searchParams }: { searchParams: Promis
                 <Link href="/me/homework" className={`${styles.stat} ${styles.statLinkable}`}>
                   <span className={styles.statLabel}>Homework</span>
                   <span className={`${styles.statBig} ${c.to_do > 0 ? styles.overdue : styles.marked}`}>
-                    {c.to_do > 0 ? c.to_do : '✓'}<span className={styles.statOf}>{c.to_do > 0 ? ' to hand in' : ' all handed in'}</span>
+                    {c.to_do > 0 ? c.to_do : '✓'}<span className={styles.statOf}>{c.to_do > 0 ? ' to submit' : ' all submitted'}</span>
                   </span>
-                  <span className={styles.statSub}>{c.marked > 0 ? `${c.marked} marked` : 'Nothing marked yet'}</span>
+                  <span className={styles.statSub}>{c.marked > 0 ? `${c.marked} corrected` : 'Nothing corrected yet'}</span>
                   <span className={styles.tileLink}>Open My homework →</span>
                 </Link>
               </div>

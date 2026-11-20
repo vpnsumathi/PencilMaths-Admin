@@ -109,8 +109,9 @@ export default async function MyHomework({ searchParams }: { searchParams: Promi
 
       {tab === 'todo' && <>
       {toDo.length === 0 && <p className={styles.muted}>Nothing to submit right now. 🎉</p>}
+      {/* id: the home page's Submit buttons open the page at this homework (#hw-…). */}
       {toDo.map((h) => (
-        <article key={h.sheet_id} className={styles.card} style={{ marginBottom: 12 }}>
+        <article key={h.sheet_id} id={`hw-${h.sheet_id}`} className={`${styles.card} ${styles.anchor}`} style={{ marginBottom: 12 }}>
           <p className={styles.subject}>{h.subject}</p>
           <h3>{h.title}</h3>
           <Sheets h={h} />

@@ -14,11 +14,12 @@ function Label({ checkIn }: { checkIn: boolean }) {
 // then opens Google Classroom. At other times it says "Open classroom" and only opens the class. Either way the
 // database decides whether a press counts, so a page left open past class time can't check anyone in.
 // Pressing it twice does no harm: the first press is the one that counts.
-export function JoinClassButton({ batchId, checkIn }: { batchId: string; checkIn: boolean }) {
+// className: the button's look where the page wants its own (the home page's Up next card).
+export function JoinClassButton({ batchId, checkIn, className }: { batchId: string; checkIn: boolean; className?: string }) {
   return (
     <form action={joinClass} className={styles.joinForm}>
       <input type="hidden" name="batch_id" value={batchId} />
-      <button className={styles.join}><Label checkIn={checkIn} /></button>
+      <button className={className ?? styles.join}><Label checkIn={checkIn} /></button>
     </form>
   );
 }
