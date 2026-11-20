@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { getUserId, getViewer } from '@/lib/auth';
+import { messagesMissing } from '@/lib/messages';
 import { createClient } from '@/lib/supabase/server';
 
 // Every page inside (portal) is for active staff, and for teachers (who see only their own batches and students).
@@ -14,8 +15,17 @@ export default async function PortalLayout({ children }: { children: React.React
     redirect(studentId ? '/me' : '/no-access');
   }
 
+  // Staff: how many conversations have a student message nobody has opened yet (the number on Messages).
+  // One small count; teachers don't message, so they never ask.
+  let unread = 0;
+  if (viewer.kind === 'staff') {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc('office_unread_count');
+    if (error) { if (!messagesMissing(error)) console.error('office_unread_count failed:', error.message); } else unread = data ?? 0;
+  }
+
   return (
-    <AppShell staff={{ full_name: viewer.fullName, role: viewer.kind === 'teacher' ? 'teacher' : viewer.role }}>
+    <AppShell staff={{ full_name: viewer.fullName, role: viewer.kind === 'teacher' ? 'teacher' : viewer.role }} unread={unread}>
       {children}
     </AppShell>
   );

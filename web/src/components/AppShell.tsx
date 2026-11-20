@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { signOut } from '@/app/actions';
 import styles from './AppShell.module.css';
 import {
-  BookIcon, CalendarIcon, CalendarPlusIcon, ClipboardCheckIcon, HomeIcon, LogOutIcon, MailIcon, MenuIcon, PencilIcon, SettingsIcon, ShieldCheckIcon, UploadIcon, UsersIcon, XIcon,
+  BookIcon, CalendarIcon, CalendarPlusIcon, ClipboardCheckIcon, ClipboardListIcon, HomeIcon, LogOutIcon, MailIcon, MenuIcon, MessageIcon, PencilIcon, SettingsIcon, ShieldCheckIcon, UploadIcon, UsersIcon, XIcon,
 } from './icons';
 
 type Staff = { full_name: string; role: string };
@@ -19,8 +19,11 @@ const NAV: NavLink[] = [
   { href: '/teachers', label: 'Teachers', icon: PencilIcon, ready: true },
   { href: '/batches', label: 'Batches', icon: CalendarIcon, ready: true },
   { href: '/attendance', label: 'Attendance', icon: ClipboardCheckIcon, ready: true },
+  { href: '/homework-tracker', label: 'Homework Tracker', icon: ClipboardListIcon, ready: true },
   { href: '/class-schedule', label: 'Class Schedule', icon: CalendarIcon, ready: true },
   { href: '/extra-classes', label: 'Extra classes', icon: CalendarPlusIcon, ready: true },
+  // Messages with students (Help/29). Staff only: teachers do not message (decided 20 Nov 2026).
+  { href: '/messages', label: 'Messages', icon: MessageIcon, ready: true },
   { href: '/enquiries', label: 'Enquiries', icon: MailIcon, ready: true },
 ];
 const ADMIN_NAV: NavLink[] = [
@@ -44,7 +47,8 @@ const TEACHER_NAV: NavLink[] = [
   { href: '/extra-classes', label: 'Extra classes', icon: CalendarPlusIcon, ready: true },
 ];
 
-export function AppShell({ staff, children }: { staff: Staff; children: React.ReactNode }) {
+// unread: conversations with a student message no staff member has opened yet (shown on Messages).
+export function AppShell({ staff, unread = 0, children }: { staff: Staff; unread?: number; children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false); // mobile menu open?
   const links = staff.role === 'teacher' ? TEACHER_NAV : staff.role === 'admin' ? [...NAV, ...ADMIN_NAV] : NAV;
@@ -81,6 +85,9 @@ export function AppShell({ staff, children }: { staff: Staff; children: React.Re
                 <Link href={href} onClick={() => setOpen(false)}
                   className={`${styles.link} ${active ? styles.active : ''}`} aria-current={active ? 'page' : undefined}>
                   <Icon size={18} /> {label}
+                  {href === '/messages' && unread > 0 && (
+                    <span className={styles.badge} aria-label={`${unread} unread`}>{unread > 99 ? '99+' : unread}</span>
+                  )}
                 </Link>
                 {children && inside && children.map((c) => {
                   const childActive = pathname === c.href || pathname.startsWith(`${c.href}/`);
@@ -110,4 +117,4 @@ export function AppShell({ staff, children }: { staff: Staff; children: React.Re
       <main className={styles.main}>{children}</main>
     </div>
   );
-}
+}

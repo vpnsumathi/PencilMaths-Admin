@@ -1,0 +1,14 @@
+.convo { margin-top: 16px; padding: 4px 16px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; max-height: 62vh; overflow-y: auto; }
+.older { display: block; margin: 10px auto 0; text-align: center; font-size: 14px; }
+.reply { display: grid; gap: 6px; margin-top: 12px; }
+.row { display: flex; gap: 10px; align-items: flex-end; }
+.textarea {
+  flex: 1; min-height: 64px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 12px;
+  font: inherit; font-size: 15px; color: var(--text); background: var(--surface); resize: vertical;
+}
+.textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+.send {
+  padding: 10px 18px; border: 0; border-radius: 12px; background: var(--brand); color: #fff; font: inherit; font-weight: 700; cursor: pointer;
+}
+.send:disabled { opacity: 0.6; cursor: default; }
+.count { font-size: 12px; color: var(--muted); }

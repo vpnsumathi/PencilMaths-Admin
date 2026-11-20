@@ -5,7 +5,7 @@ import { CLASS_WINDOW, cleanClassLink, currentClass } from '@/lib/classLink';
 import { dayLabel, KIND_LABEL, ukClock, ukClock24, ukDate, type ListResult } from '@/lib/extraClasses';
 import { createClient } from '@/lib/supabase/server';
 import { ExtraBadge } from '../extra-classes/bits';
-import styles from '../dashboard.module.css';
+import styles from './teacher.module.css';
 
 // The teacher's dashboard box: their next class (or the one on now) with Join class, and the two after it.
 // Weekly batch classes and extra classes (guide 24) sit in the same list; an extra class has the Extra label.

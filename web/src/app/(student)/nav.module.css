@@ -4,3 +4,9 @@
   .long { display: none; }
   .short { display: inline; }
 }
+
+/* The number of new messages on the Messages tab. */
+.badge {
+  display: inline-block; min-width: 20px; margin-left: 6px; padding: 0 6px; border-radius: 999px;
+  background: var(--brand); color: #fff; font-size: 12px; line-height: 20px; text-align: center;
+}

@@ -3,7 +3,7 @@ import ui from '@/components/ui.module.css';
 import { shortWhen, ukClock, type ListResult, type TeacherChange } from '@/lib/extraClasses';
 import { createClient } from '@/lib/supabase/server';
 import { ExtraBadge } from '../extra-classes/bits';
-import styles from '../dashboard.module.css';
+import styles from './teacher.module.css';
 
 // A teacher's dashboard: extra classes to mark (ended, register not saved) and what the office changed in the last
 // 48 hours (booked, moved, cancelled, restored, another teacher, students added or taken off), so a moved class

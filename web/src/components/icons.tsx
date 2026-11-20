@@ -25,6 +25,9 @@ function Icon({ size = 20, children, ...rest }: IconProps) {
 export const MailIcon = (p: IconProps) => (
   <Icon {...p}><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></Icon>
 );
+export const MessageIcon = (p: IconProps) => (
+  <Icon {...p}><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></Icon>
+);
 export const LockIcon = (p: IconProps) => (
   <Icon {...p}><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></Icon>
 );
@@ -74,6 +77,14 @@ export const ClipboardCheckIcon = (p: IconProps) => (
   <Icon {...p}>
     <rect width="8" height="4" x="8" y="2" rx="1" />
     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" />
+  </Icon>
+);
+// Homework Tracker: a clipboard with a list.
+export const ClipboardListIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect width="8" height="4" x="8" y="2" rx="1" />
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    <path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" />
   </Icon>
 );
 export const PencilIcon = (p: IconProps) => (

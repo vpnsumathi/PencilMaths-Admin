@@ -13,6 +13,7 @@ import { createDriveFolder } from '../actions';
 import { AttendanceCard, cardPeriod, type CardPeriod } from '../AttendanceCard';
 import { ExtraClassesCard } from '../ExtraClassesCard';
 import { HandInLink } from '../HandInLink';
+import { MessagesCard } from '../MessagesCard';
 import { PortalAccess } from '../PortalAccess';
 import { StudentNotesCard } from '../StudentNotesCard';
 import { loadStudentFormOptions, StudentForm, type Enrolment, type Guardian, type Student } from '../StudentForm';
@@ -72,7 +73,10 @@ export default async function StudentPage({ params, searchParams }: Props) {
             {formatPercent(stats?.homework_pct)} (last 28 days)
           </p>
         </div>
-        <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
+        <div className={ui.formActions}>
+          <Link href={`/homework-tracker?student=${student.id}`} className={ui.secondaryButton}>Homework Tracker</Link>
+          <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
+        </div>
       </div>
       <Alerts ok={ok} problem={problem} />
       {folder?.provider !== 'google_drive' && (
@@ -101,6 +105,10 @@ export default async function StudentPage({ params, searchParams }: Props) {
       {/* Class notes and documents for this student (guide 22 §9): loads on its own too. */}
       <Suspense fallback={null}>
         <StudentNotesCard studentId={student.id} firstName={student.first_name} teacher={false} />
+      </Suspense>
+      {/* Messages with this student (guide 29), staff only: loads on its own too. */}
+      <Suspense fallback={null}>
+        <MessagesCard studentId={student.id} firstName={student.first_name} />
       </Suspense>
       <StudentForm
         student={student as Student}

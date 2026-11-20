@@ -2,8 +2,19 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
-import type { ChartBar } from './data';
 import styles from './charts.module.css';
+
+// One bar. Moved here from the Dashboard with the subject and year group charts (guide 28).
+export type ChartBar = {
+  key: string;
+  label: string;
+  value: number | null; // null = no data for this bar (drawn as a gap)
+  display: string; // the value as text, e.g. "92%"
+  detail?: string; // extra line in the tooltip
+  href?: string;
+  max?: number; // draws a track behind the bar (e.g. batch capacity)
+  tone?: number; // ordinal colour step 1–5
+};
 
 type Props = {
   bars: ChartBar[];

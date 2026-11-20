@@ -8,6 +8,7 @@ import { checkAfterPage } from '@/lib/meetCheck';
 import { JoinClassButton } from './classes/JoinClassButton';
 import { getMyDashboard } from './myDashboard';
 import { getMyExtras } from './myExtras';
+import { getMyUnread } from './myMessages';
 import { UpcomingCard } from './classes/ExtraClasses';
 import { FocusMessage } from '@/components/FocusMessage';
 
@@ -17,9 +18,10 @@ export const metadata = { title: 'My dashboard' };
 export default async function MyDashboard({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
   // The same answer the layout already asked for (cached), so no second call.
-  const [me, extras] = await Promise.all([
+  const [me, extras, unread] = await Promise.all([
     getMyDashboard() as Promise<Dashboard>, // the layout has already checked this is a student
     getMyExtras(),
+    getMyUnread(), // the same answer the layout asked for (cached)
   ]);
   // Once the page is sent: check the student's own classes today whose check-in has opened with Google Meet, then
   // catch up on finished classes nobody looked at (guide 21, section 15). Nothing waits for Google.
@@ -58,6 +60,15 @@ export default async function MyDashboard({ searchParams }: { searchParams: Prom
       )}
 
       <div className={styles.tiles}>
+        {/* Only when something new has come from PencilMaths (Help/29). */}
+        {unread > 0 && (
+          <Link href="/me/messages" className={`${styles.tile} ${styles.tileLinkable}`}>
+            <p className={styles.subject}>New messages</p>
+            <p className={styles.big}>{unread}</p>
+            <p className={styles.muted}>{unread === 1 ? 'A new message' : `${unread} new messages`} from PencilMaths.</p>
+            <span className={styles.tileLink}>Read and reply →</span>
+          </Link>
+        )}
         <Link href="/me/classes" className={`${styles.tile} ${styles.tileLinkable}`}>
           <p className={styles.subject}>My classes</p>
           <p className={styles.big}>{me.classes.length}</p>

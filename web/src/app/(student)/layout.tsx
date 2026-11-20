@@ -5,6 +5,7 @@ import { signOut } from '@/app/actions';
 import { getUserId } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { getMyDashboard } from './me/myDashboard';
+import { getMyUnread } from './me/myMessages';
 import { StudentNav } from './StudentNav';
 import { StudentSwitcher, type LinkedStudent } from './StudentSwitcher';
 import styles from './student.module.css';
@@ -16,7 +17,8 @@ export default async function StudentLayout({ children }: { children: React.Reac
   // my_dashboard returns nothing for staff, unknown logins and students who have left (the page reuses it).
   // A family login can open several children; my_students lists them.
   const supabase = await createClient();
-  const [me, { data: linked }] = await Promise.all([getMyDashboard(), supabase.rpc('my_students')]);
+  // getMyUnread: the number on the Messages tab, asked for at the same time.
+  const [me, { data: linked }, unread] = await Promise.all([getMyDashboard(), supabase.rpc('my_students'), getMyUnread()]);
   if (!me) redirect('/');
   const name = `${me.first_name} ${me.last_name}`;
   const students = (linked ?? []) as LinkedStudent[];
@@ -28,7 +30,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         <Link href="/me" className={styles.brand} aria-label="PencilMaths: my dashboard">
           <Image src="/logo.png" alt="PencilMaths" width={136} height={45} priority />
         </Link>
-        <StudentNav />
+        <StudentNav unread={unread} />
         {students.length > 1
           ? <StudentSwitcher students={students} />
           : <span className={styles.who} title={`Signed in as ${name}`}>{name}</span>}

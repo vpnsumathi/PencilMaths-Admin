@@ -80,7 +80,10 @@ a.item { cursor: pointer; }
 .table th, .table td { padding: 8px 4px; text-align: left; border-bottom: 1px solid var(--border); }
 .table th { font-weight: 500; }
 
-/* ---------- Sparkline ---------- */
-.spark { display: block; width: 120px; height: 32px; overflow: visible; }
-.spark polyline { fill: none; stroke: #2a78d6; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.spark circle { fill: #2a78d6; stroke: var(--surface); stroke-width: 2; }
+/* ---------- The Students page's folded charts (StudentCharts.tsx) ---------- */
+.charts { margin-top: 16px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+.charts summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.chartPair { display: grid; gap: 24px; margin-top: 16px; }
+.chartPair h2 { margin: 0; font-size: 15px; }
+.chartPair p { margin: 4px 0 48px; font-size: 13px; }
+@media (min-width: 900px) { .chartPair { grid-template-columns: 1fr 1fr; } }

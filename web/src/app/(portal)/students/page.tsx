@@ -8,6 +8,7 @@ import { formatPercent } from '@/lib/format';
 import { STUDENT_STATUSES, yearShort } from '@/lib/options';
 import { createClient } from '@/lib/supabase/server';
 import { MissingFolders } from './MissingFolders';
+import { StudentCharts } from './StudentCharts';
 
 export const metadata = { title: 'Students' };
 
@@ -19,7 +20,7 @@ export default async function StudentsPage({ searchParams }: Props) {
   // student_list is a database view: each student with subjects, teachers, batches and their 28-day stats.
   let query = supabase
     .from('student_list')
-    .select('id, code, first_name, last_name, year_group, status, subjects, teachers, batches, missing_teacher, missing_batch, attendance_pct, homework_pct, created_at, updated_at')
+    .select('id, code, first_name, last_name, year_group, status, subject_ids, subjects, teachers, batches, missing_teacher, missing_batch, attendance_pct, homework_pct, created_at, updated_at')
     .order('last_name')
     .order('first_name');
   // Default view hides students who have left.
@@ -41,7 +42,9 @@ export default async function StudentsPage({ searchParams }: Props) {
     .is('file_links', null)
     .order('last_name')
     .order('first_name');
-  const [teacher, { data: students, error }, { data: missingRows, error: missingError }] = await Promise.all([isTeacher(), query, missingQuery]);
+  const [teacher, { data: students, error }, { data: missingRows, error: missingError }, { data: subjects }] = await Promise.all([
+    isTeacher(), query, missingQuery, supabase.from('subjects').select('id, name').order('sort'),
+  ]);
   if (error) throw error;
   if (missingError) console.error('Students without a Drive folder could not be listed:', missingError.message);
   const missing = teacher ? [] : (missingRows ?? []).map((s) => ({ id: s.id, name: `${s.first_name} ${s.last_name ?? ''}`.trim() }));
@@ -99,6 +102,7 @@ export default async function StudentsPage({ searchParams }: Props) {
           </table>
         </div>
       )}
+      <StudentCharts students={students} subjects={subjects ?? []} />
     </>
   );
 }
