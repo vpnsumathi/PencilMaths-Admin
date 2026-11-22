@@ -165,7 +165,8 @@ export default async function BatchPage({ params, searchParams }: Props) {
         <div className={ui.formActions}>
           <Link href={`/attendance?batch=${batch.id}`} className={ui.secondaryButton}>Attendance List</Link>
           {usesLibrary && <Link href={`/batches/${batch.id}/lesson-tracker`} className={ui.secondaryButton}>Lesson plan with dates</Link>}
-          {!teacher && <Link href={`/homework-tracker?year=${batch.year_group}&batch=${batch.id}`} className={ui.secondaryButton}>Homework Tracker</Link>}
+          {/* Staff and the batch's teacher (who sees only their own batches there too). */}
+          <Link href={`/homework-tracker?year=${batch.year_group}&batch=${batch.id}`} className={ui.secondaryButton}>Homework Tracker</Link>
           {joinHref && !batch.closed_on && (
             <a href={joinHref} target="_blank" rel="noopener noreferrer" className={ui.primaryButton}>
               {meetNow ? 'Join class (Meet)' : 'Join class'}

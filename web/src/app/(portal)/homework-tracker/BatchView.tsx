@@ -12,8 +12,9 @@ import styles from './tracker.module.css';
 // Batch view: one school year (guide 27): tiles for the batch, a tab per term, then students x homework (newest on
 // the left), each cell a letter and colour, and each student's totals for the school year. A cell opens that
 // homework in the Student view. The grid itself is BatchGrid (a client component, for page size).
-export function BatchView({ q, data }: { q: TrackerQuery; data: BatchData }) {
-  if (!data.batch) return <p className={ui.empty}>Batch not found.</p>;
+// teacher: a teacher's own batch (the database only returns their own open batches and the students in them now).
+export function BatchView({ q, data, teacher = false }: { q: TrackerQuery; data: BatchData; teacher?: boolean }) {
+  if (!data.batch) return <p className={ui.empty}>{teacher ? 'This is not one of your open batches.' : 'Batch not found.'}</p>;
   const b = data.batch;
   const term = data.term ?? 0;
   const up = splitUpcoming(data.upcoming, data.today);
@@ -28,7 +29,7 @@ export function BatchView({ q, data }: { q: TrackerQuery; data: BatchData }) {
         <div>
           <h2>{b.code}{b.name ? ` · ${b.name}` : ''} · {b.subject} · {yearLabel(b.year_group)}{b.closed_on ? ' (closed)' : ''}</h2>
           <p>
-            {b.teacher ?? 'No teacher'} · {live ? `${data.students.filter((s) => s.current).length} students now`
+            {teacher ? 'Your batch' : b.teacher ?? 'No teacher'} · {live ? `${data.students.filter((s) => s.current).length} students now`
               : `${data.students.length} students in ${yearText}`}
             {' · '}{b.tracker ? 'Lesson Tracker set' : 'No Lesson Tracker yet'}
           </p>

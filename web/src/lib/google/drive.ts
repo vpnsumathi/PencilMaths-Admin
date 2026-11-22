@@ -127,7 +127,11 @@ export async function fileInfo(fileId: string): Promise<{ id: string; parents?: 
 // Fetches a file's contents (for files this app uploaded). Returns Google's response to pass on.
 export async function downloadFile(fileId: string) {
   const res = await send(`${DRIVE}/files/${encodeURIComponent(fileId)}?alt=media`);
-  if (!res.ok) throw new Error(`Google Drive download error: ${res.status}`);
+  if (!res.ok) {
+    // Google's reason goes in the error (and so in the log), e.g. "404 File not found: …".
+    const reason = (await res.json().catch(() => null))?.error?.message ?? '';
+    throw new Error(`Google Drive download error: ${res.status} ${reason}`.trim());
+  }
   return res;
 }
 

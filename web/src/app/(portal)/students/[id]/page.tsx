@@ -156,7 +156,11 @@ async function TeacherView({ student, period }: { student: Basic; period: CardPe
             {formatPercent(stats?.attendance_pct)} · Homework {formatPercent(stats?.homework_pct)} (last 28 days, your classes)
           </p>
         </div>
-        <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
+        <div className={ui.formActions}>
+          {/* Their homework in your batches only (the database decides). */}
+          <Link href={`/homework-tracker?student=${student.id}`} className={ui.secondaryButton}>Homework Tracker</Link>
+          <StatusBadge status={student.status} label={STUDENT_STATUSES[student.status] ?? student.status} />
+        </div>
       </div>
       <AttendanceCard studentId={student.id} period={period} {...attendance} note="your classes" />
       <Suspense fallback={null}>

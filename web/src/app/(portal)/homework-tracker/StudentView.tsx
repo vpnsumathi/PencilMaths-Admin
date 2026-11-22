@@ -21,7 +21,8 @@ const inYear = (c: StudentClass, year: number) =>
 
 // Student view, one school year (guide 27): who and which classes, tiles and rates, filter chips, then every
 // homework newest first with a heading per month, and (this school year) the homework still to come.
-export function StudentView({ q, data, student }: { q: TrackerQuery; data: StudentData; student: Student }) {
+// teacher: the database only returns the student's classes and homework in the teacher's own batches.
+export function StudentView({ q, data, student, teacher = false }: { q: TrackerQuery; data: StudentData; student: Student; teacher?: boolean }) {
   const live = data.year === 0 || data.year === schoolYearOf(data.today);
   const shows = (Object.keys(SHOW) as Show[]).filter((s) => live || s !== 'upcoming');
   const show: Show = q.show && (shows as string[]).includes(q.show) ? (q.show as Show) : defaultShow(data.rows);
@@ -56,7 +57,7 @@ export function StudentView({ q, data, student }: { q: TrackerQuery; data: Stude
           <h2>{student.first_name} {student.last_name}</h2>
           <p>
             {student.code} · {yearLabel(student.year_group)}
-            {data.classes.length === 0 ? ' · not in any class' : ` · ${yearClasses.map((c) =>
+            {data.classes.length === 0 ? (teacher ? ' · not in your batches now' : ' · not in any class') : ` · ${yearClasses.map((c) =>
               `${c.code} ${c.subject}${c.teacher ? ` (${c.teacher})` : ''}${c.current ? '' : c.to_on ? `, left ${hwDate(c.to_on)}` : ', not in it now'}`).join(' · ')}`}
           </p>
           {chosen?.from_on && q.scope === 'batch' && (
@@ -69,7 +70,7 @@ export function StudentView({ q, data, student }: { q: TrackerQuery; data: Stude
               <Link href={trackerHref(q, { scope: 'batch' })} className={q.scope === 'batch' ? styles.switchOn : undefined}
                 aria-current={q.scope === 'batch' ? 'true' : undefined}>This batch</Link>
               <Link href={trackerHref(q, { scope: 'all' })} className={q.scope === 'all' ? styles.switchOn : undefined}
-                aria-current={q.scope === 'all' ? 'true' : undefined}>All their classes</Link>
+                aria-current={q.scope === 'all' ? 'true' : undefined}>{teacher ? 'All your batches' : 'All their classes'}</Link>
             </nav>
           )}
           {q.batch && q.scope === 'batch' && <Link href={`/batches/${q.batch}#homework`} prefetch={false} className={ui.button}>Batch page</Link>}

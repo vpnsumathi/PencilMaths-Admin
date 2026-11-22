@@ -43,6 +43,7 @@ const TEACHER_NAV: NavLink[] = [
   { href: '/batches', label: 'My batches', icon: CalendarIcon, ready: true },
   { href: '/students', label: 'My students', icon: UsersIcon, ready: true },
   { href: '/attendance', label: 'Attendance', icon: ClipboardCheckIcon, ready: true },
+  { href: '/homework-tracker', label: 'Homework Tracker', icon: ClipboardListIcon, ready: true },
   { href: '/class-schedule', label: 'Class Schedule', icon: CalendarIcon, ready: true },
   { href: '/extra-classes', label: 'Extra classes', icon: CalendarPlusIcon, ready: true },
 ];
