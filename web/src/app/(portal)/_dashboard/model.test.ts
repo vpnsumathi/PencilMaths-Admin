@@ -133,4 +133,8 @@ describe('links and changes', () => {
     assert.equal(change(null, [80]), null);
     assert.equal(change(90, [80, null]), null);
   });
+  it('no trend at all (an empty database) gives no change instead of an error', () => {
+    assert.equal(change(0, null), null);
+    assert.equal(change(0, []), null);
+  });
 });

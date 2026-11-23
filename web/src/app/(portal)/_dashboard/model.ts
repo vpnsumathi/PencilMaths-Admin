@@ -271,9 +271,10 @@ export function itemHref(key: NeedKey, i: NeedItem): string {
 // ---------- Tiles ----------
 export const pct = (part: number, whole: number) => (whole > 0 ? Math.round((100 * part) / whole) : null);
 
-// The change against the last complete week, for the small red or green note. null: nothing to compare.
-export function change(now: number | null, trend: Trend) {
-  const last = trend.at(-1);
+// The change against the last complete week, for the small red or green note. null: nothing to compare
+// (also when there is no trend at all, e.g. an empty database or a teacher with no students yet).
+export function change(now: number | null, trend: Trend | null | undefined) {
+  const last = trend?.at(-1);
   if (now == null || last == null) return null;
   return Math.round(now - last);
 }

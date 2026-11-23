@@ -64,7 +64,7 @@ function Tiles({ d, teacher }: { d: SummaryData; teacher: boolean }) {
 }
 
 type TileProps = {
-  href: string; label: string; value: string; unit?: string; lines: string[]; trend: (number | null)[];
+  href: string; label: string; value: string; unit?: string; lines: string[]; trend: (number | null)[] | null;
   delta?: number | null; max?: number; warn?: boolean; trendLabel?: string;
 };
 function Tile({ href, label, value, unit = '', lines, trend, delta = null, max, warn, trendLabel = 'last 6 weeks' }: TileProps) {
@@ -86,7 +86,9 @@ function Tile({ href, label, value, unit = '', lines, trend, delta = null, max, 
 }
 
 // A tiny trend line: the last 6 complete weeks. Gaps (null) are skipped; the last point gets a dot.
-function Sparkline({ values, max, label }: { values: (number | null)[]; max?: number; label: string }) {
+// No trend at all (null) shows the "Trend after 2 weeks" note rather than breaking the page.
+function Sparkline({ values: given, max, label }: { values: (number | null)[] | null; max?: number; label: string }) {
+  const values = given ?? [];
   const w = 120;
   const h = 28;
   const top = max ?? Math.max(...values.map((v) => v ?? 0), 1);

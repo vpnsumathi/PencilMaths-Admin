@@ -119,6 +119,33 @@ export async function trashFile(fileId: string) {
   });
 }
 
+// Moves several files this app made to the Drive bin (e.g. Lesson library worksheets nothing uses any more), a few at
+// a time. Never throws: a file Google refuses (already gone, made under another Google connection, Google busy) is
+// logged and counted as left. Stops starting new ones after `deadlineMs`, so a big delete finishes within the page's
+// time limit; those are counted as left too. Files stay in the bin for 30 days.
+export async function trashFiles(fileIds: string[], { concurrency = 6, deadlineMs = 40_000 } = {}) {
+  const ids = [...new Set(fileIds.filter(Boolean))];
+  const stopAt = Date.now() + deadlineMs;
+  let next = 0;
+  let binned = 0;
+  let left = 0;
+  async function worker() {
+    while (next < ids.length) {
+      const id = ids[next++];
+      if (Date.now() > stopAt) { left++; continue; }
+      try {
+        await trashFile(id);
+        binned++;
+      } catch (e) {
+        console.error(`Could not move Drive file ${id} to the bin:`, e);
+        left++;
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+  return { binned, left };
+}
+
 // A file's folder and link, to check a browser upload landed where it should.
 export async function fileInfo(fileId: string): Promise<{ id: string; parents?: string[]; webViewLink: string; trashed: boolean }> {
   return drive(`/files/${encodeURIComponent(fileId)}?fields=id,parents,webViewLink,trashed`);
